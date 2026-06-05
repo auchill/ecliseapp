@@ -1,0 +1,250 @@
+:root {
+    --eclise-navy: #0d1321;
+    --eclise-blue: #1677ff;
+    --eclise-sky: #53b1ff;
+    --eclise-gray: #6b7280;
+    --eclise-light: #e5e7eb;
+    --eclise-ink: #111827;
+    --eclise-border: #d8dde8;
+}
+
+body {
+    background: #f8fafc;
+    color: var(--eclise-ink);
+    font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    letter-spacing: 0;
+}
+
+a {
+    color: var(--eclise-blue);
+}
+
+.site-shell {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.navbar {
+    border-bottom: 1px solid rgba(13, 19, 33, 0.08);
+}
+
+.brand-logo {
+    width: 198px;
+    max-height: 52px;
+    object-fit: contain;
+}
+
+.footer-logo {
+    width: 220px;
+    max-width: 100%;
+    height: auto;
+}
+
+.nav-link {
+    font-weight: 600;
+    color: #253044;
+}
+
+.nav-link.active,
+.nav-link:hover {
+    color: var(--eclise-blue);
+}
+
+.btn {
+    border-radius: 8px;
+    font-weight: 700;
+}
+
+.btn-primary {
+    --bs-btn-bg: var(--eclise-blue);
+    --bs-btn-border-color: var(--eclise-blue);
+    --bs-btn-hover-bg: #005fdd;
+    --bs-btn-hover-border-color: #005fdd;
+}
+
+.btn-outline-primary {
+    --bs-btn-color: var(--eclise-blue);
+    --bs-btn-border-color: var(--eclise-blue);
+    --bs-btn-hover-bg: var(--eclise-blue);
+    --bs-btn-hover-border-color: var(--eclise-blue);
+}
+
+.hero {
+    position: relative;
+    min-height: 76vh;
+    color: #fff;
+    background-color: var(--eclise-navy);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+}
+
+.hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(90deg, rgba(13, 19, 33, 0.95), rgba(13, 19, 33, 0.72)), url("/images/brand/logo_large.png");
+    background-repeat: no-repeat;
+    background-position: right 8% center;
+    background-size: min(52vw, 560px);
+}
+
+.hero > .container {
+    position: relative;
+    z-index: 1;
+}
+
+.hero h1 {
+    max-width: 760px;
+    font-size: clamp(2.6rem, 6vw, 5.6rem);
+    line-height: 0.98;
+    letter-spacing: 0;
+}
+
+.hero p {
+    max-width: 700px;
+    color: #dce8fb;
+}
+
+.section-pad {
+    padding: 5rem 0;
+}
+
+.section-pad-sm {
+    padding: 3rem 0;
+}
+
+.surface {
+    background: #fff;
+    border: 1px solid var(--eclise-border);
+    border-radius: 8px;
+    box-shadow: 0 14px 35px rgba(15, 23, 42, 0.06);
+}
+
+.service-icon,
+.metric-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    background: var(--eclise-blue);
+    flex: 0 0 44px;
+}
+
+.eyebrow {
+    color: var(--eclise-blue);
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0;
+}
+
+.muted {
+    color: var(--eclise-gray);
+}
+
+.product-card img,
+.part-card img {
+    width: 100%;
+    height: 190px;
+    object-fit: contain;
+    padding: 1.25rem;
+    background: #f1f5f9;
+}
+
+.admin-nav {
+    background: #0d1321;
+}
+
+.admin-nav .nav-link {
+    color: #dce8fb;
+}
+
+.admin-nav .nav-link:hover,
+.admin-nav .nav-link.active {
+    color: #fff;
+    background: rgba(22, 119, 255, 0.24);
+}
+
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: 999px;
+    padding: 0.35rem 0.7rem;
+    font-size: 0.82rem;
+    font-weight: 800;
+    color: #0b3a72;
+    background: #e5f2ff;
+}
+
+.timeline {
+    border-left: 3px solid var(--eclise-blue);
+    padding-left: 1rem;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 1rem;
+}
+
+.timeline-item::before {
+    content: "";
+    position: absolute;
+    left: -1.45rem;
+    top: 0.35rem;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--eclise-blue);
+    border: 2px solid #fff;
+}
+
+.table > :not(caption) > * > * {
+    vertical-align: middle;
+}
+
+.form-control,
+.form-select {
+    border-radius: 8px;
+    border-color: var(--eclise-border);
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--eclise-blue);
+    box-shadow: 0 0 0 0.2rem rgba(22, 119, 255, 0.16);
+}
+
+.page-header {
+    background: var(--eclise-navy);
+    color: #fff;
+    padding: 4rem 0;
+}
+
+.page-header p {
+    color: #dce8fb;
+}
+
+@media (max-width: 991.98px) {
+    .brand-logo {
+        width: 162px;
+    }
+
+    .hero {
+        min-height: 68vh;
+    }
+
+    .hero::before {
+        background-position: right -80px bottom 30px;
+        background-size: 360px;
+    }
+
+    .section-pad {
+        padding: 3.5rem 0;
+    }
+}
