@@ -46,13 +46,27 @@
                                 <table class="table">
                                     <tbody>
                                         <tr><th scope="row">Customer</th><td>{{ $booking->customer_name }}</td></tr>
+                                        <tr><th scope="row">Device type</th><td>{{ $booking->device_type }}</td></tr>
                                         <tr><th scope="row">Issue</th><td>{{ $booking->issue_category }}</td></tr>
                                         <tr><th scope="row">Description</th><td>{{ $booking->issue_description }}</td></tr>
+                                        <tr><th scope="row">Fulfillment</th><td>{{ $booking->fulfillmentLabel() }}</td></tr>
+                                        <tr><th scope="row">Shipping cost</th><td>${{ number_format($booking->shipping_cost, 2) }}</td></tr>
+                                        <tr><th scope="row">Delivery carrier</th><td>{{ $booking->delivery_carrier ?: 'Not available yet' }}</td></tr>
+                                        <tr><th scope="row">Delivery tracking</th><td>{{ $booking->delivery_tracking_number ?: 'Not available yet' }}</td></tr>
+                                        <tr><th scope="row">Tracking notes</th><td>{{ $booking->tracking_notes ?: 'No tracking notes yet.' }}</td></tr>
                                         <tr><th scope="row">Estimated completion</th><td>{{ $booking->estimated_completion_date?->format('M j, Y') ?? 'To be confirmed' }}</td></tr>
                                         <tr><th scope="row">Notes</th><td>{{ $booking->customer_notes ?: 'No customer notes yet.' }}</td></tr>
                                     </tbody>
                                 </table>
                             </div>
+                            @if ($booking->isShipping())
+                                <h3 class="h5 fw-bold mt-4">Shipping Address</h3>
+                                @foreach ($booking->shippingAddressLines() as $line)
+                                    <div>{{ $line }}</div>
+                                @endforeach
+                            @else
+                                <div class="alert alert-info mt-4">We will notify you when your repaired device is ready for pickup.</div>
+                            @endif
                         </div>
                         <div class="col-lg-6">
                             <h3 class="h5 fw-bold mb-3">Repair Timeline</h3>
@@ -61,6 +75,9 @@
                                     <div class="timeline-item">
                                         <h4 class="h6 mb-1">{{ $update->status }}</h4>
                                         <p class="muted small mb-0">{{ $update->note }}</p>
+                                        @if ($update->delivery_carrier || $update->tracking_number)
+                                            <p class="small mb-0">{{ $update->delivery_carrier }} {{ $update->tracking_number }}</p>
+                                        @endif
                                         <span class="small muted">{{ $update->created_at->format('M j, Y g:i A') }}</span>
                                     </div>
                                 @empty

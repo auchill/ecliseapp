@@ -25,6 +25,16 @@ class StoreRepairBookingRequest extends FormRequest
             'preferred_appointment_date' => ['nullable', 'date', 'after_or_equal:today'],
             'preferred_appointment_time' => ['nullable', 'date_format:H:i'],
             'device_image' => ['nullable', 'image', 'max:4096'],
+            'fulfillment_method' => ['required', 'in:pickup,shipping'],
+            'shipping_full_name' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:255'],
+            'shipping_phone' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:40'],
+            'shipping_email' => ['required_if:fulfillment_method,shipping', 'nullable', 'email', 'max:255'],
+            'shipping_address_line1' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:255'],
+            'shipping_address_line2' => ['nullable', 'string', 'max:255'],
+            'shipping_city' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:120'],
+            'shipping_province' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:120'],
+            'shipping_postal_code' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:40'],
+            'shipping_country' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:120'],
             'terms_accepted' => ['accepted'],
         ];
     }

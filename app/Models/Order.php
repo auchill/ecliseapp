@@ -17,9 +17,15 @@ class Order extends Model
         'Processing',
         'Ready for Pickup',
         'Shipped',
+        'Delivered',
         'Completed',
         'Cancelled',
         'Refunded',
+    ];
+
+    public const FULFILLMENT_METHODS = [
+        'pickup' => 'Store Pickup',
+        'shipping' => 'Shipping',
     ];
 
     protected $fillable = [
@@ -35,6 +41,23 @@ class Order extends Model
         'status',
         'payment_provider',
         'payment_reference',
+        'fulfillment_method',
+        'payment_status',
+        'shipping_full_name',
+        'shipping_phone',
+        'shipping_email',
+        'shipping_address_line1',
+        'shipping_address_line2',
+        'shipping_city',
+        'shipping_province',
+        'shipping_postal_code',
+        'shipping_country',
+        'shipping_cost',
+        'delivery_carrier',
+        'tracking_number',
+        'tracking_notes',
+        'admin_notes',
+        'customer_notes',
         'notes',
     ];
 
@@ -43,6 +66,7 @@ class Order extends Model
         return [
             'subtotal' => 'decimal:2',
             'tax' => 'decimal:2',
+            'shipping_cost' => 'decimal:2',
             'total' => 'decimal:2',
         ];
     }
@@ -55,5 +79,44 @@ class Order extends Model
     public function items(): HasMany
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    public function statusUpdates(): HasMany
+    {
+        return $this->hasMany(OrderStatusUpdate::class)->latest();
+    }
+
+    public function publicStatusUpdates(): HasMany
+    {
+        return $this->hasMany(OrderStatusUpdate::class)
+            ->where('is_customer_visible', true)
+            ->oldest();
+    }
+
+    public function isShipping(): bool
+    {
+        return $this->fulfillment_method === 'shipping';
+    }
+
+    public function fulfillmentLabel(): string
+    {
+        return self::FULFILLMENT_METHODS[$this->fulfillment_method] ?? 'Store Pickup';
+    }
+
+    public function shippingAddressLines(): array
+    {
+        if (! $this->isShipping()) {
+            return [];
+        }
+
+        return array_values(array_filter([
+            $this->shipping_full_name,
+            $this->shipping_address_line1,
+            $this->shipping_address_line2,
+            trim(implode(', ', array_filter([$this->shipping_city, $this->shipping_province, $this->shipping_postal_code]))),
+            $this->shipping_country,
+            $this->shipping_phone ? 'Phone: '.$this->shipping_phone : null,
+            $this->shipping_email ? 'Email: '.$this->shipping_email : null,
+        ]));
     }
 }

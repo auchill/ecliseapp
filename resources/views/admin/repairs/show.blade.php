@@ -31,6 +31,69 @@
                                 <label class="form-label" for="estimated_completion_date">Estimated completion</label>
                                 <input class="form-control" id="estimated_completion_date" name="estimated_completion_date" type="date" value="{{ old('estimated_completion_date', $repair->estimated_completion_date?->toDateString()) }}">
                             </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="fulfillment_method">Fulfillment</label>
+                                <select class="form-select" id="fulfillment_method" name="fulfillment_method" required>
+                                    @foreach ($fulfillmentMethods as $value => $label)
+                                        <option value="{{ $value }}" @selected(old('fulfillment_method', $repair->fulfillment_method) === $value)>{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="shipping_cost">Shipping cost</label>
+                                <input class="form-control" id="shipping_cost" name="shipping_cost" type="number" min="0" step="0.01" value="{{ old('shipping_cost', $repair->shipping_cost) }}" required>
+                            </div>
+
+                            <div class="col-12"><hr><h2 class="h6 fw-bold">Shipping Address</h2></div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="shipping_full_name">Full name</label>
+                                <input class="form-control" id="shipping_full_name" name="shipping_full_name" value="{{ old('shipping_full_name', $repair->shipping_full_name) }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="shipping_phone">Phone</label>
+                                <input class="form-control" id="shipping_phone" name="shipping_phone" value="{{ old('shipping_phone', $repair->shipping_phone) }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="shipping_email">Email</label>
+                                <input class="form-control" id="shipping_email" name="shipping_email" type="email" value="{{ old('shipping_email', $repair->shipping_email) }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="shipping_country">Country</label>
+                                <input class="form-control" id="shipping_country" name="shipping_country" value="{{ old('shipping_country', $repair->shipping_country) }}">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label" for="shipping_address_line1">Street address</label>
+                                <input class="form-control" id="shipping_address_line1" name="shipping_address_line1" value="{{ old('shipping_address_line1', $repair->shipping_address_line1) }}">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label" for="shipping_address_line2">Apartment/unit</label>
+                                <input class="form-control" id="shipping_address_line2" name="shipping_address_line2" value="{{ old('shipping_address_line2', $repair->shipping_address_line2) }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="shipping_city">City</label>
+                                <input class="form-control" id="shipping_city" name="shipping_city" value="{{ old('shipping_city', $repair->shipping_city) }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="shipping_province">Province/state</label>
+                                <input class="form-control" id="shipping_province" name="shipping_province" value="{{ old('shipping_province', $repair->shipping_province) }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="shipping_postal_code">Postal code</label>
+                                <input class="form-control" id="shipping_postal_code" name="shipping_postal_code" value="{{ old('shipping_postal_code', $repair->shipping_postal_code) }}">
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label" for="delivery_carrier">Delivery carrier/agent</label>
+                                <input class="form-control" id="delivery_carrier" name="delivery_carrier" value="{{ old('delivery_carrier', $repair->delivery_carrier) }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="delivery_tracking_number">Tracking number</label>
+                                <input class="form-control" id="delivery_tracking_number" name="delivery_tracking_number" value="{{ old('delivery_tracking_number', $repair->delivery_tracking_number) }}">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label" for="tracking_notes">Tracking notes</label>
+                                <textarea class="form-control" id="tracking_notes" name="tracking_notes" rows="3">{{ old('tracking_notes', $repair->tracking_notes) }}</textarea>
+                            </div>
                             <div class="col-12">
                                 <label class="form-label" for="customer_notes">Customer-visible notes</label>
                                 <textarea class="form-control" id="customer_notes" name="customer_notes" rows="4">{{ old('customer_notes', $repair->customer_notes) }}</textarea>
@@ -46,7 +109,7 @@
                             <div class="col-12">
                                 <div class="form-check">
                                     <input class="form-check-input" id="is_customer_visible" name="is_customer_visible" type="checkbox" value="1" checked>
-                                    <label class="form-check-label" for="is_customer_visible">Show timeline note to customer</label>
+                                    <label class="form-check-label" for="is_customer_visible">Show timeline note to customer and email customer</label>
                                 </div>
                             </div>
                             <div class="col-12">
@@ -65,6 +128,9 @@
                                     <tr><th scope="row">Phone</th><td>{{ $repair->phone }}</td></tr>
                                     <tr><th scope="row">Issue</th><td>{{ $repair->issue_category }}</td></tr>
                                     <tr><th scope="row">Description</th><td>{{ $repair->issue_description }}</td></tr>
+                                    <tr><th scope="row">Fulfillment</th><td>{{ $repair->fulfillmentLabel() }}</td></tr>
+                                    <tr><th scope="row">Shipping cost</th><td>${{ number_format($repair->shipping_cost, 2) }}</td></tr>
+                                    <tr><th scope="row">Repair total</th><td>${{ number_format($repair->repair_total, 2) }}</td></tr>
                                     <tr><th scope="row">Appointment</th><td>{{ $repair->preferred_appointment_date?->format('M j, Y') ?? 'Not set' }} {{ $repair->preferred_appointment_time }}</td></tr>
                                 </tbody>
                             </table>
@@ -73,13 +139,18 @@
                     <div class="surface p-4">
                         <h2 class="h5 fw-bold">Timeline</h2>
                         <div class="timeline">
-                            @foreach ($repair->statusUpdates as $update)
+                            @forelse ($repair->statusUpdates as $update)
                                 <div class="timeline-item">
                                     <h3 class="h6 mb-1">{{ $update->status }}</h3>
                                     <p class="muted small mb-0">{{ $update->note }}</p>
+                                    @if ($update->delivery_carrier || $update->tracking_number)
+                                        <p class="small mb-0">{{ $update->delivery_carrier }} {{ $update->tracking_number }}</p>
+                                    @endif
                                     <span class="small muted">{{ $update->created_at->format('M j, Y g:i A') }}</span>
                                 </div>
-                            @endforeach
+                            @empty
+                                <p class="muted mb-0">No status updates yet.</p>
+                            @endforelse
                         </div>
                     </div>
                 </div>

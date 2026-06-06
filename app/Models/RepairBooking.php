@@ -19,8 +19,15 @@ class RepairBooking extends Model
         'Waiting for Parts',
         'Repair in Progress',
         'Ready for Pickup',
+        'Shipped',
+        'Delivered',
         'Completed',
         'Cancelled',
+    ];
+
+    public const FULFILLMENT_METHODS = [
+        'pickup' => 'Store Pickup',
+        'shipping' => 'Shipping',
     ];
 
     protected $fillable = [
@@ -42,6 +49,21 @@ class RepairBooking extends Model
         'estimated_completion_date',
         'internal_notes',
         'customer_notes',
+        'fulfillment_method',
+        'shipping_full_name',
+        'shipping_phone',
+        'shipping_email',
+        'shipping_address_line1',
+        'shipping_address_line2',
+        'shipping_city',
+        'shipping_province',
+        'shipping_postal_code',
+        'shipping_country',
+        'shipping_cost',
+        'repair_total',
+        'delivery_carrier',
+        'delivery_tracking_number',
+        'tracking_notes',
     ];
 
     protected function casts(): array
@@ -50,6 +72,8 @@ class RepairBooking extends Model
             'preferred_appointment_date' => 'date',
             'estimated_completion_date' => 'date',
             'terms_accepted' => 'boolean',
+            'shipping_cost' => 'decimal:2',
+            'repair_total' => 'decimal:2',
         ];
     }
 
@@ -73,5 +97,32 @@ class RepairBooking extends Model
     public function deviceLabel(): string
     {
         return trim("{$this->device_brand} {$this->device_model}") ?: $this->device_type;
+    }
+
+    public function isShipping(): bool
+    {
+        return $this->fulfillment_method === 'shipping';
+    }
+
+    public function fulfillmentLabel(): string
+    {
+        return self::FULFILLMENT_METHODS[$this->fulfillment_method] ?? 'Store Pickup';
+    }
+
+    public function shippingAddressLines(): array
+    {
+        if (! $this->isShipping()) {
+            return [];
+        }
+
+        return array_values(array_filter([
+            $this->shipping_full_name,
+            $this->shipping_address_line1,
+            $this->shipping_address_line2,
+            trim(implode(', ', array_filter([$this->shipping_city, $this->shipping_province, $this->shipping_postal_code]))),
+            $this->shipping_country,
+            $this->shipping_phone ? 'Phone: '.$this->shipping_phone : null,
+            $this->shipping_email ? 'Email: '.$this->shipping_email : null,
+        ]));
     }
 }

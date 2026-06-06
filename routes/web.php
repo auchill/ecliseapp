@@ -12,6 +12,7 @@ use App\Http\Controllers\CartController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\CustomerDashboardController;
+use App\Http\Controllers\OrderTrackingController;
 use App\Http\Controllers\PartController;
 use App\Http\Controllers\PublicPageController;
 use App\Http\Controllers\RepairBookingController;
@@ -30,6 +31,8 @@ Route::post('/repairs/track', [RepairBookingController::class, 'track'])->name('
 
 Route::get('/shop', [ShopController::class, 'index'])->name('shop.index');
 Route::get('/products/{product}', [ShopController::class, 'show'])->name('products.show');
+Route::get('/orders/track', [OrderTrackingController::class, 'form'])->name('orders.track');
+Route::post('/orders/track/result', [OrderTrackingController::class, 'result'])->name('orders.track.result');
 Route::get('/parts', [PartController::class, 'index'])->name('parts.index');
 Route::get('/contact', [ContactController::class, 'create'])->name('contact.create');
 Route::post('/contact', [ContactController::class, 'store'])->name('contact.store');

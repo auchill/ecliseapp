@@ -6,12 +6,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class RepairStatusUpdate extends Model
+class OrderStatusUpdate extends Model
 {
     use HasFactory;
 
     protected $fillable = [
-        'repair_booking_id',
+        'order_id',
         'status',
         'note',
         'is_customer_visible',
@@ -27,9 +27,9 @@ class RepairStatusUpdate extends Model
         ];
     }
 
-    public function repairBooking(): BelongsTo
+    public function order(): BelongsTo
     {
-        return $this->belongsTo(RepairBooking::class);
+        return $this->belongsTo(Order::class);
     }
 
     public function creator(): BelongsTo

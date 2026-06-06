@@ -25,9 +25,10 @@
                             <li class="nav-item"><a class="nav-link {{ request()->routeIs('home') ? 'active' : '' }}" href="{{ route('home') }}">Home</a></li>
                             <li class="nav-item"><a class="nav-link {{ request()->routeIs('about') ? 'active' : '' }}" href="{{ route('about') }}">About</a></li>
                             <li class="nav-item"><a class="nav-link {{ request()->routeIs('services') ? 'active' : '' }}" href="{{ route('services') }}">Services</a></li>
-                            <li class="nav-item"><a class="nav-link {{ request()->routeIs('repairs.*') ? 'active' : '' }}" href="{{ route('repairs.create') }}">Book Repair</a></li>
-                            <li class="nav-item"><a class="nav-link {{ request()->routeIs('shop.*') || request()->routeIs('products.*') ? 'active' : '' }}" href="{{ route('shop.index') }}">Shop</a></li>
-                            <li class="nav-item"><a class="nav-link {{ request()->routeIs('parts.*') ? 'active' : '' }}" href="{{ route('parts.index') }}">Parts</a></li>
+                                <li class="nav-item"><a class="nav-link {{ request()->routeIs('repairs.*') ? 'active' : '' }}" href="{{ route('repairs.create') }}">Book Repair</a></li>
+                                <li class="nav-item"><a class="nav-link {{ request()->routeIs('shop.*') || request()->routeIs('products.*') ? 'active' : '' }}" href="{{ route('shop.index') }}">Shop</a></li>
+                                <li class="nav-item"><a class="nav-link {{ request()->routeIs('orders.track*') ? 'active' : '' }}" href="{{ route('orders.track') }}">Track Order</a></li>
+                                <li class="nav-item"><a class="nav-link {{ request()->routeIs('parts.*') ? 'active' : '' }}" href="{{ route('parts.index') }}">Parts</a></li>
                             <li class="nav-item"><a class="nav-link {{ request()->routeIs('contact.*') ? 'active' : '' }}" href="{{ route('contact.create') }}">Contact</a></li>
                             @auth
                                 <li class="nav-item"><a class="nav-link {{ request()->routeIs('cart.*') ? 'active' : '' }}" href="{{ route('cart.index') }}"><i class="bi bi-bag"></i><span class="visually-hidden">Cart</span></a></li>
@@ -102,6 +103,7 @@
                             <div class="d-flex flex-wrap gap-2">
                                 <a class="btn btn-outline-light btn-sm" href="{{ route('repairs.create') }}">Book Repair</a>
                                 <a class="btn btn-outline-light btn-sm" href="{{ route('repairs.track') }}">Track Repair</a>
+                                <a class="btn btn-outline-light btn-sm" href="{{ route('orders.track') }}">Track Order</a>
                                 <a class="btn btn-outline-light btn-sm" href="{{ route('shop.index') }}">Shop</a>
                                 <a class="btn btn-outline-light btn-sm" href="{{ route('parts.index') }}">Parts</a>
                             </div>
