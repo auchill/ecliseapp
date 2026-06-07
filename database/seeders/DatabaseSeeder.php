@@ -4,7 +4,11 @@ namespace Database\Seeders;
 
 use App\Models\Category;
 use App\Models\Part;
+use App\Models\PartBrand;
+use App\Models\PartCategory;
 use App\Models\Product;
+use App\Models\ProductBrand;
+use App\Models\ProductCategory;
 use App\Models\RepairBooking;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
@@ -22,6 +26,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call(ShippingSeeder::class);
+        $this->call(CatalogTaxonomySeeder::class);
 
         $admin = User::query()->updateOrCreate(
             ['email' => 'admin@eclisetech.com'],
@@ -115,6 +120,13 @@ class DatabaseSeeder extends Seeder
                 ['sku' => $product['sku']],
                 [
                     'category_id' => $categories[$product['category']]->id,
+                    'product_category_id' => ProductCategory::query()->where('slug', Str::slug(match ($product['category']) {
+                        'Used Phones', 'New Phones' => 'Phones',
+                        'Used Computers', 'New Computers' => 'Laptops',
+                        'Phone Accessories', 'Computer Accessories' => 'Accessories',
+                        default => $product['category'],
+                    }))->value('id'),
+                    'product_brand_id' => ProductBrand::query()->where('slug', Str::slug($product['brand']))->value('id'),
                     'name' => $product['name'],
                     'slug' => Str::slug($product['name']),
                     'brand' => $product['brand'],
@@ -145,8 +157,18 @@ class DatabaseSeeder extends Seeder
                 ],
                 [
                     'device_type' => $deviceType,
+                    'part_brand_id' => PartBrand::query()->where('slug', Str::slug($brand.' Parts'))->value('id')
+                        ?: PartBrand::query()->where('slug', Str::slug($brand))->value('id'),
+                    'part_category_id' => PartCategory::query()->where('slug', Str::slug($partCategory))->value('id'),
                     'part_category' => $partCategory,
                     'price' => $price,
+                    'selling_price' => $price,
+                    'final_price' => $price,
+                    'quantity' => $stockStatus === 'In stock' ? 5 : 0,
+                    'availability_status' => $stockStatus,
+                    'external_api_source' => 'MobileSentrix',
+                    'is_api_item' => false,
+                    'is_active' => true,
                     'stock_status' => $stockStatus,
                     'supplier' => 'MobileSentrix',
                     'last_synced_at' => now(),

@@ -41,6 +41,9 @@
                                 <th>Order</th>
                                 <th>Customer</th>
                                 <th>Status</th>
+                                <th>Payment</th>
+                                <th>Gateway</th>
+                                <th>Shipping</th>
                                 <th>Total</th>
                                 <th>Date</th>
                                 <th></th>
@@ -52,12 +55,15 @@
                                     <td>{{ $order->order_number }}</td>
                                     <td>{{ $order->customer_name }}</td>
                                     <td><span class="status-pill">{{ $order->status }}</span></td>
+                                    <td>{{ ucfirst($order->payment_status) }}</td>
+                                    <td>{{ $order->latestPayment?->gatewayLabel() ?? ucfirst($order->payment_gateway ?? 'Pending') }}</td>
+                                    <td>{{ $order->isShipping() ? ($order->shipping_method_name ?: 'Shipping') : 'Pickup' }}</td>
                                     <td>${{ number_format($order->total, 2) }}</td>
                                     <td>{{ $order->created_at->format('M j, Y') }}</td>
                                     <td class="text-end"><a class="btn btn-outline-primary btn-sm" href="{{ route('admin.orders.show', $order) }}"><i class="bi bi-eye"></i><span class="visually-hidden">Open</span></a></td>
                                 </tr>
                             @empty
-                                <tr><td colspan="6">No orders found.</td></tr>
+                                <tr><td colspan="9">No orders found.</td></tr>
                             @endforelse
                         </tbody>
                     </table>

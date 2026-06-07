@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class RepairBooking extends Model
 {
@@ -46,6 +47,11 @@ class RepairBooking extends Model
         'device_image_path',
         'terms_accepted',
         'status',
+        'payment_status',
+        'payment_gateway',
+        'payment_amount',
+        'currency',
+        'paid_at',
         'estimated_completion_date',
         'internal_notes',
         'customer_notes',
@@ -77,6 +83,8 @@ class RepairBooking extends Model
             'preferred_appointment_date' => 'date',
             'estimated_completion_date' => 'date',
             'terms_accepted' => 'boolean',
+            'payment_amount' => 'decimal:2',
+            'paid_at' => 'datetime',
             'shipping_base_cost' => 'decimal:2',
             'shipping_discount_amount' => 'decimal:2',
             'shipping_cost' => 'decimal:2',
@@ -104,6 +112,16 @@ class RepairBooking extends Model
     public function shippingMethod(): BelongsTo
     {
         return $this->belongsTo(ShippingMethod::class);
+    }
+
+    public function payments(): MorphMany
+    {
+        return $this->morphMany(Payment::class, 'payable');
+    }
+
+    public function latestPayment()
+    {
+        return $this->morphOne(Payment::class, 'payable')->latestOfMany();
     }
 
     public function deviceLabel(): string

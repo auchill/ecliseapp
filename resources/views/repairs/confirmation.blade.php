@@ -25,6 +25,8 @@
                                     <tr><th scope="row">Issue</th><td>{{ $booking->issue_category }}</td></tr>
                                     <tr><th scope="row">Status</th><td><span class="status-pill">{{ $booking->status }}</span></td></tr>
                                     <tr><th scope="row">Fulfillment</th><td>{{ $booking->fulfillmentLabel() }}</td></tr>
+                                    <tr><th scope="row">Payment gateway</th><td>{{ $booking->latestPayment?->gatewayLabel() ?? ucfirst($booking->payment_gateway ?? 'Not required') }}</td></tr>
+                                    <tr><th scope="row">Payment status</th><td>{{ ucfirst($booking->payment_status ?? 'pending') }}</td></tr>
                                     @if ($booking->isShipping())
                                         <tr><th scope="row">Shipping method</th><td>{{ $booking->shipping_method_name ?: 'To be confirmed' }}</td></tr>
                                         <tr><th scope="row">Estimated delivery</th><td>{{ $booking->shipping_delivery_days ?: 'To be confirmed' }}</td></tr>

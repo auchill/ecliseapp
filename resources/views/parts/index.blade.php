@@ -24,7 +24,7 @@
                         <select class="form-select" id="brand" name="brand">
                             <option value="">All</option>
                             @foreach ($brands as $brand)
-                                <option value="{{ $brand }}" @selected(request('brand') === $brand)>{{ $brand }}</option>
+                                <option value="{{ $brand->slug }}" @selected(request('brand') === $brand->slug)>{{ $brand->name }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -46,7 +46,7 @@
                         <select class="form-select" id="part_category" name="part_category">
                             <option value="">All</option>
                             @foreach ($categories as $category)
-                                <option value="{{ $category }}" @selected(request('part_category') === $category)>{{ $category }}</option>
+                                <option value="{{ $category->slug }}" @selected(request('part_category') === $category->slug)>{{ $category->name }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -64,12 +64,12 @@
                         <div class="surface part-card h-100 overflow-hidden">
                             <img src="{{ $part->imageUrl() }}" alt="{{ $part->name }}">
                             <div class="p-4">
-                                <p class="eyebrow mb-1">{{ $part->part_category }}</p>
+                                <p class="eyebrow mb-1">{{ $part->categoryName() }}</p>
                                 <h2 class="h5 fw-bold">{{ $part->name }}</h2>
-                                <p class="muted small">{{ $part->brand }} &middot; {{ $part->model_compatibility }} &middot; {{ $part->stock_status }}</p>
+                                <p class="muted small">{{ $part->brandName() }} &middot; {{ $part->model_compatibility }} &middot; {{ $part->availability_status ?: $part->stock_status }}</p>
                                 <div class="d-flex justify-content-between align-items-center">
-                                    <strong>${{ number_format($part->price, 2) }}</strong>
-                                    <span class="small muted">{{ $part->supplier }}</span>
+                                    <strong>${{ number_format($part->displayPrice(), 2) }}</strong>
+                                    <span class="small muted">{{ $part->external_api_source ?: $part->supplier }}</span>
                                 </div>
                             </div>
                         </div>

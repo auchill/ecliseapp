@@ -129,6 +129,8 @@
                                     <tr><th scope="row">Issue</th><td>{{ $repair->issue_category }}</td></tr>
                                     <tr><th scope="row">Description</th><td>{{ $repair->issue_description }}</td></tr>
                                     <tr><th scope="row">Fulfillment</th><td>{{ $repair->fulfillmentLabel() }}</td></tr>
+                                    <tr><th scope="row">Payment gateway</th><td>{{ $repair->latestPayment?->gatewayLabel() ?? ucfirst($repair->payment_gateway ?? 'Not required') }}</td></tr>
+                                    <tr><th scope="row">Payment status</th><td>{{ ucfirst($repair->payment_status ?? 'pending') }}</td></tr>
                                     @if ($repair->isShipping())
                                         <tr><th scope="row">Shipping method</th><td>{{ $repair->shipping_method_name ?: 'To be confirmed' }}</td></tr>
                                         <tr><th scope="row">Estimated delivery</th><td>{{ $repair->shipping_delivery_days ?: 'To be confirmed' }}</td></tr>

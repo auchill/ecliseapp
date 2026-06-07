@@ -50,10 +50,10 @@
                                 <tr>
                                     <td>{{ $part->name }}</td>
                                     <td>{{ $part->device_type }}</td>
-                                    <td>{{ $part->brand }}</td>
-                                    <td>{{ $part->part_category }}</td>
-                                    <td>${{ number_format($part->price, 2) }}</td>
-                                    <td>{{ $part->stock_status }}</td>
+                                    <td>{{ $part->brandName() }}</td>
+                                    <td>{{ $part->categoryName() }}</td>
+                                    <td>${{ number_format($part->displayPrice(), 2) }}</td>
+                                    <td>{{ $part->availability_status ?: $part->stock_status }}</td>
                                     <td class="text-end">
                                         <div class="d-inline-flex gap-2">
                                             <a class="btn btn-outline-primary btn-sm" href="{{ route('admin.parts.edit', $part) }}"><i class="bi bi-pencil"></i><span class="visually-hidden">Edit</span></a>

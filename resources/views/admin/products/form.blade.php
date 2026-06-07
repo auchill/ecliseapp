@@ -28,17 +28,22 @@
                         <input class="form-control" id="sku" name="sku" value="{{ old('sku', $product->sku) }}" required>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label" for="category_id">Category</label>
-                        <select class="form-select" id="category_id" name="category_id">
+                        <label class="form-label" for="product_category_id">Product Category</label>
+                        <select class="form-select" id="product_category_id" name="product_category_id">
                             <option value="">Uncategorized</option>
-                            @foreach ($categories as $category)
-                                <option value="{{ $category->id }}" @selected((int) old('category_id', $product->category_id) === $category->id)>{{ $category->name }}</option>
+                            @foreach ($productCategories as $category)
+                                <option value="{{ $category->id }}" @selected((int) old('product_category_id', $product->product_category_id) === $category->id)>{{ $category->name }}</option>
                             @endforeach
                         </select>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label" for="brand">Brand</label>
-                        <input class="form-control" id="brand" name="brand" value="{{ old('brand', $product->brand) }}">
+                        <label class="form-label" for="product_brand_id">Product Brand</label>
+                        <select class="form-select" id="product_brand_id" name="product_brand_id">
+                            <option value="">No product brand</option>
+                            @foreach ($productBrands as $brand)
+                                <option value="{{ $brand->id }}" @selected((int) old('product_brand_id', $product->product_brand_id) === $brand->id)>{{ $brand->name }}</option>
+                            @endforeach
+                        </select>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label" for="model">Model</label>

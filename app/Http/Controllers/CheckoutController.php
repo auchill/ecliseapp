@@ -5,8 +5,8 @@ namespace App\Http\Controllers;
 use App\Http\Requests\CheckoutRequest;
 use App\Models\Cart;
 use App\Models\Order;
+use App\Services\PaymentGatewayService;
 use App\Services\ShippingCostService;
-use App\Services\SquarePaymentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -37,7 +37,7 @@ class CheckoutController extends Controller
         ]);
     }
 
-    public function store(CheckoutRequest $request, SquarePaymentService $payments, ShippingCostService $shippingCosts)
+    public function store(CheckoutRequest $request, ShippingCostService $shippingCosts, PaymentGatewayService $paymentGateways)
     {
         $cart = $this->activeCart($request)->load('items.product');
 
@@ -60,15 +60,15 @@ class CheckoutController extends Controller
         }
 
         $data = $this->normalizeFulfillmentData($data, $shippingQuote);
-        $payment = $payments->createCheckout($cart, $data);
 
-        $order = DB::transaction(function () use ($cart, $data, $payment, $request): Order {
+        $order = DB::transaction(function () use ($cart, $data, $request): Order {
             $subtotal = $cart->subtotal();
             $tax = round($subtotal * 0.13, 2);
             $total = $subtotal + $tax + $data['shipping_cost'];
 
             $order = Order::query()->create([
                 'user_id' => $request->user()->id,
+                'cart_id' => $cart->id,
                 'order_number' => $this->generateOrderNumber(),
                 'customer_name' => $data['customer_name'],
                 'email' => $data['email'],
@@ -78,10 +78,13 @@ class CheckoutController extends Controller
                 'tax' => $tax,
                 'total' => $total,
                 'status' => 'Pending',
-                'payment_provider' => $payment['provider'],
-                'payment_reference' => $payment['reference'],
+                'payment_provider' => $data['payment_gateway'],
+                'payment_gateway' => $data['payment_gateway'],
+                'payment_reference' => null,
                 'fulfillment_method' => $data['fulfillment_method'],
-                'payment_status' => 'Pending',
+                'payment_status' => 'pending',
+                'payment_amount' => $total,
+                'currency' => 'cad',
                 'shipping_full_name' => $data['shipping_full_name'] ?? null,
                 'shipping_phone' => $data['shipping_phone'] ?? null,
                 'shipping_email' => $data['shipping_email'] ?? null,
@@ -99,8 +102,8 @@ class CheckoutController extends Controller
                 'shipping_cost' => $data['shipping_cost'],
                 'delivery_carrier' => $data['delivery_carrier'] ?? null,
                 'tracking_number' => $data['tracking_number'] ?? null,
-                'customer_notes' => $data['notes'] ?? $payment['message'],
-                'notes' => $data['notes'] ?? $payment['message'],
+                'customer_notes' => $data['notes'] ?? null,
+                'notes' => $data['notes'] ?? null,
             ]);
 
             $order->statusUpdates()->create([
@@ -124,19 +127,20 @@ class CheckoutController extends Controller
                     'line_total' => $item->lineTotal(),
                 ]);
 
-                $item->product->decrement('quantity', $item->quantity);
-
-                if ($item->product->fresh()->quantity === 0) {
-                    $item->product->update(['status' => 'Out of Stock']);
-                }
             }
-
-            $cart->update(['status' => 'converted']);
 
             return $order;
         });
 
-        return redirect()->route('checkout.confirmation', $order);
+        $payment = $order->payments()->create([
+            'order_id' => $order->id,
+            'gateway' => $data['payment_gateway'],
+            'amount' => $order->total,
+            'currency' => 'cad',
+            'status' => 'pending',
+        ]);
+
+        return redirect()->away($paymentGateways->createCheckout($payment));
     }
 
     public function confirmation(Order $order)
@@ -144,7 +148,7 @@ class CheckoutController extends Controller
         abort_unless(auth()->id() === $order->user_id || auth()->user()?->isAdmin(), 403);
 
         return view('checkout.confirmation', [
-            'order' => $order->load('items'),
+            'order' => $order->load('items', 'latestPayment'),
         ]);
     }
 

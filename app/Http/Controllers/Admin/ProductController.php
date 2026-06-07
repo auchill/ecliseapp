@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreProductRequest;
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\ProductBrand;
+use App\Models\ProductCategory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -14,7 +16,7 @@ class ProductController extends Controller
     public function index(Request $request)
     {
         $products = Product::query()
-            ->with('category')
+            ->with('category', 'productBrand', 'productCategory')
             ->when($request->filled('q'), function ($query) use ($request): void {
                 $search = $request->string('q');
                 $query->where('name', 'like', "%{$search}%")
@@ -35,6 +37,8 @@ class ProductController extends Controller
         return view('admin.products.form', [
             'product' => new Product,
             'categories' => Category::query()->where('type', 'product')->orderBy('name')->get(),
+            'productBrands' => ProductBrand::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
+            'productCategories' => ProductCategory::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
             'conditions' => Product::CONDITIONS,
             'statuses' => Product::STATUSES,
         ]);
@@ -55,6 +59,8 @@ class ProductController extends Controller
         return view('admin.products.form', [
             'product' => $product,
             'categories' => Category::query()->where('type', 'product')->orderBy('name')->get(),
+            'productBrands' => ProductBrand::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
+            'productCategories' => ProductCategory::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
             'conditions' => Product::CONDITIONS,
             'statuses' => Product::STATUSES,
         ]);
@@ -83,6 +89,22 @@ class ProductController extends Controller
 
         if ($request->hasFile('product_image')) {
             $data['image_path'] = $request->file('product_image')->store('products', 'public');
+        }
+
+        if (! empty($data['product_brand_id'])) {
+            $data['brand'] = ProductBrand::query()->find($data['product_brand_id'])?->name;
+        }
+
+        if (! empty($data['product_category_id'])) {
+            $productCategory = ProductCategory::query()->find($data['product_category_id']);
+            $legacyCategory = $productCategory
+                ? Category::query()->firstOrCreate(
+                    ['slug' => $productCategory->slug],
+                    ['name' => $productCategory->name, 'type' => 'product'],
+                )
+                : null;
+
+            $data['category_id'] = $legacyCategory?->id;
         }
 
         unset($data['product_image']);

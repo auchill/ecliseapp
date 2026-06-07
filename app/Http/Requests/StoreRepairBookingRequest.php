@@ -26,6 +26,7 @@ class StoreRepairBookingRequest extends FormRequest
             'preferred_appointment_date' => ['nullable', 'date', 'after_or_equal:today'],
             'preferred_appointment_time' => ['nullable', 'date_format:H:i'],
             'device_image' => ['nullable', 'image', 'max:4096'],
+            'payment_gateway' => ['nullable', Rule::in(['stripe', 'paypal'])],
             'fulfillment_method' => ['required', 'in:pickup,shipping'],
             'shipping_method_id' => [
                 'required_if:fulfillment_method,shipping',

@@ -33,7 +33,7 @@
                         <select class="form-select" id="brand" name="brand">
                             <option value="">All</option>
                             @foreach ($brands as $brand)
-                                <option value="{{ $brand }}" @selected(request('brand') === $brand)>{{ $brand }}</option>
+                                <option value="{{ $brand->slug }}" @selected(request('brand') === $brand->slug)>{{ $brand->name }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -66,9 +66,9 @@
                         <div class="surface product-card h-100 overflow-hidden">
                             <img src="{{ $product->imageUrl() }}" alt="{{ $product->name }}">
                             <div class="p-4">
-                                <p class="eyebrow mb-1">{{ $product->category?->name ?? 'Product' }}</p>
+                                <p class="eyebrow mb-1">{{ $product->categoryName() ?? 'Product' }}</p>
                                 <h2 class="h5 fw-bold">{{ $product->name }}</h2>
-                                <p class="muted small">{{ $product->condition }} &middot; {{ $product->brand }} &middot; {{ $product->quantity }} in stock</p>
+                                <p class="muted small">{{ $product->condition }} &middot; {{ $product->brandName() }} &middot; {{ $product->quantity }} in stock</p>
                                 <div class="d-flex align-items-center justify-content-between">
                                     <div>
                                         @if ($product->sale_price)

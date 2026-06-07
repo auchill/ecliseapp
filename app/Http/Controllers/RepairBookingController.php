@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreRepairBookingRequest;
 use App\Http\Requests\TrackRepairRequest;
 use App\Models\RepairBooking;
+use App\Services\PaymentGatewayService;
 use App\Services\ShippingCostService;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
@@ -28,7 +29,7 @@ class RepairBookingController extends Controller
         ]);
     }
 
-    public function store(StoreRepairBookingRequest $request, ShippingCostService $shippingCosts)
+    public function store(StoreRepairBookingRequest $request, ShippingCostService $shippingCosts, PaymentGatewayService $paymentGateways)
     {
         $data = $request->validated();
 
@@ -55,6 +56,17 @@ class RepairBookingController extends Controller
         $data['status'] = 'Submitted';
         $data['terms_accepted'] = true;
         $data['repair_total'] = $data['shipping_cost'];
+        $data['payment_status'] = $data['repair_total'] > 0 ? 'pending' : 'paid';
+        $data['payment_gateway'] = $data['repair_total'] > 0 ? ($data['payment_gateway'] ?? null) : null;
+        $data['payment_amount'] = $data['repair_total'];
+        $data['currency'] = 'cad';
+        $data['paid_at'] = $data['repair_total'] > 0 ? null : now();
+
+        if ($data['repair_total'] > 0 && empty($data['payment_gateway'])) {
+            return back()
+                ->withErrors(['payment_gateway' => 'Choose Stripe or PayPal for paid repair return shipping.'])
+                ->withInput();
+        }
 
         unset($data['device_image']);
 
@@ -76,13 +88,25 @@ class RepairBookingController extends Controller
             'email' => $booking->email,
         ]);
 
+        if ((float) $booking->repair_total > 0) {
+            $payment = $booking->payments()->create([
+                'repair_order_id' => $booking->id,
+                'gateway' => $booking->payment_gateway,
+                'amount' => $booking->repair_total,
+                'currency' => 'cad',
+                'status' => 'pending',
+            ]);
+
+            return redirect()->away($paymentGateways->createCheckout($payment));
+        }
+
         return redirect()->route('repairs.confirmation', $booking);
     }
 
     public function confirmation(RepairBooking $repairBooking)
     {
         return view('repairs.confirmation', [
-            'booking' => $repairBooking->load('publicStatusUpdates'),
+            'booking' => $repairBooking->load('publicStatusUpdates', 'latestPayment'),
         ]);
     }
 
@@ -101,7 +125,7 @@ class RepairBookingController extends Controller
             ->where(function ($query) use ($contact): void {
                 $query->where('email', $contact)->orWhere('phone', $contact);
             })
-            ->with('publicStatusUpdates')
+            ->with('publicStatusUpdates', 'latestPayment')
             ->first();
 
         if (! $booking) {

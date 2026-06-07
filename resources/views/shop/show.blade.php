@@ -12,12 +12,12 @@
                     </div>
                 </div>
                 <div class="col-lg-6">
-                    <p class="eyebrow">{{ $product->category?->name }}</p>
+                    <p class="eyebrow">{{ $product->categoryName() }}</p>
                     <h1 class="display-5 fw-bold">{{ $product->name }}</h1>
                     <p class="muted fs-5">{{ $product->description }}</p>
                     <div class="d-flex flex-wrap gap-2 mb-4">
                         <span class="status-pill">{{ $product->condition }}</span>
-                        <span class="status-pill">{{ $product->brand }}</span>
+                        <span class="status-pill">{{ $product->brandName() }}</span>
                         <span class="status-pill">{{ $product->quantity }} in stock</span>
                     </div>
                     <div class="mb-4">

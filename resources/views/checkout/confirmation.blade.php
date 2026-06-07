@@ -8,7 +8,7 @@
             <div class="surface p-4 p-lg-5">
                 <p class="eyebrow">Order Created</p>
                 <h1 class="display-6 fw-bold">Order {{ $order->order_number }}</h1>
-                <p class="muted fs-5">Your order was saved with Square placeholder reference {{ $order->payment_reference }}.</p>
+                <p class="muted fs-5">Your order has been created. Payment status will update after the selected gateway confirms the transaction.</p>
                 @if ($order->isShipping())
                     <div class="alert alert-info">Your order will be shipped after processing. Tracking details will appear here when available.</div>
                 @else
@@ -49,6 +49,8 @@
                     <div class="col-lg-6">
                         <h2 class="h5 fw-bold">Fulfillment</h2>
                         <p class="mb-1"><strong>Method:</strong> {{ $order->fulfillmentLabel() }}</p>
+                        <p class="mb-1"><strong>Payment gateway:</strong> {{ $order->latestPayment?->gatewayLabel() ?? ucfirst($order->payment_gateway ?? 'Pending') }}</p>
+                        <p class="mb-1"><strong>Payment status:</strong> {{ ucfirst($order->payment_status) }}</p>
                         @if ($order->isShipping())
                             <p class="mb-1"><strong>Shipping method:</strong> {{ $order->shipping_method_name ?: 'To be confirmed' }}</p>
                             <p class="mb-1"><strong>Estimated delivery:</strong> {{ $order->shipping_delivery_days ?: 'To be confirmed' }}</p>
@@ -58,7 +60,6 @@
                         @else
                             <p class="mb-1"><strong>Shipping:</strong> No charge for store pickup.</p>
                         @endif
-                        <p class="mb-1"><strong>Payment status:</strong> {{ $order->payment_status }}</p>
                         @if ($order->delivery_carrier)
                             <p class="mb-1"><strong>Delivery carrier:</strong> {{ $order->delivery_carrier }}</p>
                         @endif

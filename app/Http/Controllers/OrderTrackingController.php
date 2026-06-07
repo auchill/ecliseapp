@@ -29,7 +29,7 @@ class OrderTrackingController extends Controller
                     ->orWhere('shipping_email', $contact)
                     ->orWhere('shipping_phone', $contact);
             })
-            ->with(['items', 'publicStatusUpdates'])
+            ->with(['items', 'publicStatusUpdates', 'latestPayment'])
             ->first();
 
         if (! $order) {

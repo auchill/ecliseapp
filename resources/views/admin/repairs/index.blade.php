@@ -42,6 +42,9 @@
                                 <th>Customer</th>
                                 <th>Device</th>
                                 <th>Status</th>
+                                <th>Payment</th>
+                                <th>Gateway</th>
+                                <th>Shipping</th>
                                 <th>Created</th>
                                 <th></th>
                             </tr>
@@ -53,11 +56,14 @@
                                     <td>{{ $repair->customer_name }}</td>
                                     <td>{{ $repair->deviceLabel() }}</td>
                                     <td><span class="status-pill">{{ $repair->status }}</span></td>
+                                    <td>{{ ucfirst($repair->payment_status ?? 'pending') }}</td>
+                                    <td>{{ $repair->latestPayment?->gatewayLabel() ?? ucfirst($repair->payment_gateway ?? 'Not required') }}</td>
+                                    <td>{{ $repair->isShipping() ? ($repair->shipping_method_name ?: 'Shipping') : 'Pickup' }}</td>
                                     <td>{{ $repair->created_at->format('M j, Y') }}</td>
                                     <td class="text-end"><a class="btn btn-outline-primary btn-sm" href="{{ route('admin.repairs.show', $repair) }}"><i class="bi bi-pencil-square"></i><span class="visually-hidden">Open</span></a></td>
                                 </tr>
                             @empty
-                                <tr><td colspan="6">No repairs found.</td></tr>
+                                <tr><td colspan="9">No repairs found.</td></tr>
                             @endforelse
                         </tbody>
                     </table>

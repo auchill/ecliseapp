@@ -9,6 +9,7 @@ use App\Models\RepairBooking;
 use App\Models\ShippingDiscountRule;
 use App\Models\ShippingMethod;
 use App\Models\User;
+use App\Services\PaymentFinalizer;
 use Database\Seeders\ShippingSeeder;
 use Illuminate\Support\Facades\Mail;
 
@@ -41,6 +42,7 @@ test('checkout pickup creates a pickup order with zero shipping', function () {
             'customer_name' => 'Pickup Customer',
             'email' => 'pickup@example.com',
             'phone' => '416-555-0001',
+            'payment_gateway' => 'stripe',
             'fulfillment_method' => 'pickup',
         ])
         ->assertRedirect();
@@ -52,7 +54,11 @@ test('checkout pickup creates a pickup order with zero shipping', function () {
         ->and((float) $order->shipping_base_cost)->toBe(0.0)
         ->and((float) $order->shipping_discount_amount)->toBe(0.0)
         ->and((float) $order->shipping_cost)->toBe(0.0)
+        ->and($order->payment_status)->toBe('pending')
         ->and((float) $order->total)->toBe(113.0);
+
+    expect($order->payments()->count())->toBe(1)
+        ->and($product->fresh()->quantity)->toBe(2);
 });
 
 test('checkout normal shipping stores method snapshot and regular shipping cost', function () {
@@ -81,6 +87,7 @@ test('checkout normal shipping stores method snapshot and regular shipping cost'
             'customer_name' => 'Shipping Customer',
             'email' => 'shipping@example.com',
             'phone' => '416-555-0002',
+            'payment_gateway' => 'paypal',
             'fulfillment_method' => 'shipping',
             'shipping_method_id' => $method->id,
             'shipping_full_name' => 'Shipping Customer',
@@ -103,6 +110,7 @@ test('checkout normal shipping stores method snapshot and regular shipping cost'
         ->and((float) $order->shipping_base_cost)->toBe(20.0)
         ->and((float) $order->shipping_discount_amount)->toBe(0.0)
         ->and((float) $order->shipping_cost)->toBe(20.0)
+        ->and($order->latestPayment->gateway)->toBe('paypal')
         ->and((float) $order->total)->toBe(133.0);
 
     $this->post(route('orders.track.result'), [
@@ -142,6 +150,7 @@ test('checkout applies the best matching shipping discount', function () {
             'customer_name' => 'Free Shipping Customer',
             'email' => 'free-shipping@example.com',
             'phone' => '416-555-0101',
+            'payment_gateway' => 'stripe',
             'fulfillment_method' => 'shipping',
             'shipping_method_id' => $normal->id,
             'shipping_full_name' => 'Free Shipping Customer',
@@ -186,6 +195,7 @@ test('checkout applies the best matching shipping discount', function () {
             'customer_name' => 'Overnight Customer',
             'email' => 'overnight@example.com',
             'phone' => '416-555-0102',
+            'payment_gateway' => 'stripe',
             'fulfillment_method' => 'shipping',
             'shipping_method_id' => $overnight->id,
             'shipping_full_name' => 'Overnight Customer',
@@ -221,6 +231,7 @@ test('repair shipping calculates selected return shipping method and appears in 
         'device_model' => 'iPhone 13',
         'issue_category' => 'Screen',
         'issue_description' => 'The display is cracked and needs replacement.',
+        'payment_gateway' => 'paypal',
         'fulfillment_method' => 'shipping',
         'shipping_method_id' => $method->id,
         'shipping_full_name' => 'Repair Customer',
@@ -242,6 +253,8 @@ test('repair shipping calculates selected return shipping method and appears in 
         ->and((float) $repair->shipping_base_cost)->toBe(45.0)
         ->and((float) $repair->shipping_discount_amount)->toBe(0.0)
         ->and((float) $repair->shipping_cost)->toBe(45.0)
+        ->and($repair->payment_status)->toBe('pending')
+        ->and($repair->latestPayment->gateway)->toBe('paypal')
         ->and((float) $repair->repair_total)->toBe(45.0);
 
     $this->post(route('repairs.track.submit'), [
@@ -251,6 +264,62 @@ test('repair shipping calculates selected return shipping method and appears in 
         ->assertSee($repair->tracking_number)
         ->assertSee('Overnight Shipping')
         ->assertSee('Final shipping');
+});
+
+test('verified payment finalization marks order paid and commits inventory once', function () {
+    Mail::fake();
+
+    $user = User::query()->create([
+        'name' => 'Paid Customer',
+        'email' => 'paid@example.com',
+        'password' => 'password',
+    ]);
+
+    $product = Product::query()->create([
+        'name' => 'Paid Phone',
+        'slug' => 'paid-phone',
+        'sku' => 'PAID-1',
+        'condition' => 'Used',
+        'price' => 100,
+        'quantity' => 2,
+        'status' => 'Active',
+    ]);
+
+    $cart = Cart::query()->create(['user_id' => $user->id, 'status' => 'active']);
+    $cart->items()->create(['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 100]);
+
+    $this->actingAs($user)
+        ->post(route('checkout.store'), [
+            'customer_name' => 'Paid Customer',
+            'email' => 'paid@example.com',
+            'phone' => '416-555-9999',
+            'payment_gateway' => 'stripe',
+            'fulfillment_method' => 'pickup',
+        ])
+        ->assertRedirect();
+
+    $order = Order::query()->with('payments')->firstOrFail();
+    $payment = $order->payments->first();
+
+    expect($order->payment_status)->toBe('pending')
+        ->and($product->fresh()->quantity)->toBe(2)
+        ->and($cart->fresh()->status)->toBe('active');
+
+    app(PaymentFinalizer::class)->markPaid($payment, [
+        'gateway_reference_id' => 'pi_test_123',
+        'stripe_payment_intent_id' => 'pi_test_123',
+    ]);
+
+    $order->refresh();
+
+    expect($order->payment_status)->toBe('paid')
+        ->and($order->inventory_committed_at)->not->toBeNull()
+        ->and($product->fresh()->quantity)->toBe(1)
+        ->and($cart->fresh()->status)->toBe('converted');
+
+    app(PaymentFinalizer::class)->markPaid($payment->fresh());
+
+    expect($product->fresh()->quantity)->toBe(1);
 });
 
 test('admin can manage shipping methods and discounts', function () {
@@ -345,7 +414,7 @@ test('admin status updates create timelines and queue mail rendering', function 
         'total' => 133,
         'status' => 'Pending',
         'payment_status' => 'Pending',
-        'payment_provider' => 'square',
+        'payment_provider' => 'stripe',
         'fulfillment_method' => 'shipping',
         'shipping_full_name' => 'Mail Customer',
         'shipping_phone' => '416-555-0004',

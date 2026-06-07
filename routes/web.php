@@ -4,7 +4,12 @@ use App\Http\Controllers\Admin\ContactMessageController as AdminContactMessageCo
 use App\Http\Controllers\Admin\CustomerController as AdminCustomerController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\OrderController as AdminOrderController;
+use App\Http\Controllers\Admin\PartBrandController as AdminPartBrandController;
+use App\Http\Controllers\Admin\PartCategoryController as AdminPartCategoryController;
 use App\Http\Controllers\Admin\PartController as AdminPartController;
+use App\Http\Controllers\Admin\PaymentController as AdminPaymentController;
+use App\Http\Controllers\Admin\ProductBrandController as AdminProductBrandController;
+use App\Http\Controllers\Admin\ProductCategoryController as AdminProductCategoryController;
 use App\Http\Controllers\Admin\ProductController as AdminProductController;
 use App\Http\Controllers\Admin\RepairController as AdminRepairController;
 use App\Http\Controllers\Admin\ShippingDiscountRuleController as AdminShippingDiscountRuleController;
@@ -16,6 +21,8 @@ use App\Http\Controllers\ContactController;
 use App\Http\Controllers\CustomerDashboardController;
 use App\Http\Controllers\OrderTrackingController;
 use App\Http\Controllers\PartController;
+use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\PaymentWebhookController;
 use App\Http\Controllers\PublicPageController;
 use App\Http\Controllers\RepairBookingController;
 use App\Http\Controllers\ShopController;
@@ -38,6 +45,12 @@ Route::post('/orders/track/result', [OrderTrackingController::class, 'result'])-
 Route::get('/parts', [PartController::class, 'index'])->name('parts.index');
 Route::get('/contact', [ContactController::class, 'create'])->name('contact.create');
 Route::post('/contact', [ContactController::class, 'store'])->name('contact.store');
+Route::post('/webhooks/stripe', [PaymentWebhookController::class, 'stripe'])->name('webhooks.stripe');
+Route::post('/webhooks/paypal', [PaymentWebhookController::class, 'paypal'])->name('webhooks.paypal');
+Route::get('/payments/{payment}', [PaymentController::class, 'show'])->name('payments.show');
+Route::get('/payments/{payment}/stripe/success', [PaymentController::class, 'stripeSuccess'])->name('payments.stripe.success');
+Route::get('/payments/{payment}/paypal/return', [PaymentController::class, 'paypalReturn'])->name('payments.paypal.return');
+Route::get('/payments/{payment}/cancel', [PaymentController::class, 'cancel'])->name('payments.cancel');
 
 Route::middleware('guest')->group(function (): void {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
@@ -60,6 +73,7 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout.show');
     Route::post('/checkout', [CheckoutController::class, 'store'])->name('checkout.store');
     Route::get('/checkout/confirmation/{order}', [CheckoutController::class, 'confirmation'])->name('checkout.confirmation');
+
 });
 
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function (): void {
@@ -70,12 +84,18 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::patch('/repairs/{repair}', [AdminRepairController::class, 'update'])->name('repairs.update');
 
     Route::resource('products', AdminProductController::class)->except(['show']);
+    Route::resource('product-brands', AdminProductBrandController::class)->except(['show']);
+    Route::resource('product-categories', AdminProductCategoryController::class)->except(['show']);
     Route::get('/orders', [AdminOrderController::class, 'index'])->name('orders.index');
     Route::get('/orders/{order}', [AdminOrderController::class, 'show'])->name('orders.show');
     Route::patch('/orders/{order}', [AdminOrderController::class, 'update'])->name('orders.update');
 
     Route::post('/parts/sync', [AdminPartController::class, 'sync'])->name('parts.sync');
     Route::resource('parts', AdminPartController::class)->except(['show']);
+    Route::resource('part-brands', AdminPartBrandController::class)->except(['show']);
+    Route::resource('part-categories', AdminPartCategoryController::class)->except(['show']);
+    Route::get('/payments', [AdminPaymentController::class, 'index'])->name('payments.index');
+    Route::get('/payments/{payment}', [AdminPaymentController::class, 'show'])->name('payments.show');
     Route::resource('shipping-methods', AdminShippingMethodController::class)->except(['show']);
     Route::resource('shipping-discounts', AdminShippingDiscountRuleController::class)->except(['show']);
 

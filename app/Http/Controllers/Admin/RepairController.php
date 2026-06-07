@@ -14,6 +14,7 @@ class RepairController extends Controller
     public function index(Request $request)
     {
         $repairs = RepairBooking::query()
+            ->with('latestPayment')
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
             ->when($request->filled('q'), function ($query) use ($request): void {
                 $search = $request->string('q');
@@ -39,7 +40,7 @@ class RepairController extends Controller
     public function show(RepairBooking $repair)
     {
         return view('admin.repairs.show', [
-            'repair' => $repair->load('statusUpdates', 'user'),
+            'repair' => $repair->load('statusUpdates', 'user', 'latestPayment'),
             'statuses' => RepairBooking::STATUSES,
             'fulfillmentMethods' => RepairBooking::FULFILLMENT_METHODS,
         ]);

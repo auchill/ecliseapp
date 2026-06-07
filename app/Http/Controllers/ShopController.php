@@ -2,8 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Category;
 use App\Models\Product;
+use App\Models\ProductBrand;
+use App\Models\ProductCategory;
 use Illuminate\Http\Request;
 
 class ShopController extends Controller
@@ -11,7 +12,7 @@ class ShopController extends Controller
     public function index(Request $request)
     {
         $products = Product::query()
-            ->with('category')
+            ->with('category', 'productBrand', 'productCategory')
             ->active()
             ->when($request->filled('q'), function ($query) use ($request): void {
                 $search = $request->string('q');
@@ -23,9 +24,19 @@ class ShopController extends Controller
                 });
             })
             ->when($request->filled('category'), function ($query) use ($request): void {
-                $query->whereHas('category', fn ($query) => $query->where('slug', $request->string('category')));
+                $category = $request->string('category');
+                $query->where(function ($query) use ($category): void {
+                    $query->whereHas('productCategory', fn ($query) => $query->where('slug', $category))
+                        ->orWhereHas('category', fn ($query) => $query->where('slug', $category));
+                });
             })
-            ->when($request->filled('brand'), fn ($query) => $query->where('brand', $request->string('brand')))
+            ->when($request->filled('brand'), function ($query) use ($request): void {
+                $brand = $request->string('brand');
+                $query->where(function ($query) use ($brand): void {
+                    $query->whereHas('productBrand', fn ($query) => $query->where('slug', $brand))
+                        ->orWhere('brand', $brand);
+                });
+            })
             ->when($request->filled('condition'), fn ($query) => $query->where('condition', $request->string('condition')))
             ->when($request->filled('min_price'), fn ($query) => $query->where('price', '>=', $request->input('min_price')))
             ->when($request->filled('max_price'), fn ($query) => $query->where('price', '<=', $request->input('max_price')))
@@ -35,8 +46,8 @@ class ShopController extends Controller
 
         return view('shop.index', [
             'products' => $products,
-            'categories' => Category::query()->where('type', 'product')->orderBy('name')->get(),
-            'brands' => Product::query()->active()->whereNotNull('brand')->distinct()->orderBy('brand')->pluck('brand'),
+            'categories' => ProductCategory::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
+            'brands' => ProductBrand::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
             'conditions' => Product::CONDITIONS,
         ]);
     }
@@ -46,11 +57,16 @@ class ShopController extends Controller
         abort_unless($product->status === 'Active', 404);
 
         return view('shop.show', [
-            'product' => $product->load('category'),
+            'product' => $product->load('category', 'productBrand', 'productCategory'),
             'relatedProducts' => Product::query()
+                ->with('category', 'productBrand', 'productCategory')
                 ->active()
                 ->where('id', '!=', $product->id)
-                ->where('category_id', $product->category_id)
+                ->when(
+                    $product->product_category_id,
+                    fn ($query) => $query->where('product_category_id', $product->product_category_id),
+                    fn ($query) => $query->where('category_id', $product->category_id),
+                )
                 ->take(3)
                 ->get(),
         ]);

@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Order extends Model
 {
@@ -30,6 +31,7 @@ class Order extends Model
 
     protected $fillable = [
         'user_id',
+        'cart_id',
         'order_number',
         'customer_name',
         'email',
@@ -40,9 +42,14 @@ class Order extends Model
         'total',
         'status',
         'payment_provider',
+        'payment_gateway',
         'payment_reference',
         'fulfillment_method',
         'payment_status',
+        'payment_amount',
+        'currency',
+        'paid_at',
+        'inventory_committed_at',
         'shipping_full_name',
         'shipping_phone',
         'shipping_email',
@@ -74,7 +81,10 @@ class Order extends Model
             'shipping_base_cost' => 'decimal:2',
             'shipping_discount_amount' => 'decimal:2',
             'shipping_cost' => 'decimal:2',
+            'payment_amount' => 'decimal:2',
             'total' => 'decimal:2',
+            'paid_at' => 'datetime',
+            'inventory_committed_at' => 'datetime',
         ];
     }
 
@@ -96,6 +106,21 @@ class Order extends Model
     public function shippingMethod(): BelongsTo
     {
         return $this->belongsTo(ShippingMethod::class);
+    }
+
+    public function cart(): BelongsTo
+    {
+        return $this->belongsTo(Cart::class);
+    }
+
+    public function payments(): MorphMany
+    {
+        return $this->morphMany(Payment::class, 'payable');
+    }
+
+    public function latestPayment()
+    {
+        return $this->morphOne(Payment::class, 'payable')->latestOfMany();
     }
 
     public function publicStatusUpdates(): HasMany

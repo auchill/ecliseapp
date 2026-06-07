@@ -17,6 +17,8 @@ class Product extends Model
 
     protected $fillable = [
         'category_id',
+        'product_brand_id',
+        'product_category_id',
         'name',
         'slug',
         'sku',
@@ -49,6 +51,16 @@ class Product extends Model
         return $this->belongsTo(Category::class);
     }
 
+    public function productBrand(): BelongsTo
+    {
+        return $this->belongsTo(ProductBrand::class);
+    }
+
+    public function productCategory(): BelongsTo
+    {
+        return $this->belongsTo(ProductCategory::class);
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('status', 'Active')->where('quantity', '>', 0);
@@ -57,6 +69,16 @@ class Product extends Model
     public function currentPrice(): float
     {
         return (float) ($this->sale_price ?: $this->price);
+    }
+
+    public function brandName(): ?string
+    {
+        return $this->productBrand?->name ?? $this->brand;
+    }
+
+    public function categoryName(): ?string
+    {
+        return $this->productCategory?->name ?? $this->category?->name;
     }
 
     public function imageUrl(): string

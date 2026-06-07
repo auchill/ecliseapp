@@ -41,6 +41,19 @@ return [
         'environment' => env('SQUARE_ENVIRONMENT', 'sandbox'),
     ],
 
+    'stripe' => [
+        'key' => env('STRIPE_KEY'),
+        'secret' => env('STRIPE_SECRET'),
+        'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+    ],
+
+    'paypal' => [
+        'client_id' => env('PAYPAL_CLIENT_ID'),
+        'secret' => env('PAYPAL_SECRET'),
+        'mode' => env('PAYPAL_MODE', 'sandbox'),
+        'webhook_id' => env('PAYPAL_WEBHOOK_ID'),
+    ],
+
     'mobilesentrix' => [
         'api_key' => env('MOBILESENTRIX_API_KEY'),
         'api_url' => env('MOBILESENTRIX_API_URL'),

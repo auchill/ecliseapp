@@ -14,6 +14,7 @@ class OrderController extends Controller
     public function index(Request $request)
     {
         $orders = Order::query()
+            ->with('latestPayment')
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
             ->when($request->filled('q'), function ($query) use ($request): void {
                 $search = $request->string('q');
@@ -36,7 +37,7 @@ class OrderController extends Controller
     public function show(Order $order)
     {
         return view('admin.orders.show', [
-            'order' => $order->load('items', 'user', 'statusUpdates'),
+            'order' => $order->load('items', 'user', 'statusUpdates', 'latestPayment'),
             'statuses' => Order::STATUSES,
             'fulfillmentMethods' => Order::FULFILLMENT_METHODS,
         ]);

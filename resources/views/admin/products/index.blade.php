@@ -44,7 +44,7 @@
                                 <tr>
                                     <td>{{ $product->name }}</td>
                                     <td>{{ $product->sku }}</td>
-                                    <td>{{ $product->category?->name }}</td>
+                                    <td>{{ $product->categoryName() }}</td>
                                     <td>${{ number_format($product->currentPrice(), 2) }}</td>
                                     <td>{{ $product->quantity }}</td>
                                     <td><span class="status-pill">{{ $product->status }}</span></td>

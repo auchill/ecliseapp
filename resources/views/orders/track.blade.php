@@ -48,6 +48,7 @@
                                         <tr><th scope="row">Fulfillment</th><td>{{ $order->fulfillmentLabel() }}</td></tr>
                                         <tr><th scope="row">Order status</th><td>{{ $order->status }}</td></tr>
                                         <tr><th scope="row">Payment status</th><td>{{ $order->payment_status }}</td></tr>
+                                        <tr><th scope="row">Payment gateway</th><td>{{ $order->latestPayment?->gatewayLabel() ?? ucfirst($order->payment_gateway ?? 'Pending') }}</td></tr>
                                         @if ($order->isShipping())
                                             <tr><th scope="row">Shipping method</th><td>{{ $order->shipping_method_name ?: 'To be confirmed' }}</td></tr>
                                             <tr><th scope="row">Estimated delivery</th><td>{{ $order->shipping_delivery_days ?: 'To be confirmed' }}</td></tr>

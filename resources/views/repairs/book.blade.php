@@ -66,6 +66,22 @@
                         <label class="form-label" for="issue_description">Issue description</label>
                         <textarea class="form-control" id="issue_description" name="issue_description" rows="5" required>{{ old('issue_description') }}</textarea>
                     </div>
+                    <div class="col-12">
+                        <label class="form-label d-block">Payment method</label>
+                        <div class="row g-3">
+                            @foreach (['stripe' => 'Stripe', 'paypal' => 'PayPal'] as $gateway => $label)
+                                <div class="col-md-6">
+                                    <label class="surface p-3 d-flex gap-3 h-100" for="payment_{{ $gateway }}">
+                                        <input class="form-check-input mt-1" id="payment_{{ $gateway }}" name="payment_gateway" type="radio" value="{{ $gateway }}" @checked(old('payment_gateway', 'stripe') === $gateway)>
+                                        <span>
+                                            <strong>{{ $label }}</strong>
+                                            <span class="d-block muted small">{{ $gateway === 'stripe' ? 'Cards, Apple Pay, and Google Pay where available.' : 'Pay with your PayPal account or supported PayPal options.' }}</span>
+                                        </span>
+                                    </label>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
                     <div class="col-12" data-fulfillment-form>
                         <label class="form-label d-block">After-repair fulfillment</label>
                         <div class="row g-3">
@@ -188,7 +204,7 @@
                         </div>
                     </div>
                     <div class="col-12 d-flex flex-wrap gap-2">
-                        <button class="btn btn-primary btn-lg" type="submit"><i class="bi bi-send me-2"></i>Submit Repair Request</button>
+                        <button class="btn btn-primary btn-lg" type="submit"><i class="bi bi-credit-card me-2"></i>Submit and Continue</button>
                         <a class="btn btn-outline-primary btn-lg" href="{{ route('repairs.track') }}"><i class="bi bi-search me-2"></i>Track Existing Repair</a>
                     </div>
                 </div>
