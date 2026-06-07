@@ -95,6 +95,8 @@ class OrderController extends Controller
     {
         if ($data['fulfillment_method'] === 'pickup') {
             $data['shipping_cost'] = 0;
+            $data['shipping_base_cost'] = 0;
+            $data['shipping_discount_amount'] = 0;
 
             foreach ([
                 'shipping_full_name',
@@ -106,6 +108,9 @@ class OrderController extends Controller
                 'shipping_province',
                 'shipping_postal_code',
                 'shipping_country',
+                'shipping_method_id',
+                'shipping_method_name',
+                'shipping_delivery_days',
                 'delivery_carrier',
                 'tracking_number',
                 'tracking_notes',

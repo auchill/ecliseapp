@@ -25,9 +25,17 @@
                                     <tr><th scope="row">Issue</th><td>{{ $booking->issue_category }}</td></tr>
                                     <tr><th scope="row">Status</th><td><span class="status-pill">{{ $booking->status }}</span></td></tr>
                                     <tr><th scope="row">Fulfillment</th><td>{{ $booking->fulfillmentLabel() }}</td></tr>
-                                    <tr><th scope="row">Shipping cost</th><td>${{ number_format($booking->shipping_cost, 2) }}</td></tr>
-                                    <tr><th scope="row">Delivery carrier</th><td>{{ $booking->delivery_carrier ?: 'Not available yet' }}</td></tr>
-                                    <tr><th scope="row">Delivery tracking</th><td>{{ $booking->delivery_tracking_number ?: 'Not available yet' }}</td></tr>
+                                    @if ($booking->isShipping())
+                                        <tr><th scope="row">Shipping method</th><td>{{ $booking->shipping_method_name ?: 'To be confirmed' }}</td></tr>
+                                        <tr><th scope="row">Estimated delivery</th><td>{{ $booking->shipping_delivery_days ?: 'To be confirmed' }}</td></tr>
+                                        <tr><th scope="row">Shipping base</th><td>${{ number_format($booking->shipping_base_cost, 2) }}</td></tr>
+                                        <tr><th scope="row">Shipping discount</th><td>${{ number_format($booking->shipping_discount_amount, 2) }}</td></tr>
+                                        <tr><th scope="row">Final shipping</th><td>${{ number_format($booking->shipping_cost, 2) }}</td></tr>
+                                        <tr><th scope="row">Delivery carrier</th><td>{{ $booking->delivery_carrier ?: 'Not available yet' }}</td></tr>
+                                        <tr><th scope="row">Delivery tracking</th><td>{{ $booking->delivery_tracking_number ?: 'Not available yet' }}</td></tr>
+                                    @else
+                                        <tr><th scope="row">Shipping</th><td>No charge for store pickup.</td></tr>
+                                    @endif
                                     <tr><th scope="row">Appointment</th><td>{{ $booking->preferred_appointment_date?->format('M j, Y') ?? 'Not set' }} {{ $booking->preferred_appointment_time }}</td></tr>
                                 </tbody>
                             </table>

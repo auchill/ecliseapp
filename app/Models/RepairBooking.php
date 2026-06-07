@@ -59,6 +59,11 @@ class RepairBooking extends Model
         'shipping_province',
         'shipping_postal_code',
         'shipping_country',
+        'shipping_method_id',
+        'shipping_method_name',
+        'shipping_delivery_days',
+        'shipping_base_cost',
+        'shipping_discount_amount',
         'shipping_cost',
         'repair_total',
         'delivery_carrier',
@@ -72,6 +77,8 @@ class RepairBooking extends Model
             'preferred_appointment_date' => 'date',
             'estimated_completion_date' => 'date',
             'terms_accepted' => 'boolean',
+            'shipping_base_cost' => 'decimal:2',
+            'shipping_discount_amount' => 'decimal:2',
             'shipping_cost' => 'decimal:2',
             'repair_total' => 'decimal:2',
         ];
@@ -92,6 +99,11 @@ class RepairBooking extends Model
         return $this->hasMany(RepairStatusUpdate::class)
             ->where('is_customer_visible', true)
             ->oldest();
+    }
+
+    public function shippingMethod(): BelongsTo
+    {
+        return $this->belongsTo(ShippingMethod::class);
     }
 
     public function deviceLabel(): string

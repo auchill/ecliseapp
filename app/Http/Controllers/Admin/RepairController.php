@@ -73,8 +73,23 @@ class RepairController extends Controller
         $statusChanged = $repair->status !== $data['status'];
         $data = $this->normalizeFulfillmentData($data);
         $data['repair_total'] = $data['shipping_cost'];
+        $shippingSnapshot = $data['fulfillment_method'] === 'pickup'
+            ? [
+                'shipping_method_id' => null,
+                'shipping_method_name' => null,
+                'shipping_delivery_days' => null,
+                'shipping_base_cost' => 0,
+                'shipping_discount_amount' => 0,
+            ]
+            : [
+                'shipping_method_id' => $repair->shipping_method_id,
+                'shipping_method_name' => $repair->shipping_method_name,
+                'shipping_delivery_days' => $repair->shipping_delivery_days,
+                'shipping_base_cost' => $repair->shipping_base_cost,
+                'shipping_discount_amount' => $repair->shipping_discount_amount,
+            ];
 
-        $repair->update([
+        $repair->update($shippingSnapshot + [
             'status' => $data['status'],
             'fulfillment_method' => $data['fulfillment_method'],
             'shipping_full_name' => $data['shipping_full_name'] ?? null,
@@ -116,6 +131,8 @@ class RepairController extends Controller
     {
         if ($data['fulfillment_method'] === 'pickup') {
             $data['shipping_cost'] = 0;
+            $data['shipping_base_cost'] = 0;
+            $data['shipping_discount_amount'] = 0;
 
             foreach ([
                 'shipping_full_name',
@@ -127,6 +144,9 @@ class RepairController extends Controller
                 'shipping_province',
                 'shipping_postal_code',
                 'shipping_country',
+                'shipping_method_id',
+                'shipping_method_name',
+                'shipping_delivery_days',
                 'delivery_carrier',
                 'delivery_tracking_number',
                 'tracking_notes',

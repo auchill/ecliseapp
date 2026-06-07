@@ -9,6 +9,7 @@ use App\Services\ShippingCostService;
 use App\Services\SquarePaymentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 
 class CheckoutController extends Controller
 {
@@ -20,11 +21,19 @@ class CheckoutController extends Controller
             return redirect()->route('shop.index')->with('status', 'Add an item before checkout.');
         }
 
+        $subtotal = $cart->subtotal();
+        $shippingMethods = $shippingCosts->getAvailableShippingMethods();
+        $shippingQuotes = $shippingMethods
+            ->mapWithKeys(fn ($method) => [
+                (string) $method->id => $shippingCosts->calculateForShopOrder($subtotal, $method->id),
+            ])
+            ->all();
+
         return view('checkout.show', [
             'cart' => $cart,
-            'pickupShippingCost' => $shippingCosts->calculate('pickup'),
-            'canadaShippingCost' => $shippingCosts->calculate('shipping', 'Canada'),
-            'internationalShippingCost' => $shippingCosts->calculate('shipping', 'United States'),
+            'pickupQuote' => $shippingCosts->calculateForFulfillment('pickup', $subtotal, null),
+            'shippingMethods' => $shippingMethods,
+            'shippingQuotes' => $shippingQuotes,
         ]);
     }
 
@@ -37,7 +46,20 @@ class CheckoutController extends Controller
         }
 
         $data = $request->validated();
-        $data = $this->normalizeFulfillmentData($data, $shippingCosts);
+
+        try {
+            $shippingQuote = $shippingCosts->calculateForFulfillment(
+                $data['fulfillment_method'],
+                $cart->subtotal(),
+                isset($data['shipping_method_id']) ? (int) $data['shipping_method_id'] : null,
+            );
+        } catch (InvalidArgumentException $exception) {
+            return back()
+                ->withErrors(['shipping_method_id' => $exception->getMessage()])
+                ->withInput();
+        }
+
+        $data = $this->normalizeFulfillmentData($data, $shippingQuote);
         $payment = $payments->createCheckout($cart, $data);
 
         $order = DB::transaction(function () use ($cart, $data, $payment, $request): Order {
@@ -69,6 +91,11 @@ class CheckoutController extends Controller
                 'shipping_province' => $data['shipping_province'] ?? null,
                 'shipping_postal_code' => $data['shipping_postal_code'] ?? null,
                 'shipping_country' => $data['shipping_country'] ?? null,
+                'shipping_method_id' => $data['shipping_method_id'],
+                'shipping_method_name' => $data['shipping_method_name'],
+                'shipping_delivery_days' => $data['shipping_delivery_days'],
+                'shipping_base_cost' => $data['shipping_base_cost'],
+                'shipping_discount_amount' => $data['shipping_discount_amount'],
                 'shipping_cost' => $data['shipping_cost'],
                 'delivery_carrier' => $data['delivery_carrier'] ?? null,
                 'tracking_number' => $data['tracking_number'] ?? null,
@@ -78,8 +105,8 @@ class CheckoutController extends Controller
 
             $order->statusUpdates()->create([
                 'status' => 'Pending',
-                'note' => $order->isShipping()
-                    ? 'Order placed for shipping.'
+                'note' => $order->isShipping() && $order->shipping_method_name
+                    ? "Order placed for {$order->shipping_method_name}."
                     : 'Order placed for store pickup.',
                 'is_customer_visible' => true,
                 'delivery_carrier' => $order->delivery_carrier,
@@ -121,12 +148,9 @@ class CheckoutController extends Controller
         ]);
     }
 
-    private function normalizeFulfillmentData(array $data, ShippingCostService $shippingCosts): array
+    private function normalizeFulfillmentData(array $data, array $shippingQuote): array
     {
-        $data['shipping_cost'] = $shippingCosts->calculate(
-            $data['fulfillment_method'],
-            $data['shipping_country'] ?? null,
-        );
+        $data = array_merge($data, $shippingQuote);
 
         if ($data['fulfillment_method'] === 'pickup') {
             foreach ([

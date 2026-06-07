@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class CheckoutRequest extends FormRequest
 {
@@ -18,6 +19,11 @@ class CheckoutRequest extends FormRequest
             'email' => ['required', 'email', 'max:255'],
             'phone' => ['required', 'string', 'max:40'],
             'fulfillment_method' => ['required', 'in:pickup,shipping'],
+            'shipping_method_id' => [
+                'required_if:fulfillment_method,shipping',
+                'nullable',
+                Rule::exists('shipping_methods', 'id')->where('is_active', true),
+            ],
             'shipping_full_name' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:255'],
             'shipping_phone' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:40'],
             'shipping_email' => ['required_if:fulfillment_method,shipping', 'nullable', 'email', 'max:255'],

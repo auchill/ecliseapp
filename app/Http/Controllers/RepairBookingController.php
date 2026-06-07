@@ -7,22 +7,44 @@ use App\Http\Requests\TrackRepairRequest;
 use App\Models\RepairBooking;
 use App\Services\ShippingCostService;
 use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
 
 class RepairBookingController extends Controller
 {
     public function create(ShippingCostService $shippingCosts)
     {
+        $repairSubtotal = 0.00;
+        $shippingMethods = $shippingCosts->getAvailableShippingMethods();
+        $shippingQuotes = $shippingMethods
+            ->mapWithKeys(fn ($method) => [
+                (string) $method->id => $shippingCosts->calculateForRepairOrder($repairSubtotal, $method->id),
+            ])
+            ->all();
+
         return view('repairs.book', [
-            'pickupShippingCost' => $shippingCosts->calculate('pickup'),
-            'canadaShippingCost' => $shippingCosts->calculate('shipping', 'Canada'),
-            'internationalShippingCost' => $shippingCosts->calculate('shipping', 'United States'),
+            'pickupQuote' => $shippingCosts->calculateForFulfillment('pickup', $repairSubtotal, null),
+            'shippingMethods' => $shippingMethods,
+            'shippingQuotes' => $shippingQuotes,
         ]);
     }
 
     public function store(StoreRepairBookingRequest $request, ShippingCostService $shippingCosts)
     {
         $data = $request->validated();
-        $data = $this->normalizeFulfillmentData($data, $shippingCosts);
+
+        try {
+            $shippingQuote = $shippingCosts->calculateForFulfillment(
+                $data['fulfillment_method'],
+                0.00,
+                isset($data['shipping_method_id']) ? (int) $data['shipping_method_id'] : null,
+            );
+        } catch (InvalidArgumentException $exception) {
+            return back()
+                ->withErrors(['shipping_method_id' => $exception->getMessage()])
+                ->withInput();
+        }
+
+        $data = $this->normalizeFulfillmentData($data, $shippingQuote);
 
         if ($request->hasFile('device_image')) {
             $data['device_image_path'] = $request->file('device_image')->store('repair-images', 'public');
@@ -40,8 +62,8 @@ class RepairBookingController extends Controller
 
         $booking->statusUpdates()->create([
             'status' => 'Submitted',
-            'note' => $booking->isShipping()
-                ? 'Repair request received. Repaired device will be shipped after service.'
+            'note' => $booking->isShipping() && $booking->shipping_method_name
+                ? "Repair request received. Repaired device will use {$booking->shipping_method_name} after service."
                 : 'Repair request received. Repaired device will be held for store pickup.',
             'is_customer_visible' => true,
             'delivery_carrier' => $booking->delivery_carrier,
@@ -105,12 +127,9 @@ class RepairBookingController extends Controller
         return $trackingNumber;
     }
 
-    private function normalizeFulfillmentData(array $data, ShippingCostService $shippingCosts): array
+    private function normalizeFulfillmentData(array $data, array $shippingQuote): array
     {
-        $data['shipping_cost'] = $shippingCosts->calculate(
-            $data['fulfillment_method'],
-            $data['shipping_country'] ?? null,
-        );
+        $data = array_merge($data, $shippingQuote);
 
         if ($data['fulfillment_method'] === 'pickup') {
             foreach ([

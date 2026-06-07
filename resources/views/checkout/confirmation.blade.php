@@ -39,6 +39,8 @@
                 <div class="text-end">
                     <p class="mb-1">Subtotal: <strong>${{ number_format($order->subtotal, 2) }}</strong></p>
                     <p class="mb-1">Tax: <strong>${{ number_format($order->tax, 2) }}</strong></p>
+                    <p class="mb-1">Shipping base: <strong>${{ number_format($order->shipping_base_cost, 2) }}</strong></p>
+                    <p class="mb-1">Shipping discount: <strong>${{ number_format($order->shipping_discount_amount, 2) }}</strong></p>
                     <p class="mb-1">Shipping: <strong>${{ number_format($order->shipping_cost, 2) }}</strong></p>
                     <p class="h4 fw-bold">Total: ${{ number_format($order->total, 2) }}</p>
                     <span class="status-pill">{{ $order->status }}</span>
@@ -47,6 +49,15 @@
                     <div class="col-lg-6">
                         <h2 class="h5 fw-bold">Fulfillment</h2>
                         <p class="mb-1"><strong>Method:</strong> {{ $order->fulfillmentLabel() }}</p>
+                        @if ($order->isShipping())
+                            <p class="mb-1"><strong>Shipping method:</strong> {{ $order->shipping_method_name ?: 'To be confirmed' }}</p>
+                            <p class="mb-1"><strong>Estimated delivery:</strong> {{ $order->shipping_delivery_days ?: 'To be confirmed' }}</p>
+                            <p class="mb-1"><strong>Shipping base:</strong> ${{ number_format($order->shipping_base_cost, 2) }}</p>
+                            <p class="mb-1"><strong>Shipping discount:</strong> ${{ number_format($order->shipping_discount_amount, 2) }}</p>
+                            <p class="mb-1"><strong>Final shipping:</strong> ${{ number_format($order->shipping_cost, 2) }}</p>
+                        @else
+                            <p class="mb-1"><strong>Shipping:</strong> No charge for store pickup.</p>
+                        @endif
                         <p class="mb-1"><strong>Payment status:</strong> {{ $order->payment_status }}</p>
                         @if ($order->delivery_carrier)
                             <p class="mb-1"><strong>Delivery carrier:</strong> {{ $order->delivery_carrier }}</p>

@@ -9,7 +9,15 @@
         <table cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%; max-width: 640px;">
             <tr><td><strong>Device type</strong></td><td>{{ $repair->device_type }}</td></tr>
             <tr><td><strong>Fulfillment</strong></td><td>{{ $repair->fulfillmentLabel() }}</td></tr>
-            <tr><td><strong>Shipping cost</strong></td><td>${{ number_format($repair->shipping_cost, 2) }}</td></tr>
+            @if ($repair->isShipping())
+                <tr><td><strong>Shipping method</strong></td><td>{{ $repair->shipping_method_name ?: 'To be confirmed' }}</td></tr>
+                <tr><td><strong>Estimated delivery</strong></td><td>{{ $repair->shipping_delivery_days ?: 'To be confirmed' }}</td></tr>
+                <tr><td><strong>Shipping base</strong></td><td>${{ number_format($repair->shipping_base_cost, 2) }}</td></tr>
+                <tr><td><strong>Shipping discount</strong></td><td>${{ number_format($repair->shipping_discount_amount, 2) }}</td></tr>
+                <tr><td><strong>Final shipping</strong></td><td>${{ number_format($repair->shipping_cost, 2) }}</td></tr>
+            @else
+                <tr><td><strong>Shipping</strong></td><td>No charge for store pickup.</td></tr>
+            @endif
             <tr><td><strong>Repair total</strong></td><td>${{ number_format($repair->repair_total, 2) }}</td></tr>
             @if ($repair->estimated_completion_date)
                 <tr><td><strong>Estimated completion</strong></td><td>{{ $repair->estimated_completion_date->format('M j, Y') }}</td></tr>

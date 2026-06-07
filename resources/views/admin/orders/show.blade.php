@@ -44,7 +44,9 @@
                         <div class="text-end">
                             <p class="mb-1">Subtotal: <strong>${{ number_format($order->subtotal, 2) }}</strong></p>
                             <p class="mb-1">Tax: <strong>${{ number_format($order->tax, 2) }}</strong></p>
-                            <p class="mb-1">Shipping: <strong>${{ number_format($order->shipping_cost, 2) }}</strong></p>
+                            <p class="mb-1">Shipping base: <strong>${{ number_format($order->shipping_base_cost, 2) }}</strong></p>
+                            <p class="mb-1">Shipping discount: <strong>${{ number_format($order->shipping_discount_amount, 2) }}</strong></p>
+                            <p class="mb-1">Final shipping: <strong>${{ number_format($order->shipping_cost, 2) }}</strong></p>
                             <p class="h4 fw-bold">Total: ${{ number_format($order->total, 2) }}</p>
                         </div>
                     </div>
@@ -177,6 +179,15 @@
                         <p class="mb-1"><strong>Email:</strong> {{ $order->email }}</p>
                         <p class="mb-1"><strong>Phone:</strong> {{ $order->phone }}</p>
                         <p class="mb-1"><strong>Fulfillment:</strong> {{ $order->fulfillmentLabel() }}</p>
+                        @if ($order->isShipping())
+                            <p class="mb-1"><strong>Shipping method:</strong> {{ $order->shipping_method_name ?: 'To be confirmed' }}</p>
+                            <p class="mb-1"><strong>Estimated delivery:</strong> {{ $order->shipping_delivery_days ?: 'To be confirmed' }}</p>
+                            <p class="mb-1"><strong>Shipping base:</strong> ${{ number_format($order->shipping_base_cost, 2) }}</p>
+                            <p class="mb-1"><strong>Shipping discount:</strong> ${{ number_format($order->shipping_discount_amount, 2) }}</p>
+                            <p class="mb-1"><strong>Final shipping:</strong> ${{ number_format($order->shipping_cost, 2) }}</p>
+                        @else
+                            <p class="mb-1"><strong>Shipping:</strong> No charge for store pickup.</p>
+                        @endif
                         <p class="mb-0"><strong>Payment reference:</strong> {{ $order->payment_reference ?: 'Pending' }}</p>
                     </div>
                 </div>

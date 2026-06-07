@@ -129,7 +129,15 @@
                                     <tr><th scope="row">Issue</th><td>{{ $repair->issue_category }}</td></tr>
                                     <tr><th scope="row">Description</th><td>{{ $repair->issue_description }}</td></tr>
                                     <tr><th scope="row">Fulfillment</th><td>{{ $repair->fulfillmentLabel() }}</td></tr>
-                                    <tr><th scope="row">Shipping cost</th><td>${{ number_format($repair->shipping_cost, 2) }}</td></tr>
+                                    @if ($repair->isShipping())
+                                        <tr><th scope="row">Shipping method</th><td>{{ $repair->shipping_method_name ?: 'To be confirmed' }}</td></tr>
+                                        <tr><th scope="row">Estimated delivery</th><td>{{ $repair->shipping_delivery_days ?: 'To be confirmed' }}</td></tr>
+                                        <tr><th scope="row">Shipping base</th><td>${{ number_format($repair->shipping_base_cost, 2) }}</td></tr>
+                                        <tr><th scope="row">Shipping discount</th><td>${{ number_format($repair->shipping_discount_amount, 2) }}</td></tr>
+                                        <tr><th scope="row">Final shipping</th><td>${{ number_format($repair->shipping_cost, 2) }}</td></tr>
+                                    @else
+                                        <tr><th scope="row">Shipping</th><td>No charge for store pickup.</td></tr>
+                                    @endif
                                     <tr><th scope="row">Repair total</th><td>${{ number_format($repair->repair_total, 2) }}</td></tr>
                                     <tr><th scope="row">Appointment</th><td>{{ $repair->preferred_appointment_date?->format('M j, Y') ?? 'Not set' }} {{ $repair->preferred_appointment_time }}</td></tr>
                                 </tbody>

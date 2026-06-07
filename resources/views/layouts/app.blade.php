@@ -70,6 +70,8 @@
                                 <li class="nav-item"><a class="nav-link rounded {{ request()->routeIs('admin.products.*') ? 'active' : '' }}" href="{{ route('admin.products.index') }}"><i class="bi bi-phone me-1"></i>Products</a></li>
                                 <li class="nav-item"><a class="nav-link rounded {{ request()->routeIs('admin.orders.*') ? 'active' : '' }}" href="{{ route('admin.orders.index') }}"><i class="bi bi-receipt me-1"></i>Orders</a></li>
                                 <li class="nav-item"><a class="nav-link rounded {{ request()->routeIs('admin.parts.*') ? 'active' : '' }}" href="{{ route('admin.parts.index') }}"><i class="bi bi-cpu me-1"></i>Parts</a></li>
+                                <li class="nav-item"><a class="nav-link rounded {{ request()->routeIs('admin.shipping-methods.*') ? 'active' : '' }}" href="{{ route('admin.shipping-methods.index') }}"><i class="bi bi-truck me-1"></i>Shipping Methods</a></li>
+                                <li class="nav-item"><a class="nav-link rounded {{ request()->routeIs('admin.shipping-discounts.*') ? 'active' : '' }}" href="{{ route('admin.shipping-discounts.index') }}"><i class="bi bi-percent me-1"></i>Shipping Discounts</a></li>
                                 <li class="nav-item"><a class="nav-link rounded {{ request()->routeIs('admin.customers.*') ? 'active' : '' }}" href="{{ route('admin.customers.index') }}"><i class="bi bi-people me-1"></i>Customers</a></li>
                                 <li class="nav-item"><a class="nav-link rounded {{ request()->routeIs('admin.contact-messages.*') ? 'active' : '' }}" href="{{ route('admin.contact-messages.index') }}"><i class="bi bi-envelope me-1"></i>Messages</a></li>
                             </ul>

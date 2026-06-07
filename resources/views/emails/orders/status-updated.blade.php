@@ -9,7 +9,15 @@
         <table cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%; max-width: 640px;">
             <tr><td><strong>Fulfillment</strong></td><td>{{ $order->fulfillmentLabel() }}</td></tr>
             <tr><td><strong>Payment status</strong></td><td>{{ $order->payment_status }}</td></tr>
-            <tr><td><strong>Shipping cost</strong></td><td>${{ number_format($order->shipping_cost, 2) }}</td></tr>
+            @if ($order->isShipping())
+                <tr><td><strong>Shipping method</strong></td><td>{{ $order->shipping_method_name ?: 'To be confirmed' }}</td></tr>
+                <tr><td><strong>Estimated delivery</strong></td><td>{{ $order->shipping_delivery_days ?: 'To be confirmed' }}</td></tr>
+                <tr><td><strong>Shipping base</strong></td><td>${{ number_format($order->shipping_base_cost, 2) }}</td></tr>
+                <tr><td><strong>Shipping discount</strong></td><td>${{ number_format($order->shipping_discount_amount, 2) }}</td></tr>
+                <tr><td><strong>Final shipping</strong></td><td>${{ number_format($order->shipping_cost, 2) }}</td></tr>
+            @else
+                <tr><td><strong>Shipping</strong></td><td>No charge for store pickup.</td></tr>
+            @endif
             <tr><td><strong>Total</strong></td><td>${{ number_format($order->total, 2) }}</td></tr>
             @if ($order->delivery_carrier)
                 <tr><td><strong>Delivery carrier</strong></td><td>{{ $order->delivery_carrier }}</td></tr>

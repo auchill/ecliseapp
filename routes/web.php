@@ -7,6 +7,8 @@ use App\Http\Controllers\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Admin\PartController as AdminPartController;
 use App\Http\Controllers\Admin\ProductController as AdminProductController;
 use App\Http\Controllers\Admin\RepairController as AdminRepairController;
+use App\Http\Controllers\Admin\ShippingDiscountRuleController as AdminShippingDiscountRuleController;
+use App\Http\Controllers\Admin\ShippingMethodController as AdminShippingMethodController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CheckoutController;
@@ -74,6 +76,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     Route::post('/parts/sync', [AdminPartController::class, 'sync'])->name('parts.sync');
     Route::resource('parts', AdminPartController::class)->except(['show']);
+    Route::resource('shipping-methods', AdminShippingMethodController::class)->except(['show']);
+    Route::resource('shipping-discounts', AdminShippingDiscountRuleController::class)->except(['show']);
 
     Route::get('/customers', [AdminCustomerController::class, 'index'])->name('customers.index');
     Route::get('/customers/{customer}', [AdminCustomerController::class, 'show'])->name('customers.show');

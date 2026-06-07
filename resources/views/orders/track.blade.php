@@ -48,9 +48,17 @@
                                         <tr><th scope="row">Fulfillment</th><td>{{ $order->fulfillmentLabel() }}</td></tr>
                                         <tr><th scope="row">Order status</th><td>{{ $order->status }}</td></tr>
                                         <tr><th scope="row">Payment status</th><td>{{ $order->payment_status }}</td></tr>
-                                        <tr><th scope="row">Shipping cost</th><td>${{ number_format($order->shipping_cost, 2) }}</td></tr>
-                                        <tr><th scope="row">Delivery carrier</th><td>{{ $order->delivery_carrier ?: 'Not available yet' }}</td></tr>
-                                        <tr><th scope="row">Tracking number</th><td>{{ $order->tracking_number ?: 'Not available yet' }}</td></tr>
+                                        @if ($order->isShipping())
+                                            <tr><th scope="row">Shipping method</th><td>{{ $order->shipping_method_name ?: 'To be confirmed' }}</td></tr>
+                                            <tr><th scope="row">Estimated delivery</th><td>{{ $order->shipping_delivery_days ?: 'To be confirmed' }}</td></tr>
+                                            <tr><th scope="row">Shipping base</th><td>${{ number_format($order->shipping_base_cost, 2) }}</td></tr>
+                                            <tr><th scope="row">Shipping discount</th><td>${{ number_format($order->shipping_discount_amount, 2) }}</td></tr>
+                                            <tr><th scope="row">Final shipping</th><td>${{ number_format($order->shipping_cost, 2) }}</td></tr>
+                                            <tr><th scope="row">Delivery carrier</th><td>{{ $order->delivery_carrier ?: 'Not available yet' }}</td></tr>
+                                            <tr><th scope="row">Tracking number</th><td>{{ $order->tracking_number ?: 'Not available yet' }}</td></tr>
+                                        @else
+                                            <tr><th scope="row">Shipping</th><td>No charge for store pickup.</td></tr>
+                                        @endif
                                         <tr><th scope="row">Tracking notes</th><td>{{ $order->tracking_notes ?: $order->customer_notes ?: 'No tracking notes yet.' }}</td></tr>
                                         <tr><th scope="row">Total</th><td>${{ number_format($order->total, 2) }}</td></tr>
                                     </tbody>

@@ -52,6 +52,11 @@ class Order extends Model
         'shipping_province',
         'shipping_postal_code',
         'shipping_country',
+        'shipping_method_id',
+        'shipping_method_name',
+        'shipping_delivery_days',
+        'shipping_base_cost',
+        'shipping_discount_amount',
         'shipping_cost',
         'delivery_carrier',
         'tracking_number',
@@ -66,6 +71,8 @@ class Order extends Model
         return [
             'subtotal' => 'decimal:2',
             'tax' => 'decimal:2',
+            'shipping_base_cost' => 'decimal:2',
+            'shipping_discount_amount' => 'decimal:2',
             'shipping_cost' => 'decimal:2',
             'total' => 'decimal:2',
         ];
@@ -84,6 +91,11 @@ class Order extends Model
     public function statusUpdates(): HasMany
     {
         return $this->hasMany(OrderStatusUpdate::class)->latest();
+    }
+
+    public function shippingMethod(): BelongsTo
+    {
+        return $this->belongsTo(ShippingMethod::class);
     }
 
     public function publicStatusUpdates(): HasMany

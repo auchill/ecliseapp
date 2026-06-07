@@ -6,7 +6,8 @@
     @php
         $subtotal = $cart->subtotal();
         $tax = round($subtotal * 0.13, 2);
-        $selectedFulfillment = old('fulfillment_method', 'pickup');
+        $selectedFulfillment = $shippingMethods->isEmpty() ? 'pickup' : old('fulfillment_method', 'pickup');
+        $selectedShippingMethodId = (string) old('shipping_method_id', array_key_first($shippingQuotes) ?? '');
     @endphp
 
     <section class="page-header">
@@ -44,16 +45,18 @@
                                             <input class="form-check-input mt-1" id="fulfillment_pickup" name="fulfillment_method" type="radio" value="pickup" data-fulfillment-option @checked($selectedFulfillment === 'pickup')>
                                             <span>
                                                 <strong>Store Pickup</strong>
-                                                <span class="d-block muted small">Shipping cost ${{ number_format($pickupShippingCost, 2) }}.</span>
+                                                <span class="d-block muted small">No shipping charge.</span>
                                             </span>
                                         </label>
                                     </div>
                                     <div class="col-md-6">
                                         <label class="surface p-3 d-flex gap-3 h-100" for="fulfillment_shipping">
-                                            <input class="form-check-input mt-1" id="fulfillment_shipping" name="fulfillment_method" type="radio" value="shipping" data-fulfillment-option @checked($selectedFulfillment === 'shipping')>
+                                            <input class="form-check-input mt-1" id="fulfillment_shipping" name="fulfillment_method" type="radio" value="shipping" data-fulfillment-option @checked($selectedFulfillment === 'shipping') @disabled($shippingMethods->isEmpty())>
                                             <span>
                                                 <strong>Shipping</strong>
-                                                <span class="d-block muted small">Canada ${{ number_format($canadaShippingCost, 2) }}, outside Canada ${{ number_format($internationalShippingCost, 2) }}.</span>
+                                                <span class="d-block muted small">
+                                                    {{ $shippingMethods->isEmpty() ? 'No active shipping methods available.' : 'Select a delivery speed below.' }}
+                                                </span>
                                             </span>
                                         </label>
                                     </div>
@@ -66,6 +69,32 @@
 
                             <div class="col-12" data-shipping-panel>
                                 <div class="surface p-3">
+                                    <h2 class="h5 fw-bold">Shipping method</h2>
+                                    <div class="row g-3 mb-3">
+                                        @forelse ($shippingMethods as $method)
+                                            @php $quote = $shippingQuotes[(string) $method->id] ?? null; @endphp
+                                            <div class="col-md-6">
+                                                <label class="surface p-3 d-flex gap-3 h-100" for="shipping_method_{{ $method->id }}">
+                                                    <input class="form-check-input mt-1" id="shipping_method_{{ $method->id }}" name="shipping_method_id" type="radio" value="{{ $method->id }}" data-shipping-method-option @checked($selectedShippingMethodId === (string) $method->id)>
+                                                    <span>
+                                                        <strong>{{ $method->name }}</strong>
+                                                        <span class="d-block muted small">{{ $method->deliveryDaysLabel() }} &middot; ${{ number_format($quote['shipping_cost'] ?? $method->base_cost, 2) }}</span>
+                                                        @if (($quote['shipping_discount_amount'] ?? 0) > 0)
+                                                            <span class="d-block text-success small">Discount: ${{ number_format($quote['shipping_discount_amount'], 2) }}</span>
+                                                        @endif
+                                                    </span>
+                                                </label>
+                                            </div>
+                                        @empty
+                                            <div class="col-12">
+                                                <div class="alert alert-warning mb-0">Shipping is unavailable until an active shipping method is added.</div>
+                                            </div>
+                                        @endforelse
+                                    </div>
+                                    @error('shipping_method_id')
+                                        <div class="text-danger small mb-3">{{ $message }}</div>
+                                    @enderror
+
                                     <h2 class="h5 fw-bold">Shipping address confirmation</h2>
                                     <div class="row g-3">
                                         <div class="col-md-6">
@@ -82,7 +111,7 @@
                                         </div>
                                         <div class="col-md-6">
                                             <label class="form-label" for="shipping_country">Country</label>
-                                            <input class="form-control" id="shipping_country" name="shipping_country" value="{{ old('shipping_country', 'Canada') }}" data-country-input data-shipping-required>
+                                            <input class="form-control" id="shipping_country" name="shipping_country" value="{{ old('shipping_country', 'Canada') }}" data-shipping-required>
                                         </div>
                                         <div class="col-md-8">
                                             <label class="form-label" for="shipping_address_line1">Street address</label>
@@ -148,6 +177,22 @@
                             <strong>${{ number_format($tax, 2) }}</strong>
                         </div>
                         <div class="d-flex justify-content-between pt-2">
+                            <span>Shipping method</span>
+                            <strong class="text-end" data-shipping-method-label>Store pickup</strong>
+                        </div>
+                        <div class="d-flex justify-content-between pt-2">
+                            <span>Estimated delivery</span>
+                            <strong class="text-end" data-shipping-delivery-label>Pickup</strong>
+                        </div>
+                        <div class="d-flex justify-content-between pt-2">
+                            <span>Shipping base</span>
+                            <strong data-shipping-base-label>$0.00</strong>
+                        </div>
+                        <div class="d-flex justify-content-between pt-2">
+                            <span>Shipping discount</span>
+                            <strong class="text-success" data-shipping-discount-label>$0.00</strong>
+                        </div>
+                        <div class="d-flex justify-content-between pt-2">
                             <span>Shipping</span>
                             <strong data-shipping-cost-label>$0.00</strong>
                         </div>
@@ -168,39 +213,55 @@
             if (!form) return;
 
             const subtotalTax = {{ json_encode($subtotal + $tax) }};
-            const costs = {
-                pickup: {{ json_encode($pickupShippingCost) }},
-                canada: {{ json_encode($canadaShippingCost) }},
-                international: {{ json_encode($internationalShippingCost) }},
-            };
+            const pickupQuote = @json($pickupQuote);
+            const shippingQuotes = @json($shippingQuotes);
             const panel = form.querySelector('[data-shipping-panel]');
             const pickupMessage = form.querySelector('[data-pickup-message]');
             const requiredFields = form.querySelectorAll('[data-shipping-required]');
-            const countryInput = form.querySelector('[data-country-input]');
+            const methodInputs = form.querySelectorAll('[data-shipping-method-option]');
+            const methodLabel = document.querySelector('[data-shipping-method-label]');
+            const deliveryLabel = document.querySelector('[data-shipping-delivery-label]');
+            const baseLabel = document.querySelector('[data-shipping-base-label]');
+            const discountLabel = document.querySelector('[data-shipping-discount-label]');
             const shippingLabel = document.querySelector('[data-shipping-cost-label]');
             const totalLabel = document.querySelector('[data-grand-total-label]');
             const money = new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' });
 
-            function shippingCost() {
-                const method = form.querySelector('[data-fulfillment-option]:checked')?.value || 'pickup';
-                if (method === 'pickup') return costs.pickup;
-                const country = (countryInput?.value || '').trim().toLowerCase();
-                return ['canada', 'ca', 'can'].includes(country) ? costs.canada : costs.international;
+            function selectedQuote(isShipping) {
+                if (!isShipping) return pickupQuote;
+                let selected = form.querySelector('[data-shipping-method-option]:checked');
+
+                if (!selected && methodInputs.length > 0) {
+                    selected = methodInputs[0];
+                    selected.checked = true;
+                }
+
+                return selected ? shippingQuotes[selected.value] : pickupQuote;
             }
 
             function syncFulfillment() {
                 const method = form.querySelector('[data-fulfillment-option]:checked')?.value || 'pickup';
                 const isShipping = method === 'shipping';
+                const quote = selectedQuote(isShipping) || pickupQuote;
+                const baseCost = Number(quote.shipping_base_cost || 0);
+                const discount = Number(quote.shipping_discount_amount || 0);
+                const cost = Number(quote.shipping_cost || 0);
+
                 panel.hidden = !isShipping;
                 pickupMessage.hidden = isShipping;
                 requiredFields.forEach((field) => field.required = isShipping);
-                const cost = shippingCost();
+                methodInputs.forEach((field) => field.required = isShipping);
+
+                methodLabel.textContent = quote.shipping_method_name || (isShipping ? 'Select a method' : 'Store pickup');
+                deliveryLabel.textContent = quote.shipping_delivery_days || (isShipping ? 'To be confirmed' : 'Pickup');
+                baseLabel.textContent = money.format(baseCost);
+                discountLabel.textContent = money.format(discount);
                 shippingLabel.textContent = money.format(cost);
                 totalLabel.textContent = money.format(subtotalTax + cost);
             }
 
             form.querySelectorAll('[data-fulfillment-option]').forEach((option) => option.addEventListener('change', syncFulfillment));
-            countryInput?.addEventListener('input', syncFulfillment);
+            methodInputs.forEach((option) => option.addEventListener('change', syncFulfillment));
             syncFulfillment();
         })();
     </script>
