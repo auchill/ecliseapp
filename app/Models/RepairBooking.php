@@ -13,17 +13,17 @@ class RepairBooking extends Model
     use HasFactory;
 
     public const STATUSES = [
-        'Submitted',
-        'Appointment Confirmed',
-        'Device Received',
-        'Diagnosis in Progress',
-        'Waiting for Parts',
-        'Repair in Progress',
-        'Ready for Pickup',
-        'Shipped',
-        'Delivered',
-        'Completed',
-        'Cancelled',
+        'booking_created',
+        'awaiting_customer_payment',
+        'awaiting_device',
+        'device_received',
+        'diagnosis_in_progress',
+        'waiting_for_parts',
+        'repair_in_progress',
+        'ready_for_pickup',
+        'shipped',
+        'completed',
+        'cancelled',
     ];
 
     public const FULFILLMENT_METHODS = [
@@ -31,23 +31,56 @@ class RepairBooking extends Model
         'shipping' => 'Shipping',
     ];
 
+    public const PAYMENT_STATUSES = [
+        'unpaid' => 'Unpaid',
+        'partially_paid' => 'Partially paid',
+        'paid' => 'Paid',
+    ];
+
+    public const STATUS_LABELS = [
+        'booking_created' => 'Booking created',
+        'awaiting_customer_payment' => 'Awaiting customer payment',
+        'awaiting_device' => 'Awaiting device',
+        'device_received' => 'Device received',
+        'diagnosis_in_progress' => 'Diagnosis in progress',
+        'waiting_for_parts' => 'Waiting for parts',
+        'repair_in_progress' => 'Repair in progress',
+        'ready_for_pickup' => 'Ready for pickup',
+        'shipped' => 'Shipped',
+        'completed' => 'Completed',
+        'cancelled' => 'Cancelled',
+    ];
+
     protected $fillable = [
         'user_id',
+        'quote_id',
         'tracking_number',
         'customer_name',
         'email',
         'phone',
         'device_type',
+        'device_type_id',
         'device_brand',
+        'device_brand_id',
         'device_model',
+        'device_model_id',
         'issue_category',
+        'issue_category_id',
         'issue_description',
         'preferred_appointment_date',
         'preferred_appointment_time',
         'device_image_path',
+        'repair_items',
+        'subtotal',
+        'tax_amount',
+        'shipping_amount',
+        'total_amount',
+        'amount_paid',
+        'balance_due',
         'terms_accepted',
         'status',
         'payment_status',
+        'repair_status',
         'payment_gateway',
         'payment_amount',
         'currency',
@@ -55,7 +88,9 @@ class RepairBooking extends Model
         'estimated_completion_date',
         'internal_notes',
         'customer_notes',
+        'customer_remark',
         'fulfillment_method',
+        'pickup_or_shipping_option',
         'shipping_full_name',
         'shipping_phone',
         'shipping_email',
@@ -83,6 +118,13 @@ class RepairBooking extends Model
             'preferred_appointment_date' => 'date',
             'estimated_completion_date' => 'date',
             'terms_accepted' => 'boolean',
+            'repair_items' => 'array',
+            'subtotal' => 'decimal:2',
+            'tax_amount' => 'decimal:2',
+            'shipping_amount' => 'decimal:2',
+            'total_amount' => 'decimal:2',
+            'amount_paid' => 'decimal:2',
+            'balance_due' => 'decimal:2',
             'payment_amount' => 'decimal:2',
             'paid_at' => 'datetime',
             'shipping_base_cost' => 'decimal:2',
@@ -95,6 +137,31 @@ class RepairBooking extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function quote(): BelongsTo
+    {
+        return $this->belongsTo(Quote::class);
+    }
+
+    public function deviceType(): BelongsTo
+    {
+        return $this->belongsTo(DeviceType::class);
+    }
+
+    public function deviceBrand(): BelongsTo
+    {
+        return $this->belongsTo(DeviceBrand::class);
+    }
+
+    public function deviceModel(): BelongsTo
+    {
+        return $this->belongsTo(DeviceModel::class);
+    }
+
+    public function issueCategory(): BelongsTo
+    {
+        return $this->belongsTo(IssueCategory::class);
     }
 
     public function statusUpdates(): HasMany
@@ -126,7 +193,10 @@ class RepairBooking extends Model
 
     public function deviceLabel(): string
     {
-        return trim("{$this->device_brand} {$this->device_model}") ?: $this->device_type;
+        return trim(implode(' ', array_filter([
+            $this->deviceBrand?->name ?? $this->device_brand,
+            $this->deviceModelName(),
+        ]))) ?: ($this->deviceType?->name ?? $this->device_type);
     }
 
     public function isShipping(): bool
@@ -136,7 +206,77 @@ class RepairBooking extends Model
 
     public function fulfillmentLabel(): string
     {
-        return self::FULFILLMENT_METHODS[$this->fulfillment_method] ?? 'Store Pickup';
+        return self::FULFILLMENT_METHODS[$this->pickup_or_shipping_option ?: $this->fulfillment_method] ?? self::FULFILLMENT_METHODS[$this->fulfillment_method] ?? 'Store Pickup';
+    }
+
+    public function deviceTypeName(): ?string
+    {
+        return $this->deviceType?->name ?? $this->device_type;
+    }
+
+    public function deviceBrandName(): ?string
+    {
+        return $this->deviceBrand?->name ?? $this->device_brand;
+    }
+
+    public function deviceModelName(): ?string
+    {
+        return $this->deviceModel?->name ?? $this->device_model;
+    }
+
+    public function issueCategoryName(): ?string
+    {
+        return $this->issueCategory?->name ?? $this->issue_category;
+    }
+
+    public function statusLabel(): string
+    {
+        return self::STATUS_LABELS[$this->repair_status ?: $this->status] ?? self::STATUS_LABELS[$this->status] ?? ucfirst(str_replace('_', ' ', (string) $this->status));
+    }
+
+    public function paymentStatusLabel(): string
+    {
+        return self::PAYMENT_STATUSES[$this->payment_status] ?? ucfirst(str_replace('_', ' ', (string) $this->payment_status));
+    }
+
+    public function partsTotal(): float
+    {
+        return collect($this->repair_items ?? [])
+            ->where('type', 'part')
+            ->sum(fn (array $item): float => (float) ($item['total'] ?? 0));
+    }
+
+    public function minimumPaymentAmount(): float
+    {
+        $total = (float) ($this->total_amount ?: $this->repair_total);
+        $partsTotal = $this->partsTotal();
+
+        if ($total <= 0) {
+            return 0.00;
+        }
+
+        if ($partsTotal <= 0) {
+            return round($total * 0.5, 2);
+        }
+
+        return round($partsTotal + (0.5 * max(0, $total - $partsTotal)), 2);
+    }
+
+    public function minimumPaymentDue(): float
+    {
+        return round(max(0, $this->minimumPaymentAmount() - (float) $this->amount_paid), 2);
+    }
+
+    public function currentBalanceDue(): float
+    {
+        return round(max(0, (float) ($this->total_amount ?: $this->repair_total) - (float) $this->amount_paid), 2);
+    }
+
+    public function canCustomerPay(): bool
+    {
+        return ! in_array($this->repair_status ?: $this->status, ['cancelled', 'completed'], true)
+            && $this->payment_status !== 'paid'
+            && $this->currentBalanceDue() > 0;
     }
 
     public function shippingAddressLines(): array

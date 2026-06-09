@@ -46,7 +46,16 @@
                         </select>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label" for="model_compatibility">Model compatibility</label>
+                        <label class="form-label" for="part_model_id">Parts Model</label>
+                        <select class="form-select" id="part_model_id" name="part_model_id">
+                            <option value="">Choose model if listed</option>
+                            @foreach ($partModels as $model)
+                                <option value="{{ $model->id }}" @selected((int) old('part_model_id', $part->part_model_id) === $model->id)>{{ $model->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="model_compatibility">Custom compatibility</label>
                         <input class="form-control" id="model_compatibility" name="model_compatibility" value="{{ old('model_compatibility', $part->model_compatibility) }}">
                     </div>
                     <div class="col-md-4">

@@ -16,6 +16,7 @@ class StorePartRequest extends FormRequest
         return [
             'part_brand_id' => ['required', 'exists:part_brands,id'],
             'part_category_id' => ['required', 'exists:part_categories,id'],
+            'part_model_id' => ['nullable', 'exists:part_models,id'],
             'name' => ['required', 'string', 'max:255'],
             'sku' => ['nullable', 'string', 'max:120'],
             'internal_sku' => ['nullable', 'string', 'max:120'],

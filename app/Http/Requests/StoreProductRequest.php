@@ -21,6 +21,7 @@ class StoreProductRequest extends FormRequest
             'category_id' => ['nullable', 'exists:categories,id'],
             'product_brand_id' => ['nullable', 'exists:product_brands,id'],
             'product_category_id' => ['nullable', 'exists:product_categories,id'],
+            'product_model_id' => ['nullable', 'exists:product_models,id'],
             'name' => ['required', 'string', 'max:255'],
             'sku' => ['required', 'string', 'max:120', Rule::unique('products', 'sku')->ignore($productId)],
             'brand' => ['nullable', 'string', 'max:120'],

@@ -7,7 +7,7 @@
         <div class="container">
             <p class="eyebrow mb-2">Repair Tracking</p>
             <h1 class="display-5 fw-bold mb-3">Check current repair progress.</h1>
-            <p class="fs-5 mb-0">Enter the repair tracking number and the email or phone number used on the booking.</p>
+            <p class="fs-5 mb-0">Enter the repair tracking number. Add email or phone if you want to narrow the lookup.</p>
         </div>
     </section>
 
@@ -22,7 +22,7 @@
                     </div>
                     <div class="col-lg-5">
                         <label class="form-label" for="contact">Email or phone</label>
-                        <input class="form-control" id="contact" name="contact" value="{{ old('contact') }}" required>
+                        <input class="form-control" id="contact" name="contact" value="{{ old('contact') }}">
                     </div>
                     <div class="col-lg-2">
                         <button class="btn btn-primary w-100" type="submit"><i class="bi bi-search me-2"></i>Track</button>
@@ -37,7 +37,7 @@
                             <p class="eyebrow">Repair {{ $booking->tracking_number }}</p>
                             <h2 class="display-6 fw-bold mb-0">{{ $booking->deviceLabel() }}</h2>
                         </div>
-                        <span class="status-pill">{{ $booking->status }}</span>
+                        <span class="status-pill">{{ $booking->statusLabel() }}</span>
                     </div>
 
                     <div class="row g-4">
@@ -46,12 +46,20 @@
                                 <table class="table">
                                     <tbody>
                                         <tr><th scope="row">Customer</th><td>{{ $booking->customer_name }}</td></tr>
-                                        <tr><th scope="row">Device type</th><td>{{ $booking->device_type }}</td></tr>
-                                        <tr><th scope="row">Issue</th><td>{{ $booking->issue_category }}</td></tr>
-                                        <tr><th scope="row">Description</th><td>{{ $booking->issue_description }}</td></tr>
+                                        <tr><th scope="row">Device type</th><td>{{ $booking->deviceTypeName() }}</td></tr>
+                                        <tr><th scope="row">Device brand</th><td>{{ $booking->deviceBrandName() }}</td></tr>
+                                        <tr><th scope="row">Device model</th><td>{{ $booking->deviceModelName() }}</td></tr>
+                                        <tr><th scope="row">Issue</th><td>{{ $booking->issueCategoryName() }}</td></tr>
+                                        @auth
+                                            @if ($booking->user_id === auth()->id())
+                                                <tr><th scope="row">Description</th><td>{{ $booking->issue_description }}</td></tr>
+                                            @endif
+                                        @endauth
                                         <tr><th scope="row">Fulfillment</th><td>{{ $booking->fulfillmentLabel() }}</td></tr>
                                         <tr><th scope="row">Payment gateway</th><td>{{ $booking->latestPayment?->gatewayLabel() ?? ucfirst($booking->payment_gateway ?? 'Not required') }}</td></tr>
-                                        <tr><th scope="row">Payment status</th><td>{{ ucfirst($booking->payment_status ?? 'pending') }}</td></tr>
+                                        <tr><th scope="row">Payment status</th><td>{{ $booking->paymentStatusLabel() }}</td></tr>
+                                        <tr><th scope="row">Amount paid</th><td>${{ number_format($booking->amount_paid, 2) }}</td></tr>
+                                        <tr><th scope="row">Balance due</th><td>${{ number_format($booking->currentBalanceDue(), 2) }}</td></tr>
                                         @if ($booking->isShipping())
                                             <tr><th scope="row">Shipping method</th><td>{{ $booking->shipping_method_name ?: 'To be confirmed' }}</td></tr>
                                             <tr><th scope="row">Estimated delivery</th><td>{{ $booking->shipping_delivery_days ?: 'To be confirmed' }}</td></tr>

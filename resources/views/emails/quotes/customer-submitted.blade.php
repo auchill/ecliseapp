@@ -1,0 +1,5 @@
+<p>Hello {{ $quote->customer_name }},</p>
+<p>We received your quote request <strong>{{ $quote->quote_number }}</strong>.</p>
+<p>Eclise will review the device details and contact you by email or phone to confirm pricing and next steps.</p>
+<p><strong>Device:</strong> {{ $quote->deviceLabel() }}<br>
+<strong>Issue:</strong> {{ $quote->issueCategory?->name }}</p>

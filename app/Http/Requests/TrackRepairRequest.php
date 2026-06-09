@@ -15,7 +15,7 @@ class TrackRepairRequest extends FormRequest
     {
         return [
             'tracking_number' => ['required', 'string', 'max:40'],
-            'contact' => ['required', 'string', 'max:255'],
+            'contact' => ['nullable', 'string', 'max:255'],
         ];
     }
 }

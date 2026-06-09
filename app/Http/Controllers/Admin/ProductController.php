@@ -8,6 +8,7 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductBrand;
 use App\Models\ProductCategory;
+use App\Models\ProductModel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -16,7 +17,7 @@ class ProductController extends Controller
     public function index(Request $request)
     {
         $products = Product::query()
-            ->with('category', 'productBrand', 'productCategory')
+            ->with('category', 'productBrand', 'productCategory', 'productModel')
             ->when($request->filled('q'), function ($query) use ($request): void {
                 $search = $request->string('q');
                 $query->where('name', 'like', "%{$search}%")
@@ -39,6 +40,7 @@ class ProductController extends Controller
             'categories' => Category::query()->where('type', 'product')->orderBy('name')->get(),
             'productBrands' => ProductBrand::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
             'productCategories' => ProductCategory::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
+            'productModels' => ProductModel::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
             'conditions' => Product::CONDITIONS,
             'statuses' => Product::STATUSES,
         ]);
@@ -61,6 +63,7 @@ class ProductController extends Controller
             'categories' => Category::query()->where('type', 'product')->orderBy('name')->get(),
             'productBrands' => ProductBrand::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
             'productCategories' => ProductCategory::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
+            'productModels' => ProductModel::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
             'conditions' => Product::CONDITIONS,
             'statuses' => Product::STATUSES,
         ]);
@@ -105,6 +108,10 @@ class ProductController extends Controller
                 : null;
 
             $data['category_id'] = $legacyCategory?->id;
+        }
+
+        if (! empty($data['product_model_id'])) {
+            $data['model'] = ProductModel::query()->find($data['product_model_id'])?->name;
         }
 
         unset($data['product_image']);

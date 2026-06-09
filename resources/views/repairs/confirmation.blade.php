@@ -6,9 +6,9 @@
     <section class="section-pad bg-white">
         <div class="container">
             <div class="surface p-4 p-lg-5">
-                <p class="eyebrow">Repair Submitted</p>
+                <p class="eyebrow">Repair Booking</p>
                 <h1 class="display-6 fw-bold">Tracking number: {{ $booking->tracking_number }}</h1>
-                <p class="muted fs-5">Use this number with {{ $booking->email }} or {{ $booking->phone }} to track your repair status.</p>
+                <p class="muted fs-5">Use this number to track your repair status.</p>
                 @if ($booking->isShipping())
                     <div class="alert alert-info">Your repaired device will be shipped after service. Tracking details will appear when available.</div>
                 @else
@@ -22,11 +22,13 @@
                                 <tbody>
                                     <tr><th scope="row">Customer</th><td>{{ $booking->customer_name }}</td></tr>
                                     <tr><th scope="row">Device</th><td>{{ $booking->deviceLabel() }}</td></tr>
-                                    <tr><th scope="row">Issue</th><td>{{ $booking->issue_category }}</td></tr>
-                                    <tr><th scope="row">Status</th><td><span class="status-pill">{{ $booking->status }}</span></td></tr>
+                                    <tr><th scope="row">Issue</th><td>{{ $booking->issueCategoryName() }}</td></tr>
+                                    <tr><th scope="row">Status</th><td><span class="status-pill">{{ $booking->statusLabel() }}</span></td></tr>
                                     <tr><th scope="row">Fulfillment</th><td>{{ $booking->fulfillmentLabel() }}</td></tr>
                                     <tr><th scope="row">Payment gateway</th><td>{{ $booking->latestPayment?->gatewayLabel() ?? ucfirst($booking->payment_gateway ?? 'Not required') }}</td></tr>
-                                    <tr><th scope="row">Payment status</th><td>{{ ucfirst($booking->payment_status ?? 'pending') }}</td></tr>
+                                    <tr><th scope="row">Payment status</th><td>{{ $booking->paymentStatusLabel() }}</td></tr>
+                                    <tr><th scope="row">Amount paid</th><td>${{ number_format($booking->amount_paid, 2) }}</td></tr>
+                                    <tr><th scope="row">Balance due</th><td>${{ number_format($booking->currentBalanceDue(), 2) }}</td></tr>
                                     @if ($booking->isShipping())
                                         <tr><th scope="row">Shipping method</th><td>{{ $booking->shipping_method_name ?: 'To be confirmed' }}</td></tr>
                                         <tr><th scope="row">Estimated delivery</th><td>{{ $booking->shipping_delivery_days ?: 'To be confirmed' }}</td></tr>

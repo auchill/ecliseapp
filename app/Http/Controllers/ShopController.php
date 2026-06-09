@@ -12,7 +12,7 @@ class ShopController extends Controller
     public function index(Request $request)
     {
         $products = Product::query()
-            ->with('category', 'productBrand', 'productCategory')
+            ->with('category', 'productBrand', 'productCategory', 'productModel')
             ->active()
             ->when($request->filled('q'), function ($query) use ($request): void {
                 $search = $request->string('q');
@@ -57,9 +57,9 @@ class ShopController extends Controller
         abort_unless($product->status === 'Active', 404);
 
         return view('shop.show', [
-            'product' => $product->load('category', 'productBrand', 'productCategory'),
+            'product' => $product->load('category', 'productBrand', 'productCategory', 'productModel'),
             'relatedProducts' => Product::query()
-                ->with('category', 'productBrand', 'productCategory')
+                ->with('category', 'productBrand', 'productCategory', 'productModel')
                 ->active()
                 ->where('id', '!=', $product->id)
                 ->when(

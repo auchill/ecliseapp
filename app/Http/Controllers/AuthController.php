@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Cart;
+use App\Models\Product;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -28,6 +30,7 @@ class AuthController extends Controller
         }
 
         $request->session()->regenerate();
+        $this->mergeSessionCart($request);
 
         return redirect()->intended(Auth::user()->isAdmin() ? route('admin.dashboard') : route('dashboard'));
     }
@@ -53,6 +56,7 @@ class AuthController extends Controller
         ]);
 
         Auth::login($user);
+        $this->mergeSessionCart($request);
 
         return redirect()->route('dashboard');
     }
@@ -65,5 +69,40 @@ class AuthController extends Controller
         $request->session()->regenerateToken();
 
         return redirect()->route('home');
+    }
+
+    private function mergeSessionCart(Request $request): void
+    {
+        $sessionItems = collect($request->session()->get('cart.items', []))
+            ->filter(fn ($quantity) => (int) $quantity > 0);
+
+        if ($sessionItems->isEmpty() || ! $request->user()) {
+            return;
+        }
+
+        $cart = Cart::query()->firstOrCreate([
+            'user_id' => $request->user()->id,
+            'status' => 'active',
+        ]);
+
+        $products = Product::query()
+            ->whereIn('id', $sessionItems->keys())
+            ->get()
+            ->keyBy('id');
+
+        $sessionItems->each(function ($quantity, $productId) use ($cart, $products): void {
+            $product = $products->get((int) $productId);
+
+            if (! $product || $product->status !== 'Active' || $product->quantity <= 0) {
+                return;
+            }
+
+            $item = $cart->items()->firstOrNew(['product_id' => $product->id]);
+            $item->unit_price = $product->currentPrice();
+            $item->quantity = min($product->quantity, ($item->exists ? $item->quantity : 0) + (int) $quantity);
+            $item->save();
+        });
+
+        $request->session()->forget('cart.items');
     }
 }

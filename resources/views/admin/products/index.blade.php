@@ -33,6 +33,7 @@
                                 <th>Product</th>
                                 <th>SKU</th>
                                 <th>Category</th>
+                                <th>Model</th>
                                 <th>Price</th>
                                 <th>Stock</th>
                                 <th>Status</th>
@@ -45,6 +46,7 @@
                                     <td>{{ $product->name }}</td>
                                     <td>{{ $product->sku }}</td>
                                     <td>{{ $product->categoryName() }}</td>
+                                    <td>{{ $product->modelName() }}</td>
                                     <td>${{ number_format($product->currentPrice(), 2) }}</td>
                                     <td>{{ $product->quantity }}</td>
                                     <td><span class="status-pill">{{ $product->status }}</span></td>
@@ -60,7 +62,7 @@
                                     </td>
                                 </tr>
                             @empty
-                                <tr><td colspan="7">No products found.</td></tr>
+                                <tr><td colspan="8">No products found.</td></tr>
                             @endforelse
                         </tbody>
                     </table>

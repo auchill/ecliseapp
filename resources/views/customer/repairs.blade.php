@@ -29,8 +29,8 @@
                                 <tr>
                                     <td>{{ $repair->tracking_number }}</td>
                                     <td>{{ $repair->deviceLabel() }}</td>
-                                    <td>{{ $repair->issue_category }}</td>
-                                    <td><span class="status-pill">{{ $repair->status }}</span></td>
+                                    <td>{{ $repair->issueCategoryName() }}</td>
+                                    <td><span class="status-pill">{{ $repair->statusLabel() }}</span></td>
                                     <td>{{ $repair->estimated_completion_date?->format('M j, Y') ?? 'To be confirmed' }}</td>
                                 </tr>
                             @empty

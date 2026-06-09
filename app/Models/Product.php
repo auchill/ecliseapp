@@ -19,6 +19,7 @@ class Product extends Model
         'category_id',
         'product_brand_id',
         'product_category_id',
+        'product_model_id',
         'name',
         'slug',
         'sku',
@@ -61,6 +62,11 @@ class Product extends Model
         return $this->belongsTo(ProductCategory::class);
     }
 
+    public function productModel(): BelongsTo
+    {
+        return $this->belongsTo(ProductModel::class);
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('status', 'Active')->where('quantity', '>', 0);
@@ -79,6 +85,11 @@ class Product extends Model
     public function categoryName(): ?string
     {
         return $this->productCategory?->name ?? $this->category?->name;
+    }
+
+    public function modelName(): ?string
+    {
+        return $this->productModel?->name ?? $this->model;
     }
 
     public function imageUrl(): string

@@ -7,6 +7,7 @@ use App\Http\Requests\StorePartRequest;
 use App\Models\Part;
 use App\Models\PartBrand;
 use App\Models\PartCategory;
+use App\Models\PartModel;
 use App\Services\MobileSentrixService;
 use Illuminate\Http\Request;
 
@@ -15,7 +16,7 @@ class PartController extends Controller
     public function index(Request $request)
     {
         $parts = Part::query()
-            ->with('partBrand', 'partCategory')
+            ->with('partBrand', 'partCategory', 'partModel')
             ->when($request->filled('q'), function ($query) use ($request): void {
                 $search = $request->string('q');
                 $query->where('name', 'like', "%{$search}%")
@@ -37,6 +38,7 @@ class PartController extends Controller
             'part' => new Part,
             'partBrands' => PartBrand::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
             'partCategories' => PartCategory::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
+            'partModels' => PartModel::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
         ]);
     }
 
@@ -53,6 +55,7 @@ class PartController extends Controller
             'part' => $part,
             'partBrands' => PartBrand::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
             'partCategories' => PartCategory::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
+            'partModels' => PartModel::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
         ]);
     }
 
@@ -88,9 +91,11 @@ class PartController extends Controller
 
         $partBrand = PartBrand::query()->find($data['part_brand_id']);
         $partCategory = PartCategory::query()->find($data['part_category_id']);
+        $partModel = ! empty($data['part_model_id']) ? PartModel::query()->find($data['part_model_id']) : null;
 
         $data['brand'] = $partBrand?->name ?? $data['brand'] ?? null;
         $data['part_category'] = $partCategory?->name ?? $data['part_category'] ?? null;
+        $data['model_compatibility'] = $partModel?->name ?? $data['model_compatibility'] ?? null;
         $data['selling_price'] = $data['selling_price'] ?? $data['price'];
         $data['final_price'] = $data['final_price'] ?? $data['selling_price'];
         $data['availability_status'] = $data['availability_status'] ?? $data['stock_status'];

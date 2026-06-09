@@ -46,8 +46,13 @@
                         </select>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label" for="model">Model</label>
-                        <input class="form-control" id="model" name="model" value="{{ old('model', $product->model) }}">
+                        <label class="form-label" for="product_model_id">Product Model</label>
+                        <select class="form-select" id="product_model_id" name="product_model_id">
+                            <option value="">No product model</option>
+                            @foreach ($productModels as $model)
+                                <option value="{{ $model->id }}" @selected((int) old('product_model_id', $product->product_model_id) === $model->id)>{{ $model->name }}</option>
+                            @endforeach
+                        </select>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label" for="condition">Condition</label>

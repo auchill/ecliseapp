@@ -14,8 +14,9 @@ class RepairController extends Controller
     public function index(Request $request)
     {
         $repairs = RepairBooking::query()
-            ->with('latestPayment')
+            ->with('latestPayment', 'deviceType', 'deviceBrand', 'deviceModel', 'issueCategory')
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
+            ->when($request->filled('payment_status'), fn ($query) => $query->where('payment_status', $request->string('payment_status')))
             ->when($request->filled('q'), function ($query) use ($request): void {
                 $search = $request->string('q');
                 $query->where(function ($query) use ($search): void {
@@ -33,15 +34,17 @@ class RepairController extends Controller
 
         return view('admin.repairs.index', [
             'repairs' => $repairs,
-            'statuses' => RepairBooking::STATUSES,
+            'statuses' => RepairBooking::STATUS_LABELS,
+            'paymentStatuses' => RepairBooking::PAYMENT_STATUSES,
         ]);
     }
 
     public function show(RepairBooking $repair)
     {
         return view('admin.repairs.show', [
-            'repair' => $repair->load('statusUpdates', 'user', 'latestPayment'),
-            'statuses' => RepairBooking::STATUSES,
+            'repair' => $repair->load('statusUpdates', 'user', 'latestPayment', 'quote', 'deviceType', 'deviceBrand', 'deviceModel', 'issueCategory'),
+            'statuses' => RepairBooking::STATUS_LABELS,
+            'paymentStatuses' => RepairBooking::PAYMENT_STATUSES,
             'fulfillmentMethods' => RepairBooking::FULFILLMENT_METHODS,
         ]);
     }
@@ -49,7 +52,8 @@ class RepairController extends Controller
     public function update(Request $request, RepairBooking $repair)
     {
         $data = $request->validate([
-            'status' => ['required', Rule::in(RepairBooking::STATUSES)],
+            'status' => ['required', Rule::in(array_keys(RepairBooking::STATUS_LABELS))],
+            'payment_status' => ['required', Rule::in(array_keys(RepairBooking::PAYMENT_STATUSES))],
             'fulfillment_method' => ['required', Rule::in(array_keys(RepairBooking::FULFILLMENT_METHODS))],
             'shipping_cost' => ['required', 'numeric', 'min:0'],
             'shipping_full_name' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:255'],
@@ -73,7 +77,7 @@ class RepairController extends Controller
 
         $statusChanged = $repair->status !== $data['status'];
         $data = $this->normalizeFulfillmentData($data);
-        $data['repair_total'] = $data['shipping_cost'];
+        $data['repair_total'] = round((float) $repair->subtotal + (float) $repair->tax_amount + (float) $data['shipping_cost'], 2);
         $shippingSnapshot = $data['fulfillment_method'] === 'pickup'
             ? [
                 'shipping_method_id' => null,
@@ -92,6 +96,8 @@ class RepairController extends Controller
 
         $repair->update($shippingSnapshot + [
             'status' => $data['status'],
+            'repair_status' => $data['status'],
+            'payment_status' => $data['payment_status'],
             'fulfillment_method' => $data['fulfillment_method'],
             'shipping_full_name' => $data['shipping_full_name'] ?? null,
             'shipping_phone' => $data['shipping_phone'] ?? null,
@@ -103,7 +109,10 @@ class RepairController extends Controller
             'shipping_postal_code' => $data['shipping_postal_code'] ?? null,
             'shipping_country' => $data['shipping_country'] ?? null,
             'shipping_cost' => $data['shipping_cost'],
+            'shipping_amount' => $data['shipping_cost'],
             'repair_total' => $data['repair_total'],
+            'total_amount' => $data['repair_total'],
+            'balance_due' => max(0, $data['repair_total'] - (float) $repair->amount_paid),
             'delivery_carrier' => $data['delivery_carrier'] ?? null,
             'delivery_tracking_number' => $data['delivery_tracking_number'] ?? null,
             'tracking_notes' => $data['tracking_notes'] ?? null,

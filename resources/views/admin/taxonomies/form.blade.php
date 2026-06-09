@@ -31,11 +31,20 @@
                         <label class="form-label" for="sort_order">Sort order</label>
                         <input class="form-control" id="sort_order" name="sort_order" type="number" min="0" value="{{ old('sort_order', $item->sort_order ?? 0) }}" required>
                     </div>
-                    <div class="col-md-8 d-flex align-items-end">
-                        <div class="form-check mb-2">
-                            <input class="form-check-input" id="is_active" name="is_active" type="checkbox" value="1" @checked(old('is_active', $item->is_active ?? true))>
-                            <label class="form-check-label" for="is_active">Active</label>
-                        </div>
+                    <div class="col-md-8 {{ ($usesStatus ?? false) ? '' : 'd-flex align-items-end' }}">
+                        @if ($usesStatus ?? false)
+                            <label class="form-label" for="status">Status</label>
+                            <select class="form-select" id="status" name="status" required>
+                                @foreach (['active' => 'Active', 'inactive' => 'Inactive'] as $value => $label)
+                                    <option value="{{ $value }}" @selected(old('status', $item->status ?: 'active') === $value)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        @else
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" id="is_active" name="is_active" type="checkbox" value="1" @checked(old('is_active', $item->is_active ?? true))>
+                                <label class="form-check-label" for="is_active">Active</label>
+                            </div>
+                        @endif
                     </div>
                     <div class="col-12">
                         <label class="form-label" for="description">Description</label>

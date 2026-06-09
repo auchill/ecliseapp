@@ -12,7 +12,7 @@ class PartController extends Controller
     public function index(Request $request)
     {
         $parts = Part::query()
-            ->with('partBrand', 'partCategory')
+            ->with('partBrand', 'partCategory', 'partModel')
             ->when($request->filled('q'), function ($query) use ($request): void {
                 $search = $request->string('q');
                 $query->where(function ($query) use ($search): void {

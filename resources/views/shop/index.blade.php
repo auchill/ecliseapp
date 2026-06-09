@@ -68,15 +68,22 @@
                             <div class="p-4">
                                 <p class="eyebrow mb-1">{{ $product->categoryName() ?? 'Product' }}</p>
                                 <h2 class="h5 fw-bold">{{ $product->name }}</h2>
-                                <p class="muted small">{{ $product->condition }} &middot; {{ $product->brandName() }} &middot; {{ $product->quantity }} in stock</p>
-                                <div class="d-flex align-items-center justify-content-between">
+                                <p class="muted small">{{ $product->condition }} &middot; {{ $product->brandName() }} &middot; {{ $product->modelName() }} &middot; {{ $product->quantity }} in stock</p>
+                                <div class="d-flex align-items-center justify-content-between gap-2">
                                     <div>
                                         @if ($product->sale_price)
                                             <span class="text-decoration-line-through muted small">${{ number_format($product->price, 2) }}</span>
                                         @endif
                                         <strong>${{ number_format($product->currentPrice(), 2) }}</strong>
                                     </div>
-                                    <a class="btn btn-outline-primary btn-sm" href="{{ route('products.show', $product) }}"><i class="bi bi-eye"></i><span class="visually-hidden">View</span></a>
+                                    <div class="d-inline-flex gap-2">
+                                        <a class="btn btn-outline-primary btn-sm" href="{{ route('products.show', $product) }}"><i class="bi bi-eye"></i><span class="visually-hidden">View</span></a>
+                                        <form method="POST" action="{{ route('cart.store', $product) }}">
+                                            @csrf
+                                            <input type="hidden" name="quantity" value="1">
+                                            <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-bag-plus"></i><span class="visually-hidden">Add to Cart</span></button>
+                                        </form>
+                                    </div>
                                 </div>
                             </div>
                         </div>

@@ -25,13 +25,30 @@
                             <li class="nav-item"><a class="nav-link {{ request()->routeIs('home') ? 'active' : '' }}" href="{{ route('home') }}">Home</a></li>
                             <li class="nav-item"><a class="nav-link {{ request()->routeIs('about') ? 'active' : '' }}" href="{{ route('about') }}">About</a></li>
                             <li class="nav-item"><a class="nav-link {{ request()->routeIs('services') ? 'active' : '' }}" href="{{ route('services') }}">Services</a></li>
-                                <li class="nav-item"><a class="nav-link {{ request()->routeIs('repairs.*') ? 'active' : '' }}" href="{{ route('repairs.create') }}">Book Repair</a></li>
-                                <li class="nav-item"><a class="nav-link {{ request()->routeIs('shop.*') || request()->routeIs('products.*') ? 'active' : '' }}" href="{{ route('shop.index') }}">Shop</a></li>
-                                <li class="nav-item"><a class="nav-link {{ request()->routeIs('orders.track*') ? 'active' : '' }}" href="{{ route('orders.track') }}">Track Order</a></li>
-                                <li class="nav-item"><a class="nav-link {{ request()->routeIs('parts.*') ? 'active' : '' }}" href="{{ route('parts.index') }}">Parts</a></li>
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle {{ request()->routeIs('repairs.*') || request()->routeIs('quotes.*') ? 'active' : '' }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Repair</a>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="{{ route('quotes.create') }}">Get a Quote</a></li>
+                                    <li><a class="dropdown-item" href="{{ route('repairs.create') }}">Book Repair</a></li>
+                                    <li><a class="dropdown-item" href="{{ route('repairs.track') }}">Track Repair</a></li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle {{ request()->routeIs('shop.*') || request()->routeIs('products.*') || request()->routeIs('orders.track*') ? 'active' : '' }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Shop</a>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="{{ route('shop.index') }}">Shop Online</a></li>
+                                    <li><a class="dropdown-item" href="{{ route('orders.track') }}">Track Order</a></li>
+                                </ul>
+                            </li>
+                            <li class="nav-item"><a class="nav-link {{ request()->routeIs('parts.*') ? 'active' : '' }}" href="{{ route('parts.index') }}">Parts</a></li>
                             <li class="nav-item"><a class="nav-link {{ request()->routeIs('contact.*') ? 'active' : '' }}" href="{{ route('contact.create') }}">Contact</a></li>
+                            <li class="nav-item">
+                                <a class="nav-link position-relative {{ request()->routeIs('cart.*') ? 'active' : '' }}" href="{{ route('cart.index') }}">
+                                    <i class="bi bi-bag"></i><span class="visually-hidden">Cart</span>
+                                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-primary">{{ $cartItemCount ?? 0 }}</span>
+                                </a>
+                            </li>
                             @auth
-                                <li class="nav-item"><a class="nav-link {{ request()->routeIs('cart.*') ? 'active' : '' }}" href="{{ route('cart.index') }}"><i class="bi bi-bag"></i><span class="visually-hidden">Cart</span></a></li>
                                 <li class="nav-item dropdown">
                                     <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">{{ auth()->user()->name }}</a>
                                     <ul class="dropdown-menu dropdown-menu-end">
@@ -70,10 +87,17 @@
                                 <li class="nav-item"><a class="nav-link rounded {{ request()->routeIs('admin.products.*') ? 'active' : '' }}" href="{{ route('admin.products.index') }}"><i class="bi bi-phone me-1"></i>Products</a></li>
                                 <li class="nav-item"><a class="nav-link rounded {{ request()->routeIs('admin.product-brands.*') ? 'active' : '' }}" href="{{ route('admin.product-brands.index') }}"><i class="bi bi-tags me-1"></i>Product Brands</a></li>
                                 <li class="nav-item"><a class="nav-link rounded {{ request()->routeIs('admin.product-categories.*') ? 'active' : '' }}" href="{{ route('admin.product-categories.index') }}"><i class="bi bi-grid me-1"></i>Product Categories</a></li>
+                                <li class="nav-item"><a class="nav-link rounded {{ request()->routeIs('admin.product-models.*') ? 'active' : '' }}" href="{{ route('admin.product-models.index') }}"><i class="bi bi-phone-vibrate me-1"></i>Product Models</a></li>
                                 <li class="nav-item"><a class="nav-link rounded {{ request()->routeIs('admin.orders.*') ? 'active' : '' }}" href="{{ route('admin.orders.index') }}"><i class="bi bi-receipt me-1"></i>Orders</a></li>
                                 <li class="nav-item"><a class="nav-link rounded {{ request()->routeIs('admin.parts.*') ? 'active' : '' }}" href="{{ route('admin.parts.index') }}"><i class="bi bi-cpu me-1"></i>Parts</a></li>
                                 <li class="nav-item"><a class="nav-link rounded {{ request()->routeIs('admin.part-brands.*') ? 'active' : '' }}" href="{{ route('admin.part-brands.index') }}"><i class="bi bi-tags me-1"></i>Parts Brands</a></li>
                                 <li class="nav-item"><a class="nav-link rounded {{ request()->routeIs('admin.part-categories.*') ? 'active' : '' }}" href="{{ route('admin.part-categories.index') }}"><i class="bi bi-grid me-1"></i>Parts Categories</a></li>
+                                <li class="nav-item"><a class="nav-link rounded {{ request()->routeIs('admin.part-models.*') ? 'active' : '' }}" href="{{ route('admin.part-models.index') }}"><i class="bi bi-cpu-fill me-1"></i>Parts Models</a></li>
+                                <li class="nav-item"><a class="nav-link rounded {{ request()->routeIs('admin.quotes.*') ? 'active' : '' }}" href="{{ route('admin.quotes.index') }}"><i class="bi bi-chat-square-text me-1"></i>Quotes</a></li>
+                                <li class="nav-item"><a class="nav-link rounded {{ request()->routeIs('admin.device-types.*') ? 'active' : '' }}" href="{{ route('admin.device-types.index') }}"><i class="bi bi-hdd-stack me-1"></i>Device Types</a></li>
+                                <li class="nav-item"><a class="nav-link rounded {{ request()->routeIs('admin.device-brands.*') ? 'active' : '' }}" href="{{ route('admin.device-brands.index') }}"><i class="bi bi-bookmark me-1"></i>Device Brands</a></li>
+                                <li class="nav-item"><a class="nav-link rounded {{ request()->routeIs('admin.device-models.*') ? 'active' : '' }}" href="{{ route('admin.device-models.index') }}"><i class="bi bi-phone-landscape me-1"></i>Device Models</a></li>
+                                <li class="nav-item"><a class="nav-link rounded {{ request()->routeIs('admin.issue-categories.*') ? 'active' : '' }}" href="{{ route('admin.issue-categories.index') }}"><i class="bi bi-wrench-adjustable me-1"></i>Issues</a></li>
                                 <li class="nav-item"><a class="nav-link rounded {{ request()->routeIs('admin.payments.*') ? 'active' : '' }}" href="{{ route('admin.payments.index') }}"><i class="bi bi-credit-card me-1"></i>Payments</a></li>
                                 <li class="nav-item"><a class="nav-link rounded {{ request()->routeIs('admin.shipping-methods.*') ? 'active' : '' }}" href="{{ route('admin.shipping-methods.index') }}"><i class="bi bi-truck me-1"></i>Shipping Methods</a></li>
                                 <li class="nav-item"><a class="nav-link rounded {{ request()->routeIs('admin.shipping-discounts.*') ? 'active' : '' }}" href="{{ route('admin.shipping-discounts.index') }}"><i class="bi bi-percent me-1"></i>Shipping Discounts</a></li>
@@ -108,6 +132,7 @@
                         <div class="col-sm-6 col-lg-4">
                             <h2 class="h6">Quick Links</h2>
                             <div class="d-flex flex-wrap gap-2">
+                                <a class="btn btn-outline-light btn-sm" href="{{ route('quotes.create') }}">Get a Quote</a>
                                 <a class="btn btn-outline-light btn-sm" href="{{ route('repairs.create') }}">Book Repair</a>
                                 <a class="btn btn-outline-light btn-sm" href="{{ route('repairs.track') }}">Track Repair</a>
                                 <a class="btn btn-outline-light btn-sm" href="{{ route('orders.track') }}">Track Order</a>

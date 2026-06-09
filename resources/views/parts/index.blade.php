@@ -66,7 +66,7 @@
                             <div class="p-4">
                                 <p class="eyebrow mb-1">{{ $part->categoryName() }}</p>
                                 <h2 class="h5 fw-bold">{{ $part->name }}</h2>
-                                <p class="muted small">{{ $part->brandName() }} &middot; {{ $part->model_compatibility }} &middot; {{ $part->availability_status ?: $part->stock_status }}</p>
+                                <p class="muted small">{{ $part->brandName() }} &middot; {{ $part->modelName() }} &middot; {{ $part->availability_status ?: $part->stock_status }}</p>
                                 <div class="d-flex justify-content-between align-items-center">
                                     <strong>${{ number_format($part->displayPrice(), 2) }}</strong>
                                     <span class="small muted">{{ $part->external_api_source ?: $part->supplier }}</span>

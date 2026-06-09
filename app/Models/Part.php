@@ -27,6 +27,7 @@ class Part extends Model
     protected $fillable = [
         'part_brand_id',
         'part_category_id',
+        'part_model_id',
         'name',
         'sku',
         'internal_sku',
@@ -86,6 +87,11 @@ class Part extends Model
         return $this->belongsTo(PartCategory::class);
     }
 
+    public function partModel(): BelongsTo
+    {
+        return $this->belongsTo(PartModel::class);
+    }
+
     public function brandName(): ?string
     {
         return $this->partBrand?->name ?? $this->brand;
@@ -94,6 +100,11 @@ class Part extends Model
     public function categoryName(): ?string
     {
         return $this->partCategory?->name ?? $this->part_category;
+    }
+
+    public function modelName(): ?string
+    {
+        return $this->partModel?->name ?? $this->model_compatibility;
     }
 
     public function displayPrice(): float

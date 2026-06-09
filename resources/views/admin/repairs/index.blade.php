@@ -18,12 +18,21 @@
                         <label class="form-label" for="q">Search</label>
                         <input class="form-control" id="q" name="q" value="{{ request('q') }}" placeholder="Tracking, customer, device">
                     </div>
-                    <div class="col-lg-4">
+                    <div class="col-lg-3">
                         <label class="form-label" for="status">Status</label>
                         <select class="form-select" id="status" name="status">
                             <option value="">All</option>
-                            @foreach ($statuses as $status)
-                                <option value="{{ $status }}" @selected(request('status') === $status)>{{ $status }}</option>
+                            @foreach ($statuses as $value => $label)
+                                <option value="{{ $value }}" @selected(request('status') === $value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-lg-3">
+                        <label class="form-label" for="payment_status">Payment</label>
+                        <select class="form-select" id="payment_status" name="payment_status">
+                            <option value="">All</option>
+                            @foreach ($paymentStatuses as $value => $label)
+                                <option value="{{ $value }}" @selected(request('payment_status') === $value)>{{ $label }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -55,8 +64,8 @@
                                     <td>{{ $repair->tracking_number }}</td>
                                     <td>{{ $repair->customer_name }}</td>
                                     <td>{{ $repair->deviceLabel() }}</td>
-                                    <td><span class="status-pill">{{ $repair->status }}</span></td>
-                                    <td>{{ ucfirst($repair->payment_status ?? 'pending') }}</td>
+                                    <td><span class="status-pill">{{ $repair->statusLabel() }}</span></td>
+                                    <td>{{ $repair->paymentStatusLabel() }}</td>
                                     <td>{{ $repair->latestPayment?->gatewayLabel() ?? ucfirst($repair->payment_gateway ?? 'Not required') }}</td>
                                     <td>{{ $repair->isShipping() ? ($repair->shipping_method_name ?: 'Shipping') : 'Pickup' }}</td>
                                     <td>{{ $repair->created_at->format('M j, Y') }}</td>

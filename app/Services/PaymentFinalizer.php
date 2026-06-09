@@ -68,7 +68,11 @@ class PaymentFinalizer
         ]);
 
         $payable = $payment->payable;
-        $payable?->update(['payment_status' => $status]);
+        if ($payable instanceof RepairBooking) {
+            $payable->update(['payment_status' => $payable->amount_paid > 0 ? 'partially_paid' : 'unpaid']);
+        } else {
+            $payable?->update(['payment_status' => $status]);
+        }
 
         return $payment->fresh('payable');
     }
@@ -111,16 +115,23 @@ class PaymentFinalizer
 
     private function markRepairPaid(RepairBooking $repair, Payment $payment): void
     {
+        $amountPaid = round((float) $repair->amount_paid + (float) $payment->amount, 2);
+        $total = (float) ($repair->total_amount ?: $repair->repair_total);
+        $balanceDue = round(max(0, $total - $amountPaid), 2);
+        $paymentStatus = $balanceDue <= 0.01 ? 'paid' : 'partially_paid';
+
         $repair->update([
-            'payment_status' => 'paid',
+            'amount_paid' => min($amountPaid, $total),
+            'balance_due' => $balanceDue,
+            'payment_status' => $paymentStatus,
             'payment_gateway' => $payment->gateway,
             'payment_amount' => $payment->amount,
             'currency' => $payment->currency,
-            'paid_at' => $payment->paid_at ?? now(),
+            'paid_at' => $paymentStatus === 'paid' ? ($payment->paid_at ?? now()) : $repair->paid_at,
         ]);
 
         $repair->statusUpdates()->create([
-            'status' => $repair->status,
+            'status' => $repair->repair_status ?: $repair->status,
             'note' => 'Payment confirmed through '.$payment->gatewayLabel().'.',
             'is_customer_visible' => true,
         ]);

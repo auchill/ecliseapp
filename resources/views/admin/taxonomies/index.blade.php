@@ -34,7 +34,11 @@
                                     </td>
                                     <td>{{ $item->slug }}</td>
                                     <td>{{ $item->sort_order }}</td>
-                                    <td><span class="status-pill">{{ $item->is_active ? 'Active' : 'Inactive' }}</span></td>
+                                    <td>
+                                        <span class="status-pill">
+                                            {{ ($usesStatus ?? false) ? ucfirst($item->status) : ($item->is_active ? 'Active' : 'Inactive') }}
+                                        </span>
+                                    </td>
                                     <td class="text-end">
                                         <div class="d-inline-flex gap-2">
                                             <a class="btn btn-outline-primary btn-sm" href="{{ route($routePrefix.'.edit', $item) }}"><i class="bi bi-pencil"></i><span class="visually-hidden">Edit</span></a>

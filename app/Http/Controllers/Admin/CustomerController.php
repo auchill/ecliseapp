@@ -34,7 +34,7 @@ class CustomerController extends Controller
         abort_unless($customer->role === 'customer', 404);
 
         return view('admin.customers.show', [
-            'customer' => $customer->load(['repairBookings', 'orders.items']),
+            'customer' => $customer->load(['repairBookings.deviceBrand', 'repairBookings.deviceModel', 'repairBookings.issueCategory', 'orders.items']),
         ]);
     }
 }

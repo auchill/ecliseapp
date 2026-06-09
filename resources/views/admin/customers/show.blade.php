@@ -24,7 +24,7 @@
                                     <strong>{{ $repair->tracking_number }}</strong>
                                     <div class="small muted">{{ $repair->deviceLabel() }}</div>
                                 </div>
-                                <span class="status-pill">{{ $repair->status }}</span>
+                                <span class="status-pill">{{ $repair->statusLabel() }}</span>
                             </div>
                         @empty
                             <p class="muted mb-0">No repairs found.</p>

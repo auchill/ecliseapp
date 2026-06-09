@@ -40,6 +40,7 @@
                                 <th>Device</th>
                                 <th>Brand</th>
                                 <th>Category</th>
+                                <th>Model</th>
                                 <th>Price</th>
                                 <th>Stock</th>
                                 <th></th>
@@ -52,6 +53,7 @@
                                     <td>{{ $part->device_type }}</td>
                                     <td>{{ $part->brandName() }}</td>
                                     <td>{{ $part->categoryName() }}</td>
+                                    <td>{{ $part->modelName() }}</td>
                                     <td>${{ number_format($part->displayPrice(), 2) }}</td>
                                     <td>{{ $part->availability_status ?: $part->stock_status }}</td>
                                     <td class="text-end">
@@ -66,7 +68,7 @@
                                     </td>
                                 </tr>
                             @empty
-                                <tr><td colspan="7">No parts found.</td></tr>
+                                <tr><td colspan="8">No parts found.</td></tr>
                             @endforelse
                         </tbody>
                     </table>

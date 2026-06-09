@@ -1,20 +1,29 @@
 <?php
 
 use App\Mail\OrderStatusUpdatedMail;
+use App\Mail\QuoteBookingCreatedMail;
+use App\Mail\QuoteSubmittedCustomerMail;
 use App\Mail\RepairStatusUpdatedMail;
 use App\Models\Cart;
+use App\Models\DeviceBrand;
+use App\Models\DeviceModel;
+use App\Models\DeviceType;
+use App\Models\IssueCategory;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\Quote;
 use App\Models\RepairBooking;
 use App\Models\ShippingDiscountRule;
 use App\Models\ShippingMethod;
 use App\Models\User;
 use App\Services\PaymentFinalizer;
+use Database\Seeders\ReferenceDataSeeder;
 use Database\Seeders\ShippingSeeder;
 use Illuminate\Support\Facades\Mail;
 
 beforeEach(function (): void {
     $this->seed(ShippingSeeder::class);
+    $this->seed(ReferenceDataSeeder::class);
 });
 
 test('checkout pickup creates a pickup order with zero shipping', function () {
@@ -221,17 +230,43 @@ test('checkout applies the best matching shipping discount', function () {
 
 test('repair shipping calculates selected return shipping method and appears in tracking', function () {
     $method = ShippingMethod::query()->where('code', 'overnight')->firstOrFail();
+    $user = User::query()->create([
+        'name' => 'Repair Customer',
+        'email' => 'repair@example.com',
+        'password' => 'password',
+    ]);
 
-    $this->post(route('repairs.store'), [
+    $repair = RepairBooking::query()->create([
+        'tracking_number' => 'ECL-REP-TEST-SHIP',
         'customer_name' => 'Repair Customer',
         'email' => 'repair@example.com',
         'phone' => '416-555-0003',
         'device_type' => 'Phone',
         'device_brand' => 'Apple',
         'device_model' => 'iPhone 13',
-        'issue_category' => 'Screen',
+        'issue_category' => 'Screen Replacement',
         'issue_description' => 'The display is cracked and needs replacement.',
+        'repair_items' => [
+            ['type' => 'workmanship', 'name' => 'Screen replacement labour', 'quantity' => 1, 'unit_price' => 80, 'total' => 80],
+            ['type' => 'part', 'name' => 'iPhone 13 screen', 'quantity' => 1, 'unit_price' => 120, 'total' => 120],
+        ],
+        'subtotal' => 200,
+        'tax_amount' => 26,
+        'shipping_amount' => 0,
+        'total_amount' => 226,
+        'repair_total' => 226,
+        'amount_paid' => 0,
+        'balance_due' => 226,
+        'payment_status' => 'unpaid',
+        'repair_status' => 'awaiting_customer_payment',
+        'status' => 'awaiting_customer_payment',
+        'fulfillment_method' => 'pickup',
+        'pickup_or_shipping_option' => 'pickup',
+    ]);
+
+    $this->actingAs($user)->post(route('repairs.complete.store', $repair->tracking_number), [
         'payment_gateway' => 'paypal',
+        'payment_amount_option' => 'minimum',
         'fulfillment_method' => 'shipping',
         'shipping_method_id' => $method->id,
         'shipping_full_name' => 'Repair Customer',
@@ -245,17 +280,19 @@ test('repair shipping calculates selected return shipping method and appears in 
         'terms_accepted' => '1',
     ])->assertRedirect();
 
-    $repair = RepairBooking::query()->firstOrFail();
+    $repair->refresh();
 
     expect($repair->fulfillment_method)->toBe('shipping')
+        ->and($repair->user_id)->toBe($user->id)
         ->and($repair->shipping_method_name)->toBe('Overnight Shipping')
         ->and($repair->shipping_delivery_days)->toBe('1 day')
         ->and((float) $repair->shipping_base_cost)->toBe(45.0)
         ->and((float) $repair->shipping_discount_amount)->toBe(0.0)
         ->and((float) $repair->shipping_cost)->toBe(45.0)
-        ->and($repair->payment_status)->toBe('pending')
+        ->and($repair->payment_status)->toBe('unpaid')
         ->and($repair->latestPayment->gateway)->toBe('paypal')
-        ->and((float) $repair->repair_total)->toBe(45.0);
+        ->and((float) $repair->repair_total)->toBe(271.0)
+        ->and((float) $repair->latestPayment->amount)->toBe(195.5);
 
     $this->post(route('repairs.track.submit'), [
         'tracking_number' => $repair->tracking_number,
@@ -320,6 +357,102 @@ test('verified payment finalization marks order paid and commits inventory once'
     app(PaymentFinalizer::class)->markPaid($payment->fresh());
 
     expect($product->fresh()->quantity)->toBe(1);
+});
+
+test('guest cart items merge into customer cart on login', function () {
+    $user = User::query()->create([
+        'name' => 'Cart Merge',
+        'email' => 'cart-merge@example.com',
+        'password' => 'password',
+    ]);
+
+    $product = Product::query()->create([
+        'name' => 'Merge Phone',
+        'slug' => 'merge-phone',
+        'sku' => 'MERGE-1',
+        'condition' => 'Used',
+        'price' => 120,
+        'quantity' => 5,
+        'status' => 'Active',
+    ]);
+
+    $this->withSession(['cart.items' => [$product->id => 2]])
+        ->post(route('login.store'), [
+            'email' => $user->email,
+            'password' => 'password',
+        ])
+        ->assertRedirect(route('dashboard'));
+
+    $cart = Cart::query()->where('user_id', $user->id)->where('status', 'active')->firstOrFail();
+
+    expect($cart->items()->where('product_id', $product->id)->value('quantity'))->toBe(2)
+        ->and(session('cart.items'))->toBeNull();
+});
+
+test('customer quote submission can be converted to a priced repair booking', function () {
+    Mail::fake();
+
+    $admin = User::query()->create([
+        'name' => 'Quote Admin',
+        'email' => 'quote-admin@example.com',
+        'password' => 'password',
+        'role' => 'admin',
+    ]);
+
+    $deviceType = DeviceType::query()->where('slug', 'phone')->firstOrFail();
+    $deviceBrand = DeviceBrand::query()->where('slug', 'apple')->firstOrFail();
+    $deviceModel = DeviceModel::query()->where('slug', 'iphone-13')->firstOrFail();
+    $issueCategory = IssueCategory::query()->where('slug', 'screen-replacement')->firstOrFail();
+
+    $this->post(route('quotes.store'), [
+        'customer_name' => 'Quote Customer',
+        'email' => 'quote@example.com',
+        'phone_number' => '416-555-7777',
+        'device_type_id' => $deviceType->id,
+        'device_brand_id' => $deviceBrand->id,
+        'device_model_id' => $deviceModel->id,
+        'issue_category_id' => $issueCategory->id,
+        'preferred_date' => now()->addDay()->toDateString(),
+        'preferred_time' => '11:30',
+        'issue_description' => 'Screen cracked after a drop.',
+    ])->assertRedirect(route('quotes.create'));
+
+    $quote = Quote::query()->firstOrFail();
+
+    expect($quote->status)->toBe('pending')
+        ->and(str_starts_with($quote->quote_number, 'ECL-QTE-'))->toBeTrue();
+
+    Mail::assertSent(QuoteSubmittedCustomerMail::class);
+
+    $this->actingAs($admin)
+        ->post(route('admin.quotes.convert.store', $quote), [
+            'device_type_id' => $deviceType->id,
+            'device_brand_id' => $deviceBrand->id,
+            'device_model_id' => $deviceModel->id,
+            'issue_category_id' => $issueCategory->id,
+            'preferred_appointment_date' => now()->addDay()->toDateString(),
+            'preferred_appointment_time' => '11:30',
+            'repair_item_type' => ['workmanship', 'part'],
+            'repair_item_name' => ['Screen replacement labour', 'iPhone 13 screen'],
+            'repair_item_quantity' => [1, 1],
+            'repair_item_unit_price' => [80, 120],
+            'tax_amount' => 26,
+            'internal_notes' => 'Approved quote.',
+        ])
+        ->assertRedirect();
+
+    $booking = RepairBooking::query()->where('quote_id', $quote->id)->firstOrFail();
+
+    expect($quote->fresh()->status)->toBe('converted_to_booking')
+        ->and(str_starts_with($booking->tracking_number, 'ECL-REP-'))->toBeTrue()
+        ->and($booking->payment_status)->toBe('unpaid')
+        ->and($booking->repair_status)->toBe('awaiting_customer_payment')
+        ->and((float) $booking->subtotal)->toBe(200.0)
+        ->and((float) $booking->tax_amount)->toBe(26.0)
+        ->and((float) $booking->total_amount)->toBe(226.0)
+        ->and($booking->repair_items)->toHaveCount(2);
+
+    Mail::assertSent(QuoteBookingCreatedMail::class);
 });
 
 test('admin can manage shipping methods and discounts', function () {
@@ -461,10 +594,15 @@ test('admin status updates create timelines and queue mail rendering', function 
         'issue_category' => 'Battery',
         'issue_description' => 'Battery drains quickly.',
         'terms_accepted' => true,
-        'status' => 'Submitted',
+        'status' => 'booking_created',
+        'repair_status' => 'booking_created',
+        'payment_status' => 'unpaid',
         'fulfillment_method' => 'shipping',
         'shipping_cost' => 20,
+        'shipping_amount' => 20,
         'repair_total' => 20,
+        'total_amount' => 20,
+        'balance_due' => 20,
         'shipping_full_name' => 'Repair Mail',
         'shipping_phone' => '416-555-0005',
         'shipping_email' => 'repairmail@example.com',
@@ -477,7 +615,8 @@ test('admin status updates create timelines and queue mail rendering', function 
 
     $this->actingAs($admin)
         ->patch(route('admin.repairs.update', $repair), [
-            'status' => 'Shipped',
+            'status' => 'shipped',
+            'payment_status' => 'unpaid',
             'fulfillment_method' => 'shipping',
             'shipping_cost' => 20,
             'shipping_full_name' => 'Repair Mail',

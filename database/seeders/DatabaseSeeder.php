@@ -3,12 +3,18 @@
 namespace Database\Seeders;
 
 use App\Models\Category;
+use App\Models\DeviceBrand;
+use App\Models\DeviceModel;
+use App\Models\DeviceType;
+use App\Models\IssueCategory;
 use App\Models\Part;
 use App\Models\PartBrand;
 use App\Models\PartCategory;
+use App\Models\PartModel;
 use App\Models\Product;
 use App\Models\ProductBrand;
 use App\Models\ProductCategory;
+use App\Models\ProductModel;
 use App\Models\RepairBooking;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
@@ -27,6 +33,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(ShippingSeeder::class);
         $this->call(CatalogTaxonomySeeder::class);
+        $this->call(ReferenceDataSeeder::class);
 
         $admin = User::query()->updateOrCreate(
             ['email' => 'admin@eclisetech.com'],
@@ -127,6 +134,7 @@ class DatabaseSeeder extends Seeder
                         default => $product['category'],
                     }))->value('id'),
                     'product_brand_id' => ProductBrand::query()->where('slug', Str::slug($product['brand']))->value('id'),
+                    'product_model_id' => ProductModel::query()->where('slug', Str::slug($product['model']))->value('id'),
                     'name' => $product['name'],
                     'slug' => Str::slug($product['name']),
                     'brand' => $product['brand'],
@@ -160,6 +168,7 @@ class DatabaseSeeder extends Seeder
                     'part_brand_id' => PartBrand::query()->where('slug', Str::slug($brand.' Parts'))->value('id')
                         ?: PartBrand::query()->where('slug', Str::slug($brand))->value('id'),
                     'part_category_id' => PartCategory::query()->where('slug', Str::slug($partCategory))->value('id'),
+                    'part_model_id' => PartModel::query()->where('slug', Str::slug($modelCompatibility))->value('id'),
                     'part_category' => $partCategory,
                     'price' => $price,
                     'selling_price' => $price,
@@ -184,26 +193,43 @@ class DatabaseSeeder extends Seeder
                 'email' => $customer->email,
                 'phone' => '416-555-0199',
                 'device_type' => 'Phone',
+                'device_type_id' => DeviceType::query()->where('slug', 'phone')->value('id'),
                 'device_brand' => 'Apple',
+                'device_brand_id' => DeviceBrand::query()->where('slug', 'apple')->value('id'),
                 'device_model' => 'iPhone 13',
+                'device_model_id' => DeviceModel::query()->where('slug', 'iphone-13')->value('id'),
                 'issue_category' => 'Screen repair',
+                'issue_category_id' => IssueCategory::query()->where('slug', 'screen-replacement')->value('id'),
                 'issue_description' => 'Cracked display after a drop. Touch still works.',
                 'preferred_appointment_date' => now()->addDays(2)->toDateString(),
                 'preferred_appointment_time' => '10:30',
                 'terms_accepted' => true,
-                'status' => 'Diagnosis in Progress',
+                'status' => 'diagnosis_in_progress',
+                'repair_status' => 'diagnosis_in_progress',
+                'payment_status' => 'unpaid',
+                'subtotal' => 200,
+                'tax_amount' => 26,
+                'shipping_amount' => 0,
+                'repair_total' => 226,
+                'total_amount' => 226,
+                'amount_paid' => 0,
+                'balance_due' => 226,
+                'repair_items' => [
+                    ['type' => 'workmanship', 'name' => 'Screen replacement labour', 'quantity' => 1, 'unit_price' => 80, 'total' => 80],
+                    ['type' => 'part', 'name' => 'iPhone 13 screen', 'quantity' => 1, 'unit_price' => 120, 'total' => 120],
+                ],
                 'estimated_completion_date' => now()->addDays(4)->toDateString(),
                 'customer_notes' => 'Device inspection started. We will confirm parts availability before repair.',
             ],
         );
 
         $booking->statusUpdates()->updateOrCreate(
-            ['status' => 'Submitted'],
+            ['status' => 'booking_created'],
             ['note' => 'Repair request received.', 'is_customer_visible' => true],
         );
 
         $booking->statusUpdates()->updateOrCreate(
-            ['status' => 'Diagnosis in Progress'],
+            ['status' => 'diagnosis_in_progress'],
             ['note' => 'Technician is checking display and frame condition.', 'is_customer_visible' => true],
         );
     }

@@ -22,8 +22,16 @@
                             <div class="col-md-6">
                                 <label class="form-label" for="status">Status</label>
                                 <select class="form-select" id="status" name="status" required>
-                                    @foreach ($statuses as $status)
-                                        <option value="{{ $status }}" @selected(old('status', $repair->status) === $status)>{{ $status }}</option>
+                                    @foreach ($statuses as $value => $label)
+                                        <option value="{{ $value }}" @selected(old('status', $repair->repair_status ?: $repair->status) === $value)>{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="payment_status">Payment status</label>
+                                <select class="form-select" id="payment_status" name="payment_status" required>
+                                    @foreach ($paymentStatuses as $value => $label)
+                                        <option value="{{ $value }}" @selected(old('payment_status', $repair->payment_status) === $value)>{{ $label }}</option>
                                     @endforeach
                                 </select>
                             </div>
@@ -126,11 +134,17 @@
                                 <tbody>
                                     <tr><th scope="row">Email</th><td>{{ $repair->email }}</td></tr>
                                     <tr><th scope="row">Phone</th><td>{{ $repair->phone }}</td></tr>
-                                    <tr><th scope="row">Issue</th><td>{{ $repair->issue_category }}</td></tr>
+                                    @if ($repair->quote)
+                                        <tr><th scope="row">Quote</th><td><a href="{{ route('admin.quotes.show', $repair->quote) }}">{{ $repair->quote->quote_number }}</a></td></tr>
+                                    @endif
+                                    <tr><th scope="row">Issue</th><td>{{ $repair->issueCategoryName() }}</td></tr>
                                     <tr><th scope="row">Description</th><td>{{ $repair->issue_description }}</td></tr>
+                                    <tr><th scope="row">Customer remark</th><td>{{ $repair->customer_remark ?: 'No customer remark.' }}</td></tr>
                                     <tr><th scope="row">Fulfillment</th><td>{{ $repair->fulfillmentLabel() }}</td></tr>
                                     <tr><th scope="row">Payment gateway</th><td>{{ $repair->latestPayment?->gatewayLabel() ?? ucfirst($repair->payment_gateway ?? 'Not required') }}</td></tr>
-                                    <tr><th scope="row">Payment status</th><td>{{ ucfirst($repair->payment_status ?? 'pending') }}</td></tr>
+                                    <tr><th scope="row">Payment status</th><td>{{ $repair->paymentStatusLabel() }}</td></tr>
+                                    <tr><th scope="row">Amount paid</th><td>${{ number_format($repair->amount_paid, 2) }}</td></tr>
+                                    <tr><th scope="row">Balance due</th><td>${{ number_format($repair->currentBalanceDue(), 2) }}</td></tr>
                                     @if ($repair->isShipping())
                                         <tr><th scope="row">Shipping method</th><td>{{ $repair->shipping_method_name ?: 'To be confirmed' }}</td></tr>
                                         <tr><th scope="row">Estimated delivery</th><td>{{ $repair->shipping_delivery_days ?: 'To be confirmed' }}</td></tr>
@@ -142,6 +156,28 @@
                                     @endif
                                     <tr><th scope="row">Repair total</th><td>${{ number_format($repair->repair_total, 2) }}</td></tr>
                                     <tr><th scope="row">Appointment</th><td>{{ $repair->preferred_appointment_date?->format('M j, Y') ?? 'Not set' }} {{ $repair->preferred_appointment_time }}</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="surface p-4 mb-4">
+                        <h2 class="h5 fw-bold">Repair Items</h2>
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr><th>Type</th><th>Item</th><th>Qty</th><th>Total</th></tr>
+                                </thead>
+                                <tbody>
+                                    @forelse ($repair->repair_items ?? [] as $item)
+                                        <tr>
+                                            <td>{{ ucfirst($item['type'] ?? 'item') }}</td>
+                                            <td>{{ $item['name'] ?? '' }}</td>
+                                            <td>{{ $item['quantity'] ?? 1 }}</td>
+                                            <td>${{ number_format((float) ($item['total'] ?? 0), 2) }}</td>
+                                        </tr>
+                                    @empty
+                                        <tr><td colspan="4">No repair items recorded.</td></tr>
+                                    @endforelse
                                 </tbody>
                             </table>
                         </div>

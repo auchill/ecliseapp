@@ -4,10 +4,10 @@
     <body style="font-family: Arial, sans-serif; color: #111827; line-height: 1.5;">
         <h1 style="color: #0D1321;">Repair status update</h1>
         <p>Hello {{ $repair->customer_name }},</p>
-        <p>Your repair <strong>{{ $repair->tracking_number }}</strong> for {{ $repair->deviceLabel() }} is now <strong>{{ $repair->status }}</strong>.</p>
+        <p>Your repair <strong>{{ $repair->tracking_number }}</strong> for {{ $repair->deviceLabel() }} is now <strong>{{ $repair->statusLabel() }}</strong>.</p>
 
         <table cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%; max-width: 640px;">
-            <tr><td><strong>Device type</strong></td><td>{{ $repair->device_type }}</td></tr>
+            <tr><td><strong>Device type</strong></td><td>{{ $repair->deviceTypeName() }}</td></tr>
             <tr><td><strong>Fulfillment</strong></td><td>{{ $repair->fulfillmentLabel() }}</td></tr>
             @if ($repair->isShipping())
                 <tr><td><strong>Shipping method</strong></td><td>{{ $repair->shipping_method_name ?: 'To be confirmed' }}</td></tr>
@@ -45,7 +45,7 @@
             <p><strong>Note:</strong> {{ $repair->customer_notes }}</p>
         @endif
 
-        <p>Track your repair at {{ route('repairs.track') }} using your repair tracking number and email or phone number.</p>
+        <p>Track your repair at {{ route('repairs.track') }} using your repair tracking number.</p>
         <p>Thank you,<br>Eclise Technology Inc.</p>
     </body>
 </html>
