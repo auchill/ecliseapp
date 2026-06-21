@@ -9,6 +9,13 @@ class MobileSentrixApiSetting extends Model
 {
     protected $table = 'mobilesentrix_api_settings';
 
+    protected $hidden = [
+        'consumer_key',
+        'consumer_secret',
+        'access_token',
+        'access_token_secret',
+    ];
+
     protected $fillable = [
         'environment',
         'base_url',
@@ -25,6 +32,7 @@ class MobileSentrixApiSetting extends Model
     protected function casts(): array
     {
         return [
+            'consumer_key' => 'encrypted',
             'consumer_secret' => 'encrypted',
             'access_token' => 'encrypted',
             'access_token_secret' => 'encrypted',

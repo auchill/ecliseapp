@@ -15,7 +15,7 @@ return new class extends Migration
                 $table->string('environment')->default('staging')->index();
                 $table->string('base_url')->nullable();
                 $table->string('consumer_name')->nullable();
-                $table->string('consumer_key')->nullable();
+                $table->text('consumer_key')->nullable();
                 $table->text('consumer_secret')->nullable();
                 $table->text('access_token')->nullable();
                 $table->text('access_token_secret')->nullable();

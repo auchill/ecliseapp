@@ -5,6 +5,8 @@ namespace App\Services\MobileSentrix;
 use App\Models\MobileSentrixApiSetting;
 use App\Models\MobileSentrixSyncLog;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class MobileSentrixAuthService
 {
@@ -20,6 +22,73 @@ class MobileSentrixAuthService
             'consumer_secret' => $credentials['consumer_secret'],
             'callback' => $credentials['callback_url'],
         ]);
+    }
+
+    public function requestTemporaryCredentials(): ?array
+    {
+        $credentials = $this->applicationCredentials();
+
+        try {
+            $response = Http::timeout(config('mobilesentrix.timeout'))
+                ->acceptJson()
+                ->get($this->url('/oauth/authorize/identifier'), [
+                    'consumer' => $credentials['consumer_name'],
+                    'authtype' => 1,
+                    'flowentry' => 'SignIn',
+                    'consumer_key' => $credentials['consumer_key'],
+                    'consumer_secret' => $credentials['consumer_secret'],
+                    'callback' => $credentials['callback_url'],
+                ]);
+        } catch (\Throwable $exception) {
+            Log::warning('MobileSentrix OAuth temporary token request failed before a response.', [
+                'exception' => $exception::class,
+            ]);
+
+            throw new MobileSentrixException('MobileSentrix OAuth authentication could not be started.');
+        }
+
+        if ($response->successful()) {
+            $payload = $response->json();
+
+            if (! is_array($payload)) {
+                return null;
+            }
+
+            $oauthToken = data_get($payload, 'oauth_token') ?: data_get($payload, 'data.oauth_token');
+            $oauthVerifier = data_get($payload, 'oauth_verifier') ?: data_get($payload, 'data.oauth_verifier');
+
+            if (filled($oauthToken) && filled($oauthVerifier)) {
+                return [
+                    'oauth_token' => $oauthToken,
+                    'oauth_verifier' => $oauthVerifier,
+                ];
+            }
+
+            return null;
+        }
+
+        $location = $response->header('Location');
+
+        if (filled($location)) {
+            parse_str((string) parse_url($location, PHP_URL_QUERY), $query);
+
+            if (filled($query['oauth_token'] ?? null) && filled($query['oauth_verifier'] ?? null)) {
+                return [
+                    'oauth_token' => $query['oauth_token'],
+                    'oauth_verifier' => $query['oauth_verifier'],
+                ];
+            }
+        }
+
+        if ($response->status() >= 300 && $response->status() < 400) {
+            return null;
+        }
+
+        Log::warning('MobileSentrix OAuth temporary token request failed.', [
+            'status' => $response->status(),
+        ]);
+
+        throw new MobileSentrixException('MobileSentrix OAuth authentication could not be started.');
     }
 
     public function exchangeToken(string $oauthToken, string $oauthVerifier): array
@@ -45,6 +114,10 @@ class MobileSentrixAuthService
                 ]);
 
             if (! $response->successful()) {
+                Log::warning('MobileSentrix OAuth token exchange failed.', [
+                    'status' => $response->status(),
+                ]);
+
                 throw new MobileSentrixException('MobileSentrix rejected the OAuth verifier.');
             }
 
@@ -68,7 +141,7 @@ class MobileSentrixAuthService
             $log->update([
                 'status' => 'failed',
                 'finished_at' => now(),
-                'message' => $exception->getMessage(),
+                'message' => $this->safeMessage($exception),
             ]);
 
             throw $exception;
@@ -122,6 +195,15 @@ class MobileSentrixAuthService
 
     private function url(string $path): string
     {
-        return rtrim(config('mobilesentrix.base_url'), '/').'/'.ltrim($path, '/');
+        return rtrim((string) config('mobilesentrix.base_url'), '/').'/'.ltrim($path, '/');
+    }
+
+    private function safeMessage(\Throwable $exception): string
+    {
+        if ($exception instanceof MobileSentrixException) {
+            return Str::limit($exception->getMessage(), 180, '');
+        }
+
+        return 'MobileSentrix OAuth exchange failed before a valid response was received.';
     }
 }

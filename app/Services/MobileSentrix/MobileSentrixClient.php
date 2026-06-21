@@ -5,6 +5,7 @@ namespace App\Services\MobileSentrix;
 use App\Models\MobileSentrixApiSetting;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class MobileSentrixClient
@@ -33,7 +34,7 @@ class MobileSentrixClient
 
         return [
             'ok' => true,
-            'message' => 'MobileSentrix API connection succeeded.',
+            'message' => 'MobileSentrix API connection successful.',
             'sample_count' => is_countable($categories) ? count($categories) : 0,
         ];
     }
@@ -119,9 +120,7 @@ class MobileSentrixClient
 
     private function get(string $path, array $query = []): array
     {
-        if (! $this->isConfigured()) {
-            throw new MobileSentrixException('MobileSentrix credentials are not fully configured.');
-        }
+        $this->assertConfigured();
 
         $response = Http::timeout(config('mobilesentrix.timeout'))
             ->acceptJson()
@@ -136,6 +135,10 @@ class MobileSentrixClient
     private function decodeResponse(Response $response): array
     {
         if (! $response->successful()) {
+            Log::warning('MobileSentrix API request failed.', [
+                'status' => $response->status(),
+            ]);
+
             throw new MobileSentrixException('MobileSentrix API request failed with HTTP '.$response->status().'.');
         }
 
@@ -172,6 +175,21 @@ class MobileSentrixClient
     private function url(string $path): string
     {
         return $this->credentials()['base_url'].'/'.ltrim($path, '/');
+    }
+
+    private function assertConfigured(): void
+    {
+        $missing = $this->missingCredentialNames();
+
+        if (empty($missing)) {
+            return;
+        }
+
+        if (in_array('access_token', $missing, true) || in_array('access_token_secret', $missing, true)) {
+            throw new MobileSentrixException('MobileSentrix access token is missing. Please authenticate MobileSentrix first from the admin panel.');
+        }
+
+        throw new MobileSentrixException('MobileSentrix API configuration is incomplete. Please verify the admin API settings.');
     }
 
     private function activeSettings(): ?MobileSentrixApiSetting

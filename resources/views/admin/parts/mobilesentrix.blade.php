@@ -21,21 +21,23 @@
                             <dt class="col-6">Environment</dt>
                             <dd class="col-6 text-end">{{ $configStatus['environment'] }}</dd>
                             <dt class="col-6">Base URL</dt>
-                            <dd class="col-6 text-end text-break">{{ $configStatus['base_url'] }}</dd>
+                            <dd class="col-6 text-end">{{ $configStatus['base_url'] ? 'Yes' : 'No' }}</dd>
                             <dt class="col-6">Consumer name</dt>
-                            <dd class="col-6 text-end">{{ $configStatus['consumer_name'] ? 'Configured' : 'Missing' }}</dd>
+                            <dd class="col-6 text-end">{{ $configStatus['consumer_name'] ? 'Yes' : 'No' }}</dd>
                             <dt class="col-6">Consumer key</dt>
-                            <dd class="col-6 text-end">{{ $configStatus['consumer_key'] ? 'Configured' : 'Missing' }}</dd>
+                            <dd class="col-6 text-end">{{ $configStatus['consumer_key'] ? 'Yes' : 'No' }}</dd>
                             <dt class="col-6">Consumer secret</dt>
-                            <dd class="col-6 text-end">{{ $configStatus['consumer_secret'] ? 'Configured' : 'Missing' }}</dd>
+                            <dd class="col-6 text-end">{{ $configStatus['consumer_secret'] ? 'Yes' : 'No' }}</dd>
                             <dt class="col-6">Access token</dt>
-                            <dd class="col-6 text-end">{{ $configStatus['access_token'] ? 'Configured' : 'Missing' }}</dd>
+                            <dd class="col-6 text-end">{{ $configStatus['access_token'] ? 'Yes' : 'No' }}</dd>
                             <dt class="col-6">Access secret</dt>
-                            <dd class="col-6 text-end">{{ $configStatus['access_token_secret'] ? 'Configured' : 'Missing' }}</dd>
+                            <dd class="col-6 text-end">{{ $configStatus['access_token_secret'] ? 'Yes' : 'No' }}</dd>
                             <dt class="col-6">Stored tokens</dt>
                             <dd class="col-6 text-end">{{ $configStatus['stored_access_tokens'] ? 'Yes' : 'No' }}</dd>
+                            <dt class="col-6">Last authenticated</dt>
+                            <dd class="col-6 text-end">{{ $configStatus['last_authenticated_at']?->format('M j, Y g:i A') ?? 'Never' }}</dd>
                             <dt class="col-6">Scheduled sync</dt>
-                            <dd class="col-6 text-end">{{ $configStatus['sync_enabled'] ? 'Enabled' : 'Disabled' }}</dd>
+                            <dd class="col-6 text-end">{{ $configStatus['sync_enabled'] ? 'Yes' : 'No' }}</dd>
                         </dl>
                     </div>
                 </div>
@@ -56,7 +58,7 @@
                     <div class="surface p-4 h-100">
                         <p class="eyebrow mb-2">Connection</p>
                         @if ($missingCredentials)
-                            <p class="muted small mb-3">Missing configuration: {{ implode(', ', $missingCredentials) }}</p>
+                            <p class="muted small mb-3">One or more required credentials are not configured.</p>
                         @else
                             <p class="muted small mb-3">Credentials are configured. API calls use server-side OAuth headers.</p>
                         @endif
@@ -67,7 +69,7 @@
                             </form>
                             <form method="POST" action="{{ route('admin.parts.mobilesentrix.authorize') }}">
                                 @csrf
-                                <button class="btn btn-outline-primary" type="submit"><i class="bi bi-key me-2"></i>Start OAuth</button>
+                                <button class="btn btn-outline-primary" type="submit"><i class="bi bi-key me-2"></i>{{ $configStatus['stored_access_tokens'] ? 'Re-authenticate' : 'Start OAuth' }}</button>
                             </form>
                         </div>
                     </div>

@@ -32,6 +32,16 @@ class MobileSentrixController extends Controller
     public function startAuthorization(MobileSentrixAuthService $auth): RedirectResponse
     {
         try {
+            $temporaryCredentials = $auth->requestTemporaryCredentials();
+
+            if ($temporaryCredentials) {
+                $auth->exchangeToken($temporaryCredentials['oauth_token'], $temporaryCredentials['oauth_verifier']);
+
+                return redirect()
+                    ->route('admin.parts.mobilesentrix.index')
+                    ->with('status', 'MobileSentrix OAuth authentication completed. Access tokens were stored securely.');
+            }
+
             return redirect()->away($auth->authorizationUrl());
         } catch (MobileSentrixException $exception) {
             return back()->withErrors(['mobilesentrix' => $exception->getMessage()]);
@@ -65,7 +75,7 @@ class MobileSentrixController extends Controller
 
             return back()->with('status', $result['message']);
         } catch (\Throwable $exception) {
-            return back()->withErrors(['mobilesentrix' => $exception->getMessage()]);
+            return back()->withErrors(['mobilesentrix' => 'MobileSentrix API connection failed. Please verify credentials and authenticate again.']);
         }
     }
 
