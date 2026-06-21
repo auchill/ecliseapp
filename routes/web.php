@@ -138,6 +138,7 @@ Route::middleware('admin')->prefix('admin')->name('admin.')->group(function (): 
     Route::get('/shop/payments', [AdminPaymentController::class, 'index'])->defaults('source', 'shop')->name('shop-payments.index');
 
     Route::get('/parts/mobilesentrix', [AdminMobileSentrixController::class, 'index'])->name('parts.mobilesentrix.index');
+    Route::post('/parts/mobilesentrix/authenticate-server', [AdminMobileSentrixController::class, 'authenticateServer'])->name('parts.mobilesentrix.authenticate-server');
     Route::post('/parts/mobilesentrix/authorize', [AdminMobileSentrixController::class, 'startAuthorization'])->name('parts.mobilesentrix.authorize');
     Route::get('/parts/mobilesentrix/callback', [AdminMobileSentrixController::class, 'callback'])->name('parts.mobilesentrix.callback');
     Route::post('/parts/mobilesentrix/test', [AdminMobileSentrixController::class, 'test'])->name('parts.mobilesentrix.test');

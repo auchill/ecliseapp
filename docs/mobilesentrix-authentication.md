@@ -13,6 +13,7 @@ MOBILESENTRIX_CONSUMER_NAME=
 MOBILESENTRIX_CONSUMER_KEY=
 MOBILESENTRIX_CONSUMER_SECRET=
 MOBILESENTRIX_CALLBACK_URL=http://127.0.0.1:8000/admin/parts/mobilesentrix/callback
+MOBILESENTRIX_ALLOW_BROWSER_SECRET_REDIRECT=false
 MOBILESENTRIX_SYNC_ENABLED=false
 ```
 
@@ -39,10 +40,10 @@ The relevant table is `mobilesentrix_api_settings`. The app encrypts `consumer_k
 
 1. Sign in as an admin.
 2. Open `/admin/parts/mobilesentrix`.
-3. Click `Start Live Authentication`.
-4. Complete any MobileSentrix browser login or authorization prompt.
-5. MobileSentrix should redirect back to `/admin/parts/mobilesentrix/callback`.
-6. The callback exchanges `oauth_token` and `oauth_verifier` for `access_token` and `access_token_secret`.
+3. Click `Authenticate Server-Side`.
+4. The Laravel backend calls the MobileSentrix OAuth identifier endpoint.
+5. If MobileSentrix returns `oauth_token` and `oauth_verifier`, the app exchanges them for `access_token` and `access_token_secret`.
+6. If MobileSentrix requires browser authorization, the app stops and shows safe guidance instead of exposing credentials in the browser URL.
 7. Return to `/admin/parts/mobilesentrix` and confirm the status fields show:
    - Consumer Name configured: Yes
    - Consumer Key configured: Yes
@@ -50,9 +51,31 @@ The relevant table is `mobilesentrix_api_settings`. The app encrypts `consumer_k
    - Access Token configured: Yes
    - Access Token Secret configured: Yes
 
-Use `Re-authenticate` on the same page when tokens need to be rotated.
+Use `Re-authenticate Server-Side` on the same page when tokens need to be rotated.
 
 The admin page also includes an OAuth preflight checklist and a safe support message. The support message intentionally excludes the Consumer Key, Consumer Secret, Access Token, and Access Token Secret.
+
+## Security Note About Browser OAuth
+
+The MobileSentrix browser redirect method may expose `consumer_key` and `consumer_secret` in the browser address bar because the identifier URL uses query parameters.
+
+Eclise disables browser redirects containing secrets by default:
+
+```dotenv
+MOBILESENTRIX_ALLOW_BROWSER_SECRET_REDIRECT=false
+```
+
+Use server-side authentication first through the admin page or:
+
+```bash
+php artisan mobilesentrix:authenticate
+```
+
+If server-side authentication returns HTTP 403, contact MobileSentrix support using the safe support message on `/admin/parts/mobilesentrix`. Ask them to confirm the correct Canada preprod flow, whether backend-only authentication is supported, and whether the public/server IP must be whitelisted.
+
+If Consumer Key or Consumer Secret values were exposed in screenshots, logs, browser history, or shared URLs, rotate/regenerate those credentials with MobileSentrix.
+
+Only set `MOBILESENTRIX_ALLOW_BROWSER_SECRET_REDIRECT=true` if MobileSentrix confirms in writing that browser-based authentication with credentials in the query string is required.
 
 ## Authenticate From CLI
 
@@ -64,7 +87,7 @@ php artisan mobilesentrix:authenticate
 
 If MobileSentrix returns temporary OAuth credentials directly, the command exchanges them and stores the encrypted access tokens.
 
-If MobileSentrix requires browser authorization, use the admin button. If you already have the full callback URL containing `oauth_token` and `oauth_verifier`, you can complete the exchange from CLI:
+If MobileSentrix requires browser authorization, contact MobileSentrix before enabling any browser redirect that exposes credentials. If you already have the full callback URL containing `oauth_token` and `oauth_verifier`, you can complete the exchange from CLI:
 
 ```bash
 php artisan mobilesentrix:authenticate --callback-url="http://127.0.0.1:8000/admin/parts/mobilesentrix/callback?oauth_token=...&oauth_verifier=..."
@@ -111,7 +134,7 @@ php artisan mobilesentrix:refresh-part MS-9001
 If you see:
 
 ```text
-MobileSentrix is not authenticated yet. Run php artisan mobilesentrix:authenticate or use the admin authentication button.
+MobileSentrix is not authenticated yet. Run php artisan mobilesentrix:authenticate or use the admin Authenticate Server-Side button.
 ```
 
 then `access_token` and/or `access_token_secret` are missing from the active `mobilesentrix_api_settings` row. Re-run authentication.

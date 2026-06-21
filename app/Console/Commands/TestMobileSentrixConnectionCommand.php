@@ -17,7 +17,7 @@ class TestMobileSentrixConnectionCommand extends Command
         $missing = $client->missingCredentialNames();
 
         if (in_array('access_token', $missing, true) || in_array('access_token_secret', $missing, true)) {
-            $this->error('MobileSentrix is not authenticated yet. Run php artisan mobilesentrix:authenticate or use the admin authentication button.');
+            $this->error('MobileSentrix is not authenticated yet. Run php artisan mobilesentrix:authenticate or use the admin Authenticate Server-Side button.');
 
             return self::FAILURE;
         }

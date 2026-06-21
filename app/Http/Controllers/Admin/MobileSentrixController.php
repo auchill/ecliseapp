@@ -26,6 +26,7 @@ class MobileSentrixController extends Controller
             'configStatus' => $configStatus,
             'preflight' => $preflight,
             'safeSupportMessage' => $this->safeSupportMessage($configStatus),
+            'browserSecretRedirectAllowed' => (bool) config('mobilesentrix.allow_browser_secret_redirect'),
             'missingCredentials' => $client->missingCredentialNames(),
             'latestLogs' => MobileSentrixSyncLog::query()->latest()->limit(12)->get(),
             'lastCategoryLog' => MobileSentrixSyncLog::query()->where('sync_type', 'categories')->latest()->first(),
@@ -35,16 +36,48 @@ class MobileSentrixController extends Controller
         ]);
     }
 
-    public function startAuthorization(MobileSentrixAuthService $auth): RedirectResponse
+    public function authenticateServer(MobileSentrixAuthService $auth): RedirectResponse
     {
         try {
-            return redirect()->away($auth->authorizationUrl());
-        } catch (MobileSentrixException $exception) {
+            $temporaryCredentials = $auth->requestTemporaryCredentials();
+
+            if (! $temporaryCredentials) {
+                return back()
+                    ->withErrors(['mobilesentrix' => 'This MobileSentrix OAuth flow requires browser authorization. Browser redirects containing sensitive credentials are disabled by default. Contact MobileSentrix to confirm the correct OAuth flow.'])
+                    ->with('mobilesentrix_connection_status', 'Browser authorization required')
+                    ->with('mobilesentrix_failed_at', now()->toDateTimeString());
+            }
+
+            $auth->exchangeToken($temporaryCredentials['oauth_token'], $temporaryCredentials['oauth_verifier']);
+
             return back()
-                ->withErrors(['mobilesentrix' => $exception->getMessage()])
-                ->with('mobilesentrix_connection_status', 'Failed')
-                ->with('mobilesentrix_http_status', $exception->httpStatus() ?? 'Not captured')
-                ->with('mobilesentrix_failed_at', now()->toDateTimeString());
+                ->with('status', 'MobileSentrix OAuth authentication completed. Access tokens were stored securely.')
+                ->with('mobilesentrix_connection_status', 'Authenticated');
+        } catch (MobileSentrixException $exception) {
+            return $this->redirectWithMobileSentrixException($exception);
+        }
+    }
+
+    public function startAuthorization(Request $request, MobileSentrixAuthService $auth): RedirectResponse
+    {
+        try {
+            $authorizationUrl = $auth->authorizationUrl();
+
+            if ($this->oauthUrlContainsSensitiveCredentials($authorizationUrl) && ! (bool) config('mobilesentrix.allow_browser_secret_redirect')) {
+                return back()
+                    ->withErrors(['mobilesentrix' => 'MobileSentrix authentication cannot be opened in the browser because the authorization URL includes sensitive credentials. Use the secure server-side authentication command or contact MobileSentrix to confirm the correct OAuth flow.'])
+                    ->with('mobilesentrix_connection_status', 'Browser authentication blocked');
+            }
+
+            if ($this->oauthUrlContainsSensitiveCredentials($authorizationUrl) && ! $request->boolean('confirm_secret_redirect')) {
+                return back()
+                    ->withErrors(['mobilesentrix' => 'Warning: MobileSentrix browser authentication will expose Consumer Key and Consumer Secret in the browser URL. Continue only if MobileSentrix has confirmed this is required.'])
+                    ->with('mobilesentrix_connection_status', 'Confirmation required');
+            }
+
+            return redirect()->away($authorizationUrl);
+        } catch (MobileSentrixException $exception) {
+            return $this->redirectWithMobileSentrixException($exception);
         }
     }
 
@@ -190,12 +223,43 @@ class MobileSentrixController extends Controller
             || str_ends_with($host, '.test');
     }
 
+    private function oauthUrlContainsSensitiveCredentials(string $url): bool
+    {
+        parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+
+        return collect(['consumer_key', 'consumer_secret', 'access_token', 'access_token_secret'])
+            ->contains(fn (string $parameter): bool => filled($query[$parameter] ?? null));
+    }
+
     private function safeSupportMessage(array $configStatus): string
     {
         $yesNo = fn (bool $value): string => $value ? 'Yes' : 'No';
 
         return implode(PHP_EOL, [
-            'MobileSentrix OAuth support request',
+            'Hello MobileSentrix Support,',
+            '',
+            'We are integrating the MobileSentrix API for Eclise Technology.',
+            '',
+            'The OAuth documentation appears to require the first authentication request to be opened as a GET URL with consumer_key and consumer_secret in the query string:',
+            '',
+            '/oauth/authorize/identifier',
+            '',
+            'For security reasons, we do not want to expose consumer_secret in the browser address bar.',
+            '',
+            'Please confirm:',
+            '',
+            '1. Is there a server-side authentication endpoint that does not expose consumer_secret in the browser URL?',
+            '2. Can the identifier endpoint be called securely from the backend only?',
+            '3. Is consumer_secret required in the browser URL for Canada preprod?',
+            '4. Can we use POST instead of GET for the first OAuth step?',
+            '5. Do you support OAuth Authorization header instead of query parameters?',
+            '6. Is our Consumer Key/Secret enabled for Canada preprod?',
+            '7. Does our public/server IP need to be whitelisted?',
+            '8. What exact callback URL is registered for this application?',
+            '',
+            'Also, please rotate/regenerate our Consumer Key and Consumer Secret because they were exposed during browser-based testing.',
+            '',
+            'Safe configuration summary:',
             'Base URL: '.(($configStatus['base_url'] ?? null) ?: 'Not configured'),
             'Environment: '.(($configStatus['environment'] ?? null) ?: 'Not configured'),
             'Callback URL: '.(($configStatus['callback_url'] ?? null) ?: 'Not configured'),
@@ -206,5 +270,14 @@ class MobileSentrixController extends Controller
             'Consumer Secret configured: '.$yesNo((bool) ($configStatus['consumer_secret'] ?? false)),
             'Cloudflare Ray ID: <paste Ray ID from the block page>',
         ]);
+    }
+
+    private function redirectWithMobileSentrixException(MobileSentrixException $exception): RedirectResponse
+    {
+        return back()
+            ->withErrors(['mobilesentrix' => $exception->getMessage()])
+            ->with('mobilesentrix_connection_status', 'Failed')
+            ->with('mobilesentrix_http_status', $exception->httpStatus() ?? 'Not captured')
+            ->with('mobilesentrix_failed_at', now()->toDateTimeString());
     }
 }

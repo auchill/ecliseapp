@@ -181,7 +181,7 @@ test('mobile sentrix test connection command explains missing authentication', f
     $exitCode = Artisan::call('mobilesentrix:test-connection');
 
     expect($exitCode)->toBe(1)
-        ->and(Artisan::output())->toContain('MobileSentrix is not authenticated yet. Run php artisan mobilesentrix:authenticate or use the admin authentication button.');
+        ->and(Artisan::output())->toContain('MobileSentrix is not authenticated yet. Run php artisan mobilesentrix:authenticate or use the admin Authenticate Server-Side button.');
 });
 
 test('mobile sentrix category sync stores local categories and logs the run', function () {
@@ -359,30 +359,99 @@ test('mobile sentrix reauthentication updates stored encrypted tokens', function
         ->and(MobileSentrixApiSetting::query()->first()->access_token_secret)->toBe('new-access-secret');
 });
 
-test('mobile sentrix admin authentication starts browser oauth without server side api call', function () {
-    Http::fake();
-
+function mobileSentrixAdminUser(string $email): User
+{
     $adminPermission = Permission::query()->where('name', 'admin')->firstOrFail();
-    $admin = User::query()->create([
-        'name' => 'Browser Auth Admin',
-        'email' => 'browser-auth-admin@example.com',
+
+    return User::query()->create([
+        'name' => 'MobileSentrix Admin',
+        'email' => $email,
         'password' => 'password',
         'role' => 'admin',
         'permission_id' => $adminPermission->id,
         'status' => 'active',
     ]);
+}
 
-    $response = $this->actingAs($admin)->post(route('admin.parts.mobilesentrix.authorize'));
+test('mobile sentrix admin server authentication exchanges credentials without browser url exposure', function () {
+    Http::fake([
+        'https://preprod.mobilesentrix.ca/oauth/authorize/identifiercallback' => Http::response([
+            'data' => [
+                'access_token' => 'admin-access-token',
+                'access_token_secret' => 'admin-access-secret',
+            ],
+        ]),
+        'https://preprod.mobilesentrix.ca/oauth/authorize/identifier*' => Http::response([
+            'oauth_token' => 'admin-temporary-token',
+            'oauth_verifier' => 'admin-temporary-verifier',
+        ]),
+    ]);
+
+    $admin = mobileSentrixAdminUser('server-auth-admin@example.com');
+
+    $response = $this->actingAs($admin)
+        ->withSession(['_token' => 'test-token'])
+        ->from(route('admin.parts.mobilesentrix.index'))
+        ->post(route('admin.parts.mobilesentrix.authenticate-server'), ['_token' => 'test-token']);
+
+    $response->assertRedirect(route('admin.parts.mobilesentrix.index'));
+
+    expect(MobileSentrixApiSetting::query()->first()->access_token)->toBe('admin-access-token')
+        ->and(MobileSentrixApiSetting::query()->first()->access_token_secret)->toBe('admin-access-secret');
+});
+
+test('mobile sentrix admin browser oauth redirect is blocked by default when url contains secrets', function () {
+    Http::fake();
+
+    $admin = mobileSentrixAdminUser('browser-blocked-admin@example.com');
+
+    $response = $this->actingAs($admin)
+        ->withSession(['_token' => 'test-token'])
+        ->from(route('admin.parts.mobilesentrix.index'))
+        ->post(route('admin.parts.mobilesentrix.authorize'), ['_token' => 'test-token']);
     $location = $response->headers->get('Location');
 
-    $response->assertRedirect();
+    $response->assertRedirect(route('admin.parts.mobilesentrix.index'));
+    $response->assertSessionHasErrors([
+        'mobilesentrix' => 'MobileSentrix authentication cannot be opened in the browser because the authorization URL includes sensitive credentials. Use the secure server-side authentication command or contact MobileSentrix to confirm the correct OAuth flow.',
+    ]);
+
+    expect($location)->not->toContain('preprod.mobilesentrix.ca')
+        ->and($location)->not->toContain('consumer-key')
+        ->and($location)->not->toContain('consumer-secret');
+
+    Http::assertNothingSent();
+});
+
+test('mobile sentrix browser oauth redirect requires explicit config and confirmation', function () {
+    config(['mobilesentrix.allow_browser_secret_redirect' => true]);
+
+    $admin = mobileSentrixAdminUser('browser-confirm-admin@example.com');
+
+    $unconfirmed = $this->actingAs($admin)
+        ->withSession(['_token' => 'test-token'])
+        ->from(route('admin.parts.mobilesentrix.index'))
+        ->post(route('admin.parts.mobilesentrix.authorize'), ['_token' => 'test-token']);
+
+    $unconfirmed->assertRedirect(route('admin.parts.mobilesentrix.index'));
+    $unconfirmed->assertSessionHasErrors([
+        'mobilesentrix' => 'Warning: MobileSentrix browser authentication will expose Consumer Key and Consumer Secret in the browser URL. Continue only if MobileSentrix has confirmed this is required.',
+    ]);
+
+    $confirmed = $this->actingAs($admin)
+        ->withSession(['_token' => 'test-token'])
+        ->post(route('admin.parts.mobilesentrix.authorize'), [
+            '_token' => 'test-token',
+            'confirm_secret_redirect' => '1',
+        ]);
+    $location = $confirmed->headers->get('Location');
+
+    $confirmed->assertRedirect();
 
     expect($location)->not->toBeNull()
         ->and(str_starts_with((string) $location, 'https://preprod.mobilesentrix.ca/oauth/authorize/identifier'))->toBeTrue()
-        ->and($location)->toContain('consumer=Eclise%20Test')
-        ->and($location)->toContain('callback=http%3A%2F%2Fecliseapp.test%2Fadmin%2Fparts%2Fmobilesentrix%2Fcallback');
-
-    Http::assertNothingSent();
+        ->and($location)->toContain('consumer_key=consumer-key')
+        ->and($location)->toContain('consumer_secret=consumer-secret');
 });
 
 test('mobile sentrix admin page redacts configured secrets and uses admin login redirect', function () {
@@ -393,28 +462,22 @@ test('mobile sentrix admin page redacts configured secrets and uses admin login 
 
     $this->get(route('admin.parts.mobilesentrix.index'))->assertRedirect(route('admin.login'));
 
-    $adminPermission = Permission::query()->where('name', 'admin')->firstOrFail();
-    $admin = User::query()->create([
-        'name' => 'API Admin',
-        'email' => 'api-admin@example.com',
-        'password' => 'password',
-        'role' => 'admin',
-        'permission_id' => $adminPermission->id,
-        'status' => 'active',
-    ]);
+    $admin = mobileSentrixAdminUser('api-admin@example.com');
 
     $this->actingAs($admin)
         ->get(route('admin.parts.mobilesentrix.index'))
         ->assertOk()
         ->assertSee('MobileSentrix API')
         ->assertSee('Yes')
-        ->assertSee('Start Live Authentication')
+        ->assertSee('Authenticate Server-Side')
         ->assertSee('Test Live Connection')
         ->assertSee('Connection status')
         ->assertSee('Copy Safe Support Message')
         ->assertSee('Callback route exists')
         ->assertSee('Callback URL allowed')
         ->assertSee('Cloudflare Ray ID')
+        ->assertSee('Browser authentication is disabled')
+        ->assertSee('Please confirm')
         ->assertDontSee('consumer-key')
         ->assertDontSee('very-secret-value')
         ->assertDontSee('token-secret-value');

@@ -36,7 +36,7 @@ class AuthenticateMobileSentrixCommand extends Command
             $temporaryCredentials = $auth->requestTemporaryCredentials();
 
             if (! $temporaryCredentials) {
-                $this->warn('This MobileSentrix OAuth flow requires browser authorization. Use /admin/parts/mobilesentrix and click Start Live Authentication.');
+                $this->warn('This MobileSentrix OAuth flow requires browser authorization. Use /admin/parts/mobilesentrix and click Authenticate Server-Side first, then contact MobileSentrix if backend authentication is blocked.');
                 $this->line('After MobileSentrix redirects to the callback, the admin page will store the encrypted access tokens.');
                 $this->line('For CLI completion, rerun this command with --callback-url= followed by the full callback URL.');
 
@@ -46,7 +46,7 @@ class AuthenticateMobileSentrixCommand extends Command
             return $this->exchangeAndReport($auth, $temporaryCredentials['oauth_token'], $temporaryCredentials['oauth_verifier']);
         } catch (MobileSentrixException $exception) {
             $this->error($exception->getMessage());
-            $this->line('Verify the MobileSentrix .env values, or use the admin "Start Live Authentication" button if browser authorization is required.');
+            $this->line('Verify the MobileSentrix .env values, or use the admin "Authenticate Server-Side" button.');
 
             return self::FAILURE;
         } catch (\Throwable) {

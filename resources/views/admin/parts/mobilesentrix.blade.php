@@ -98,11 +98,23 @@
                                 @csrf
                                 <button class="btn btn-primary" type="submit"><i class="bi bi-wifi me-2"></i>Test Live Connection</button>
                             </form>
-                            <form method="POST" action="{{ route('admin.parts.mobilesentrix.authorize') }}">
+                            <form method="POST" action="{{ route('admin.parts.mobilesentrix.authenticate-server') }}">
                                 @csrf
-                                <button class="btn btn-outline-primary" type="submit"><i class="bi bi-key me-2"></i>{{ $configStatus['stored_access_tokens'] ? 'Re-authenticate' : 'Start Live Authentication' }}</button>
+                                <button class="btn btn-outline-primary" type="submit"><i class="bi bi-key me-2"></i>{{ $configStatus['stored_access_tokens'] ? 'Re-authenticate Server-Side' : 'Authenticate Server-Side' }}</button>
                             </form>
                         </div>
+                        @if ($browserSecretRedirectAllowed)
+                            <div class="alert alert-warning small mt-3 mb-0">
+                                Warning: MobileSentrix browser authentication will expose Consumer Key and Consumer Secret in the browser URL. Continue only if MobileSentrix has confirmed this is required.
+                                <form class="mt-2" method="POST" action="{{ route('admin.parts.mobilesentrix.authorize') }}">
+                                    @csrf
+                                    <input type="hidden" name="confirm_secret_redirect" value="1">
+                                    <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-exclamation-triangle me-2"></i>Open Browser Authentication</button>
+                                </form>
+                            </div>
+                        @else
+                            <p class="muted small mt-3 mb-0">Browser authentication is disabled because MobileSentrix authorization URLs can include sensitive credentials.</p>
+                        @endif
                     </div>
                 </div>
             </div>
