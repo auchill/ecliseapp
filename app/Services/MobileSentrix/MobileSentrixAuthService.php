@@ -10,18 +10,13 @@ use Illuminate\Support\Str;
 
 class MobileSentrixAuthService
 {
+    private const BLOCKED_OAUTH_MESSAGE = 'MobileSentrix rejected or blocked the OAuth request with HTTP 403. This may be caused by Cloudflare, IP restriction, environment mismatch, unregistered callback URL, invalid credentials, or account not enabled for the Canada preprod API. Contact MobileSentrix support with the Cloudflare Ray ID from the block page.';
+
     public function authorizationUrl(): string
     {
         $credentials = $this->applicationCredentials();
 
-        return $this->url('/oauth/authorize/identifier').'?'.http_build_query([
-            'consumer' => $credentials['consumer_name'],
-            'authtype' => 1,
-            'flowentry' => 'SignIn',
-            'consumer_key' => $credentials['consumer_key'],
-            'consumer_secret' => $credentials['consumer_secret'],
-            'callback' => $credentials['callback_url'],
-        ]);
+        return $this->url('/oauth/authorize/identifier').'?'.$this->identifierQueryString($credentials);
     }
 
     public function requestTemporaryCredentials(): ?array
@@ -31,17 +26,11 @@ class MobileSentrixAuthService
         try {
             $response = Http::timeout(config('mobilesentrix.timeout'))
                 ->acceptJson()
-                ->get($this->url('/oauth/authorize/identifier'), [
-                    'consumer' => $credentials['consumer_name'],
-                    'authtype' => 1,
-                    'flowentry' => 'SignIn',
-                    'consumer_key' => $credentials['consumer_key'],
-                    'consumer_secret' => $credentials['consumer_secret'],
-                    'callback' => $credentials['callback_url'],
-                ]);
+                ->get($this->url('/oauth/authorize/identifier').'?'.$this->identifierQueryString($credentials));
         } catch (\Throwable $exception) {
             Log::warning('MobileSentrix OAuth temporary token request failed before a response.', [
                 'exception' => $exception::class,
+                'oauth_context' => $this->safeOAuthContext($credentials),
             ]);
 
             throw new MobileSentrixException('MobileSentrix OAuth authentication could not be started.');
@@ -84,11 +73,21 @@ class MobileSentrixAuthService
             return null;
         }
 
+        if ($response->status() === 403) {
+            Log::warning('MobileSentrix OAuth temporary token request blocked.', [
+                'status' => $response->status(),
+                'oauth_context' => $this->safeOAuthContext($credentials),
+            ]);
+
+            throw new MobileSentrixException(self::BLOCKED_OAUTH_MESSAGE, 403);
+        }
+
         Log::warning('MobileSentrix OAuth temporary token request failed.', [
             'status' => $response->status(),
+            'oauth_context' => $this->safeOAuthContext($credentials),
         ]);
 
-        throw new MobileSentrixException('MobileSentrix OAuth authentication could not be started.');
+        throw new MobileSentrixException('MobileSentrix OAuth authentication could not be started.', $response->status());
     }
 
     public function exchangeToken(string $oauthToken, string $oauthVerifier): array
@@ -117,6 +116,10 @@ class MobileSentrixAuthService
                 Log::warning('MobileSentrix OAuth token exchange failed.', [
                     'status' => $response->status(),
                 ]);
+
+                if ($response->status() === 403) {
+                    throw new MobileSentrixException(self::BLOCKED_OAUTH_MESSAGE, 403);
+                }
 
                 throw new MobileSentrixException('MobileSentrix rejected the OAuth verifier.');
             }
@@ -168,6 +171,50 @@ class MobileSentrixAuthService
             'is_active' => true,
             'last_authenticated_at' => now(),
         ])->save();
+    }
+
+    public static function maskSecret(?string $value): string
+    {
+        $value = (string) $value;
+
+        if ($value === '') {
+            return 'missing';
+        }
+
+        if (mb_strlen($value) <= 8) {
+            return mb_substr($value, 0, 2).'****'.mb_substr($value, -2);
+        }
+
+        return mb_substr($value, 0, 4).'********'.mb_substr($value, -4);
+    }
+
+    private function identifierQueryString(array $credentials): string
+    {
+        return http_build_query($this->identifierQueryParams($credentials), '', '&', PHP_QUERY_RFC3986);
+    }
+
+    private function identifierQueryParams(array $credentials): array
+    {
+        return [
+            'consumer' => $credentials['consumer_name'],
+            'authtype' => 1,
+            'flowentry' => 'SignIn',
+            'consumer_key' => $credentials['consumer_key'],
+            'consumer_secret' => $credentials['consumer_secret'],
+            'callback' => $credentials['callback_url'],
+        ];
+    }
+
+    private function safeOAuthContext(array $credentials): array
+    {
+        return [
+            'environment' => $credentials['environment'] ?? null,
+            'base_url' => $credentials['base_url'] ?? null,
+            'callback_url' => $credentials['callback_url'] ?? null,
+            'consumer_name_configured' => filled($credentials['consumer_name'] ?? null),
+            'consumer_key' => self::maskSecret($credentials['consumer_key'] ?? null),
+            'consumer_secret' => self::maskSecret($credentials['consumer_secret'] ?? null),
+        ];
     }
 
     private function applicationCredentials(): array

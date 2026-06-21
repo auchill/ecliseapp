@@ -36,8 +36,7 @@ class AuthenticateMobileSentrixCommand extends Command
             $temporaryCredentials = $auth->requestTemporaryCredentials();
 
             if (! $temporaryCredentials) {
-                $this->warn('MobileSentrix requires browser-based authentication for this application.');
-                $this->line('Use /admin/parts/mobilesentrix and click "Start Live Authentication".');
+                $this->warn('This MobileSentrix OAuth flow requires browser authorization. Use /admin/parts/mobilesentrix and click Start Live Authentication.');
                 $this->line('After MobileSentrix redirects to the callback, the admin page will store the encrypted access tokens.');
                 $this->line('For CLI completion, rerun this command with --callback-url= followed by the full callback URL.');
 
@@ -62,8 +61,8 @@ class AuthenticateMobileSentrixCommand extends Command
         $tokens = $auth->exchangeToken($oauthToken, $oauthVerifier);
 
         $this->info('MobileSentrix authentication completed. Access tokens were stored securely.');
-        $this->line('Access Token: '.$this->mask($tokens['access_token'] ?? ''));
-        $this->line('Access Token Secret: '.$this->mask($tokens['access_token_secret'] ?? ''));
+        $this->line('Access Token: '.MobileSentrixAuthService::maskSecret($tokens['access_token'] ?? ''));
+        $this->line('Access Token Secret: '.MobileSentrixAuthService::maskSecret($tokens['access_token_secret'] ?? ''));
 
         return self::SUCCESS;
     }
@@ -104,18 +103,5 @@ class AuthenticateMobileSentrixCommand extends Command
             'MOBILESENTRIX_CONSUMER_SECRET' => config('mobilesentrix.consumer_secret'),
             'MOBILESENTRIX_CALLBACK_URL' => config('mobilesentrix.callback_url'),
         ])->filter(fn ($value) => blank($value))->keys()->all();
-    }
-
-    private function mask(string $value): string
-    {
-        if ($value === '') {
-            return 'missing';
-        }
-
-        if (mb_strlen($value) <= 8) {
-            return mb_substr($value, 0, 2).'****'.mb_substr($value, -2);
-        }
-
-        return mb_substr($value, 0, 4).'********'.mb_substr($value, -4);
     }
 }

@@ -18,6 +18,13 @@ MOBILESENTRIX_SYNC_ENABLED=false
 
 Do not commit `.env`.
 
+After changing these values, clear cached config:
+
+```bash
+php artisan config:clear
+php artisan cache:clear
+```
+
 ## Migrations
 
 Run migrations before authenticating:
@@ -44,6 +51,8 @@ The relevant table is `mobilesentrix_api_settings`. The app encrypts `consumer_k
    - Access Token Secret configured: Yes
 
 Use `Re-authenticate` on the same page when tokens need to be rotated.
+
+The admin page also includes an OAuth preflight checklist and a safe support message. The support message intentionally excludes the Consumer Key, Consumer Secret, Access Token, and Access Token Secret.
 
 ## Authenticate From CLI
 
@@ -118,3 +127,22 @@ If the admin callback does not complete, verify `MOBILESENTRIX_CALLBACK_URL` exa
 ```text
 /admin/parts/mobilesentrix/callback
 ```
+
+For local development, the callback can be:
+
+```text
+http://127.0.0.1:8000/admin/parts/mobilesentrix/callback
+```
+
+If MobileSentrix does not allow `localhost` or `127.0.0.1` callbacks, use a public HTTPS staging domain or HTTPS tunnel and register that exact URL with MobileSentrix. The app accepts HTTPS callback URLs and common local development hosts.
+
+If Cloudflare blocks the OAuth identifier URL with HTTP 403:
+
+1. Confirm the correct Canada preprod base URL with MobileSentrix.
+2. Confirm the Consumer Key and Consumer Secret are enabled for Canada preprod.
+3. Confirm the callback URL is registered with MobileSentrix.
+4. Ask MobileSentrix whether your server or public IP must be whitelisted.
+5. Send MobileSentrix the Cloudflare Ray ID and blocked IP.
+6. Rotate Consumer Key and Consumer Secret if they were exposed in screenshots or logs.
+
+The app never logs or displays the full OAuth identifier URL because it contains sensitive query parameters.

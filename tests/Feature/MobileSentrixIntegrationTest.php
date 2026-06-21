@@ -73,6 +73,24 @@ test('mobile sentrix can request temporary oauth token and verifier from identif
         && $request['callback'] === 'http://ecliseapp.test/admin/parts/mobilesentrix/callback');
 });
 
+test('mobile sentrix authorization url uses rfc3986 encoded query values', function () {
+    config([
+        'mobilesentrix.consumer_name' => 'Eclise Technology Inc.',
+        'mobilesentrix.consumer_key' => 'key with spaces+plus',
+        'mobilesentrix.consumer_secret' => 'secret/value?x=1',
+        'mobilesentrix.callback_url' => 'http://127.0.0.1:8000/admin/parts/mobilesentrix/callback?return=admin panel',
+    ]);
+
+    $url = app(MobileSentrixAuthService::class)->authorizationUrl();
+
+    expect($url)->toContain('consumer=Eclise%20Technology%20Inc.')
+        ->and($url)->toContain('consumer_key=key%20with%20spaces%2Bplus')
+        ->and($url)->toContain('consumer_secret=secret%2Fvalue%3Fx%3D1')
+        ->and($url)->toContain('callback=http%3A%2F%2F127.0.0.1%3A8000%2Fadmin%2Fparts%2Fmobilesentrix%2Fcallback%3Freturn%3Dadmin%20panel')
+        ->and($url)->not->toContain('admin panel')
+        ->and($url)->not->toContain('secret/value');
+});
+
 test('mobile sentrix authenticate command exchanges live oauth responses and masks output', function () {
     Http::fake([
         'https://preprod.mobilesentrix.ca/oauth/authorize/identifiercallback' => Http::response([
@@ -99,6 +117,27 @@ test('mobile sentrix authenticate command exchanges live oauth responses and mas
         ->and($output)->toContain('Access Token Secret: live********cret')
         ->and($output)->not->toContain('live-access-token')
         ->and($output)->not->toContain('live-access-secret');
+});
+
+test('mobile sentrix authenticate command reports http 403 safely without exposing secrets', function () {
+    config([
+        'mobilesentrix.consumer_key' => 'blocked-consumer-key',
+        'mobilesentrix.consumer_secret' => 'blocked-consumer-secret',
+    ]);
+
+    Http::fake([
+        'https://preprod.mobilesentrix.ca/oauth/authorize/identifier*' => Http::response('<html>Cloudflare block</html>', 403),
+    ]);
+
+    $exitCode = Artisan::call('mobilesentrix:authenticate');
+    $output = Artisan::output();
+
+    expect($exitCode)->toBe(1)
+        ->and($output)->toContain('MobileSentrix rejected or blocked the OAuth request with HTTP 403')
+        ->and($output)->toContain('Cloudflare Ray ID')
+        ->and($output)->not->toContain('blocked-consumer-key')
+        ->and($output)->not->toContain('blocked-consumer-secret')
+        ->and(MobileSentrixApiSetting::query()->count())->toBe(0);
 });
 
 test('mobile sentrix test connection command uses stored tokens', function () {
@@ -340,7 +379,8 @@ test('mobile sentrix admin authentication starts browser oauth without server si
 
     expect($location)->not->toBeNull()
         ->and(str_starts_with((string) $location, 'https://preprod.mobilesentrix.ca/oauth/authorize/identifier'))->toBeTrue()
-        ->and($location)->toContain('callback=');
+        ->and($location)->toContain('consumer=Eclise%20Test')
+        ->and($location)->toContain('callback=http%3A%2F%2Fecliseapp.test%2Fadmin%2Fparts%2Fmobilesentrix%2Fcallback');
 
     Http::assertNothingSent();
 });
@@ -371,7 +411,11 @@ test('mobile sentrix admin page redacts configured secrets and uses admin login 
         ->assertSee('Start Live Authentication')
         ->assertSee('Test Live Connection')
         ->assertSee('Connection status')
-        ->assertDontSee('https://preprod.mobilesentrix.ca')
+        ->assertSee('Copy Safe Support Message')
+        ->assertSee('Callback route exists')
+        ->assertSee('Callback URL allowed')
+        ->assertSee('Cloudflare Ray ID')
+        ->assertDontSee('consumer-key')
         ->assertDontSee('very-secret-value')
         ->assertDontSee('token-secret-value');
 });

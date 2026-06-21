@@ -16,7 +16,38 @@
             <div class="row g-4 mb-4">
                 <div class="col-lg-4">
                     <div class="surface p-4 h-100">
-                        <p class="eyebrow mb-2">Configuration</p>
+                        <p class="eyebrow mb-2">OAuth Preflight</p>
+                        <dl class="row small mb-0">
+                            <dt class="col-7">Base URL configured</dt>
+                            <dd class="col-5 text-end">{{ $preflight['base_url_configured'] ? 'Yes' : 'No' }}</dd>
+                            <dt class="col-7">Environment</dt>
+                            <dd class="col-5 text-end">{{ $preflight['environment'] }}</dd>
+                            <dt class="col-7">Consumer Name configured</dt>
+                            <dd class="col-5 text-end">{{ $preflight['consumer_name_configured'] ? 'Yes' : 'No' }}</dd>
+                            <dt class="col-7">Consumer Key configured</dt>
+                            <dd class="col-5 text-end">{{ $preflight['consumer_key_configured'] ? 'Yes' : 'No' }}</dd>
+                            <dt class="col-7">Consumer Secret configured</dt>
+                            <dd class="col-5 text-end">{{ $preflight['consumer_secret_configured'] ? 'Yes' : 'No' }}</dd>
+                            <dt class="col-7">Callback URL configured</dt>
+                            <dd class="col-5 text-end">{{ $preflight['callback_url_configured'] ? 'Yes' : 'No' }}</dd>
+                            <dt class="col-7">Callback route exists</dt>
+                            <dd class="col-5 text-end">{{ $preflight['callback_route_exists'] ? 'Yes' : 'No' }}</dd>
+                            <dt class="col-7">Callback URL allowed</dt>
+                            <dd class="col-5 text-end">{{ $preflight['callback_url_allowed'] ? 'Yes' : 'No' }}</dd>
+                            <dt class="col-7">Access Token configured</dt>
+                            <dd class="col-5 text-end">{{ $preflight['access_token_configured'] ? 'Yes' : 'No' }}</dd>
+                            <dt class="col-7">Access Token Secret configured</dt>
+                            <dd class="col-5 text-end">{{ $preflight['access_token_secret_configured'] ? 'Yes' : 'No' }}</dd>
+                            <dt class="col-7">Last authenticated at</dt>
+                            <dd class="col-5 text-end">{{ $preflight['last_authenticated_at']?->format('M j, Y g:i A') ?? 'Never' }}</dd>
+                            <dt class="col-7">Connection status</dt>
+                            <dd class="col-5 text-end">{{ session('mobilesentrix_connection_status', 'Not tested') }}</dd>
+                        </dl>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="surface p-4 h-100">
+                        <p class="eyebrow mb-2">Configuration Status</p>
                         <dl class="row small mb-0">
                             <dt class="col-6">Environment</dt>
                             <dd class="col-6 text-end">{{ $configStatus['environment'] }}</dd>
@@ -38,8 +69,6 @@
                             <dd class="col-6 text-end">{{ $configStatus['last_authenticated_at']?->format('M j, Y g:i A') ?? 'Never' }}</dd>
                             <dt class="col-6">Scheduled sync</dt>
                             <dd class="col-6 text-end">{{ $configStatus['sync_enabled'] ? 'Yes' : 'No' }}</dd>
-                            <dt class="col-6">Connection status</dt>
-                            <dd class="col-6 text-end">{{ session('mobilesentrix_connection_status', 'Not tested') }}</dd>
                         </dl>
                     </div>
                 </div>
@@ -76,6 +105,19 @@
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <div class="surface p-4 mb-4">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+                    <div>
+                        <p class="eyebrow mb-1">MobileSentrix Support</p>
+                        <h2 class="h5 fw-bold mb-0">Safe Support Message</h2>
+                    </div>
+                    <button class="btn btn-outline-primary" id="copyMobileSentrixSupportMessage" type="button">
+                        <i class="bi bi-clipboard me-2"></i>Copy Safe Support Message
+                    </button>
+                </div>
+                <textarea class="form-control font-monospace small" id="mobileSentrixSupportMessage" rows="10" readonly>{{ $safeSupportMessage }}</textarea>
             </div>
 
             <div class="row g-4 mb-4">
@@ -154,4 +196,11 @@
             </div>
         </div>
     </section>
+    <script>
+        document.getElementById('copyMobileSentrixSupportMessage')?.addEventListener('click', () => {
+            const message = document.getElementById('mobileSentrixSupportMessage')?.value || '';
+
+            navigator.clipboard?.writeText(message);
+        });
+    </script>
 @endsection
