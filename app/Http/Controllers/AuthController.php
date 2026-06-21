@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Cart;
+use App\Models\Permission;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -25,14 +26,70 @@ class AuthController extends Controller
 
         if (! Auth::attempt($credentials, $request->boolean('remember'))) {
             return back()->withErrors([
-                'email' => 'The provided credentials do not match our records.',
+                'email' => 'Invalid customer credentials.',
             ])->onlyInput('email');
         }
 
         $request->session()->regenerate();
+        $user = $request->user()->load('permission');
+
+        if (! $user->isCustomer()) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return back()->withErrors([
+                'email' => 'Invalid customer credentials.',
+            ])->onlyInput('email');
+        }
+
         $this->mergeSessionCart($request);
 
-        return redirect()->intended(Auth::user()->isAdmin() ? route('admin.dashboard') : route('dashboard'));
+        return redirect()->intended(route('dashboard'));
+    }
+
+    public function showAdminLogin()
+    {
+        if (auth()->user()?->isAdmin()) {
+            return redirect()->route('admin.dashboard');
+        }
+
+        return view('auth.admin-login');
+    }
+
+    public function adminLogin(Request $request)
+    {
+        $credentials = $request->validate([
+            'email' => ['required', 'email'],
+            'password' => ['required', 'string'],
+        ]);
+
+        if (Auth::check()) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+        }
+
+        if (! Auth::attempt($credentials, $request->boolean('remember'))) {
+            return back()->withErrors([
+                'email' => 'Invalid admin credentials.',
+            ])->onlyInput('email');
+        }
+
+        $request->session()->regenerate();
+        $user = $request->user()->load('permission');
+
+        if (! $user->isAdmin()) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return back()->withErrors([
+                'email' => 'Invalid admin credentials.',
+            ])->onlyInput('email');
+        }
+
+        return redirect()->intended(route('admin.dashboard'));
     }
 
     public function showRegister()
@@ -53,6 +110,8 @@ class AuthController extends Controller
             'email' => $data['email'],
             'password' => $data['password'],
             'role' => 'customer',
+            'permission_id' => Permission::query()->where('name', 'customer')->where('status', 'active')->value('id'),
+            'status' => 'active',
         ]);
 
         Auth::login($user);
@@ -69,6 +128,16 @@ class AuthController extends Controller
         $request->session()->regenerateToken();
 
         return redirect()->route('home');
+    }
+
+    public function adminLogout(Request $request)
+    {
+        Auth::logout();
+
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return redirect()->route('admin.login');
     }
 
     private function mergeSessionCart(Request $request): void

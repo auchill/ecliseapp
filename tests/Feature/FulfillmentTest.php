@@ -59,6 +59,7 @@ test('checkout pickup creates a pickup order with zero shipping', function () {
     $order = Order::query()->firstOrFail();
 
     expect($order->fulfillment_method)->toBe('pickup')
+        ->and($order->source)->toBe('shop')
         ->and($order->shipping_method_id)->toBeNull()
         ->and((float) $order->shipping_base_cost)->toBe(0.0)
         ->and((float) $order->shipping_discount_amount)->toBe(0.0)
@@ -67,6 +68,7 @@ test('checkout pickup creates a pickup order with zero shipping', function () {
         ->and((float) $order->total)->toBe(113.0);
 
     expect($order->payments()->count())->toBe(1)
+        ->and($order->payments()->first()->source)->toBe('shop')
         ->and($product->fresh()->quantity)->toBe(2);
 });
 
@@ -291,6 +293,7 @@ test('repair shipping calculates selected return shipping method and appears in 
         ->and((float) $repair->shipping_cost)->toBe(45.0)
         ->and($repair->payment_status)->toBe('unpaid')
         ->and($repair->latestPayment->gateway)->toBe('paypal')
+        ->and($repair->latestPayment->source)->toBe('repair')
         ->and((float) $repair->repair_total)->toBe(271.0)
         ->and((float) $repair->latestPayment->amount)->toBe(195.5);
 

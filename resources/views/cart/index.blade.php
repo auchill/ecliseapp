@@ -67,7 +67,9 @@
                         <div class="text-end">
                             <p class="h4 fw-bold mb-2">Subtotal: ${{ number_format($subtotal, 2) }}</p>
                             @auth
-                                <a class="btn btn-primary btn-lg" href="{{ route('checkout.show') }}"><i class="bi bi-credit-card me-2"></i>Checkout</a>
+                                @if(auth()->user()->isCustomer())
+                                    <a class="btn btn-primary btn-lg" href="{{ route('checkout.show') }}"><i class="bi bi-credit-card me-2"></i>Checkout</a>
+                                @endif
                             @else
                                 <a class="btn btn-primary btn-lg" href="{{ route('login') }}"><i class="bi bi-box-arrow-in-right me-2"></i>Login to Checkout</a>
                             @endauth

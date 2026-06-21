@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('layouts.admin')
 
 @section('title', 'Order '.$order->order_number)
 
@@ -178,6 +178,7 @@
                         <h2 class="h5 fw-bold">Customer Details</h2>
                         <p class="mb-1"><strong>Email:</strong> {{ $order->email }}</p>
                         <p class="mb-1"><strong>Phone:</strong> {{ $order->phone }}</p>
+                        <p class="mb-1"><strong>Source:</strong> {{ $order->sourceLabel() }}</p>
                         <p class="mb-1"><strong>Fulfillment:</strong> {{ $order->fulfillmentLabel() }}</p>
                         <p class="mb-1"><strong>Payment gateway:</strong> {{ $order->latestPayment?->gatewayLabel() ?? ucfirst($order->payment_gateway ?? $order->payment_provider ?? 'Pending') }}</p>
                         <p class="mb-1"><strong>Payment status:</strong> {{ ucfirst($order->payment_status) }}</p>

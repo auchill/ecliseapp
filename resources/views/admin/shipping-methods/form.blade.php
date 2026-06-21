@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('layouts.admin')
 
 @section('title', $shippingMethod->exists ? 'Edit Shipping Method' : 'Add Shipping Method')
 

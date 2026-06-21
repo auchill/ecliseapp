@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use InvalidArgumentException;
 
 class Payment extends Model
 {
@@ -25,11 +26,17 @@ class Payment extends Model
         'partially_refunded' => 'Partially refunded',
     ];
 
+    public const SOURCES = [
+        'repair' => 'Repair',
+        'shop' => 'Shop',
+    ];
+
     protected $fillable = [
         'payable_type',
         'payable_id',
         'order_id',
         'repair_order_id',
+        'source',
         'gateway',
         'gateway_reference_id',
         'stripe_checkout_session_id',
@@ -42,6 +49,15 @@ class Payment extends Model
         'raw_response',
         'paid_at',
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (Payment $payment): void {
+            if ($payment->source && ! array_key_exists($payment->source, self::SOURCES)) {
+                throw new InvalidArgumentException('Invalid payment source.');
+            }
+        });
+    }
 
     protected function casts(): array
     {
@@ -80,5 +96,10 @@ class Payment extends Model
     public function statusLabel(): string
     {
         return self::STATUSES[$this->status] ?? ucfirst($this->status);
+    }
+
+    public function sourceLabel(): string
+    {
+        return self::SOURCES[$this->source] ?? ucfirst((string) $this->source);
     }
 }

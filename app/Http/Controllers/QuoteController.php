@@ -41,7 +41,7 @@ class QuoteController extends Controller
         Mail::to($quote->email)->send(new QuoteSubmittedCustomerMail($quote));
 
         User::query()
-            ->where('role', 'admin')
+            ->admins()
             ->get()
             ->each(fn (User $admin) => Mail::to($admin->email)->send(new AdminQuoteSubmittedMail($quote)));
 

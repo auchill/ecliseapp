@@ -48,7 +48,7 @@ class PaymentFinalizer
             Mail::to($payment->payable->email)->send(new PaymentReceiptMail($payment->fresh('payable')));
 
             User::query()
-                ->where('role', 'admin')
+                ->admins()
                 ->get()
                 ->each(fn (User $admin) => Mail::to($admin->email)->send(new AdminPaymentReceivedMail($payment->fresh('payable'))));
         }

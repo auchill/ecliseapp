@@ -15,6 +15,8 @@ class CheckoutController extends Controller
 {
     public function show(Request $request, ShippingCostService $shippingCosts)
     {
+        abort_if($request->user()?->isAdmin(), 403);
+
         $cart = $this->activeCart($request)->load('items.product');
 
         if ($cart->items->isEmpty()) {
@@ -39,6 +41,8 @@ class CheckoutController extends Controller
 
     public function store(CheckoutRequest $request, ShippingCostService $shippingCosts, PaymentGatewayService $paymentGateways)
     {
+        abort_if($request->user()?->isAdmin(), 403);
+
         $cart = $this->activeCart($request)->load('items.product');
 
         if ($cart->items->isEmpty()) {
@@ -70,6 +74,7 @@ class CheckoutController extends Controller
                 'user_id' => $request->user()->id,
                 'cart_id' => $cart->id,
                 'order_number' => $this->generateOrderNumber(),
+                'source' => 'shop',
                 'customer_name' => $data['customer_name'],
                 'email' => $data['email'],
                 'phone' => $data['phone'],
@@ -134,6 +139,7 @@ class CheckoutController extends Controller
 
         $payment = $order->payments()->create([
             'order_id' => $order->id,
+            'source' => 'shop',
             'gateway' => $data['payment_gateway'],
             'amount' => $order->total,
             'currency' => 'cad',
@@ -145,7 +151,7 @@ class CheckoutController extends Controller
 
     public function confirmation(Order $order)
     {
-        abort_unless(auth()->id() === $order->user_id || auth()->user()?->isAdmin(), 403);
+        abort_unless(auth()->id() === $order->user_id && auth()->user()?->isCustomer(), 403);
 
         return view('checkout.confirmation', [
             'order' => $order->load('items', 'latestPayment'),

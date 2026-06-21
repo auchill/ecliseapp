@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('layouts.admin')
 
 @section('title', 'Admin Dashboard')
 
@@ -13,13 +13,13 @@
             </div>
 
             <div class="row g-4 mb-5">
-                @foreach ($metrics as $label => $value)
+                @foreach ($metrics as $label => $metric)
                     <div class="col-sm-6 col-xl-3">
-                        <div class="surface p-4 h-100">
-                            <span class="metric-icon mb-3"><i class="bi bi-bar-chart"></i></span>
+                        <a class="surface p-4 h-100 d-block text-decoration-none text-reset" href="{{ $metric['route'] }}">
+                            <span class="metric-icon mb-3"><i class="bi {{ $metric['icon'] }}"></i></span>
                             <h2 class="h6 fw-bold text-uppercase">{{ $label }}</h2>
-                            <p class="display-6 fw-bold mb-0">{{ $value }}</p>
-                        </div>
+                            <p class="display-6 fw-bold mb-0">{{ $metric['value'] }}</p>
+                        </a>
                     </div>
                 @endforeach
             </div>

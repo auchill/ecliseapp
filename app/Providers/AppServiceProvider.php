@@ -27,7 +27,7 @@ class AppServiceProvider extends ServiceProvider
         View::composer('layouts.app', function ($view): void {
             $count = 0;
 
-            if (auth()->check()) {
+            if (auth()->check() && auth()->user()?->isCustomer()) {
                 $cart = Cart::query()
                     ->where('user_id', auth()->id())
                     ->where('status', 'active')

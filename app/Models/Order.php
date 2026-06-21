@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use InvalidArgumentException;
 
 class Order extends Model
 {
@@ -29,10 +30,16 @@ class Order extends Model
         'shipping' => 'Shipping',
     ];
 
+    public const SOURCES = [
+        'repair' => 'Repair',
+        'shop' => 'Shop',
+    ];
+
     protected $fillable = [
         'user_id',
         'cart_id',
         'order_number',
+        'source',
         'customer_name',
         'email',
         'phone',
@@ -72,6 +79,15 @@ class Order extends Model
         'customer_notes',
         'notes',
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (Order $order): void {
+            if ($order->source && ! array_key_exists($order->source, self::SOURCES)) {
+                throw new InvalidArgumentException('Invalid order source.');
+            }
+        });
+    }
 
     protected function casts(): array
     {
@@ -138,6 +154,11 @@ class Order extends Model
     public function fulfillmentLabel(): string
     {
         return self::FULFILLMENT_METHODS[$this->fulfillment_method] ?? 'Store Pickup';
+    }
+
+    public function sourceLabel(): string
+    {
+        return self::SOURCES[$this->source] ?? ucfirst((string) $this->source);
     }
 
     public function shippingAddressLines(): array

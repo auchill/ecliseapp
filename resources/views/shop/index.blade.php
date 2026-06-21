@@ -78,11 +78,13 @@
                                     </div>
                                     <div class="d-inline-flex gap-2">
                                         <a class="btn btn-outline-primary btn-sm" href="{{ route('products.show', $product) }}"><i class="bi bi-eye"></i><span class="visually-hidden">View</span></a>
-                                        <form method="POST" action="{{ route('cart.store', $product) }}">
-                                            @csrf
-                                            <input type="hidden" name="quantity" value="1">
-                                            <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-bag-plus"></i><span class="visually-hidden">Add to Cart</span></button>
-                                        </form>
+                                        @if(! auth()->user()?->isAdmin())
+                                            <form method="POST" action="{{ route('cart.store', $product) }}">
+                                                @csrf
+                                                <input type="hidden" name="quantity" value="1">
+                                                <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-bag-plus"></i><span class="visually-hidden">Add to Cart</span></button>
+                                            </form>
+                                        @endif
                                     </div>
                                 </div>
                             </div>

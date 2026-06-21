@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\PartBrandController as AdminPartBrandController;
 use App\Http\Controllers\Admin\PartCategoryController as AdminPartCategoryController;
 use App\Http\Controllers\Admin\PartController as AdminPartController;
 use App\Http\Controllers\Admin\PaymentController as AdminPaymentController;
+use App\Http\Controllers\Admin\PermissionController as AdminPermissionController;
 use App\Http\Controllers\Admin\ProductBrandController as AdminProductBrandController;
 use App\Http\Controllers\Admin\ProductCategoryController as AdminProductCategoryController;
 use App\Http\Controllers\Admin\ProductController as AdminProductController;
@@ -16,6 +17,7 @@ use App\Http\Controllers\Admin\ReferenceController as AdminReferenceController;
 use App\Http\Controllers\Admin\RepairController as AdminRepairController;
 use App\Http\Controllers\Admin\ShippingDiscountRuleController as AdminShippingDiscountRuleController;
 use App\Http\Controllers\Admin\ShippingMethodController as AdminShippingMethodController;
+use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CheckoutController;
@@ -37,8 +39,6 @@ Route::get('/services', [PublicPageController::class, 'services'])->name('servic
 Route::get('/repairs/quote', [QuoteController::class, 'create'])->name('quotes.create');
 Route::post('/repairs/quote', [QuoteController::class, 'store'])->name('quotes.store');
 
-Route::get('/repairs/book', [RepairBookingController::class, 'create'])->name('repairs.create');
-Route::post('/repairs/book', [RepairBookingController::class, 'store'])->name('repairs.store');
 Route::get('/repairs/confirmation/{repairBooking}', [RepairBookingController::class, 'confirmation'])->name('repairs.confirmation');
 Route::get('/repairs/track', [RepairBookingController::class, 'trackForm'])->name('repairs.track');
 Route::post('/repairs/track', [RepairBookingController::class, 'track'])->name('repairs.track.submit');
@@ -50,16 +50,21 @@ Route::post('/orders/track/result', [OrderTrackingController::class, 'result'])-
 Route::get('/parts', [PartController::class, 'index'])->name('parts.index');
 Route::get('/contact', [ContactController::class, 'create'])->name('contact.create');
 Route::post('/contact', [ContactController::class, 'store'])->name('contact.store');
-Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
-Route::post('/cart/products/{product}', [CartController::class, 'store'])->name('cart.store');
-Route::patch('/cart/products/{product}', [CartController::class, 'update'])->name('cart.update');
-Route::delete('/cart/products/{product}', [CartController::class, 'destroy'])->name('cart.destroy');
 Route::post('/webhooks/stripe', [PaymentWebhookController::class, 'stripe'])->name('webhooks.stripe');
 Route::post('/webhooks/paypal', [PaymentWebhookController::class, 'paypal'])->name('webhooks.paypal');
-Route::get('/payments/{payment}', [PaymentController::class, 'show'])->name('payments.show');
-Route::get('/payments/{payment}/stripe/success', [PaymentController::class, 'stripeSuccess'])->name('payments.stripe.success');
-Route::get('/payments/{payment}/paypal/return', [PaymentController::class, 'paypalReturn'])->name('payments.paypal.return');
-Route::get('/payments/{payment}/cancel', [PaymentController::class, 'cancel'])->name('payments.cancel');
+
+Route::middleware('no_admin_cart')->group(function (): void {
+    Route::get('/repairs/book', [RepairBookingController::class, 'create'])->name('repairs.create');
+    Route::post('/repairs/book', [RepairBookingController::class, 'store'])->name('repairs.store');
+    Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
+    Route::post('/cart/products/{product}', [CartController::class, 'store'])->name('cart.store');
+    Route::patch('/cart/products/{product}', [CartController::class, 'update'])->name('cart.update');
+    Route::delete('/cart/products/{product}', [CartController::class, 'destroy'])->name('cart.destroy');
+    Route::get('/payments/{payment}', [PaymentController::class, 'show'])->name('payments.show');
+    Route::get('/payments/{payment}/stripe/success', [PaymentController::class, 'stripeSuccess'])->name('payments.stripe.success');
+    Route::get('/payments/{payment}/paypal/return', [PaymentController::class, 'paypalReturn'])->name('payments.paypal.return');
+    Route::get('/payments/{payment}/cancel', [PaymentController::class, 'cancel'])->name('payments.cancel');
+});
 
 Route::middleware('guest')->group(function (): void {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
@@ -68,11 +73,15 @@ Route::middleware('guest')->group(function (): void {
     Route::post('/register', [AuthController::class, 'register'])->name('register.store');
 });
 
-Route::middleware('auth')->group(function (): void {
-    Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+Route::middleware('auth')->post('/logout', [AuthController::class, 'logout'])->name('logout');
+
+Route::middleware(['auth', 'customer'])->group(function (): void {
     Route::get('/dashboard', [CustomerDashboardController::class, 'dashboard'])->name('dashboard');
     Route::get('/my-repairs', [CustomerDashboardController::class, 'repairs'])->name('customer.repairs');
     Route::get('/my-orders', [CustomerDashboardController::class, 'orders'])->name('customer.orders');
+});
+
+Route::middleware(['auth', 'customer', 'no_admin_cart'])->group(function (): void {
     Route::get('/repairs/book/{trackingNumber}', [RepairBookingController::class, 'complete'])->name('repairs.complete');
     Route::post('/repairs/book/{trackingNumber}', [RepairBookingController::class, 'completeStore'])->name('repairs.complete.store');
 
@@ -82,46 +91,71 @@ Route::middleware('auth')->group(function (): void {
 
 });
 
+Route::prefix('admin')->name('admin.')->group(function (): void {
+    Route::get('/login', [AuthController::class, 'showAdminLogin'])->name('login');
+    Route::post('/login', [AuthController::class, 'adminLogin'])->name('login.store');
+    Route::post('/logout', [AuthController::class, 'adminLogout'])->name('logout');
+});
+
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function (): void {
-    Route::get('/', AdminDashboardController::class)->name('dashboard');
+    Route::get('/', fn () => redirect()->route('admin.dashboard'))->name('home');
+    Route::get('/dashboard', AdminDashboardController::class)->name('dashboard');
 
     Route::get('/repairs', [AdminRepairController::class, 'index'])->name('repairs.index');
-    Route::get('/repairs/{repair}', [AdminRepairController::class, 'show'])->name('repairs.show');
-    Route::patch('/repairs/{repair}', [AdminRepairController::class, 'update'])->name('repairs.update');
+    Route::get('/repairs/{repair}', [AdminRepairController::class, 'show'])->whereNumber('repair')->name('repairs.show');
+    Route::patch('/repairs/{repair}', [AdminRepairController::class, 'update'])->whereNumber('repair')->name('repairs.update');
 
-    Route::resource('products', AdminProductController::class)->except(['show']);
-    Route::resource('product-brands', AdminProductBrandController::class)->except(['show']);
-    Route::resource('product-categories', AdminProductCategoryController::class)->except(['show']);
-    foreach (['product-models', 'part-models', 'device-types', 'device-brands', 'device-models', 'issue-categories'] as $reference) {
-        Route::get($reference, [AdminReferenceController::class, 'index'])->defaults('reference', $reference)->name($reference.'.index');
-        Route::get($reference.'/create', [AdminReferenceController::class, 'create'])->defaults('reference', $reference)->name($reference.'.create');
-        Route::post($reference, [AdminReferenceController::class, 'store'])->defaults('reference', $reference)->name($reference.'.store');
-        Route::get($reference.'/{id}/edit', [AdminReferenceController::class, 'edit'])->defaults('reference', $reference)->name($reference.'.edit');
-        Route::match(['put', 'patch'], $reference.'/{id}', [AdminReferenceController::class, 'update'])->defaults('reference', $reference)->name($reference.'.update');
-        Route::delete($reference.'/{id}', [AdminReferenceController::class, 'destroy'])->defaults('reference', $reference)->name($reference.'.destroy');
+    foreach ([
+        'repairs/device-types' => 'device-types',
+        'repairs/device-brands' => 'device-brands',
+        'repairs/device-models' => 'device-models',
+        'repairs/issues' => 'issue-categories',
+        'shop/product-models' => 'product-models',
+        'parts/part-models' => 'part-models',
+    ] as $path => $reference) {
+        Route::get($path, [AdminReferenceController::class, 'index'])->defaults('reference', $reference)->name($reference.'.index');
+        Route::get($path.'/create', [AdminReferenceController::class, 'create'])->defaults('reference', $reference)->name($reference.'.create');
+        Route::post($path, [AdminReferenceController::class, 'store'])->defaults('reference', $reference)->name($reference.'.store');
+        Route::get($path.'/{id}/edit', [AdminReferenceController::class, 'edit'])->defaults('reference', $reference)->name($reference.'.edit');
+        Route::match(['put', 'patch'], $path.'/{id}', [AdminReferenceController::class, 'update'])->defaults('reference', $reference)->name($reference.'.update');
+        Route::delete($path.'/{id}', [AdminReferenceController::class, 'destroy'])->defaults('reference', $reference)->name($reference.'.destroy');
     }
-    Route::get('/orders', [AdminOrderController::class, 'index'])->name('orders.index');
-    Route::get('/orders/{order}', [AdminOrderController::class, 'show'])->name('orders.show');
-    Route::patch('/orders/{order}', [AdminOrderController::class, 'update'])->name('orders.update');
+
+    Route::get('/repairs/quotes', [AdminQuoteController::class, 'index'])->name('quotes.index');
+    Route::get('/repairs/quotes/{quote}', [AdminQuoteController::class, 'show'])->name('quotes.show');
+    Route::patch('/repairs/quotes/{quote}', [AdminQuoteController::class, 'update'])->name('quotes.update');
+    Route::get('/repairs/quotes/{quote}/convert', [AdminQuoteController::class, 'createBooking'])->name('quotes.convert.create');
+    Route::post('/repairs/quotes/{quote}/convert', [AdminQuoteController::class, 'storeBooking'])->name('quotes.convert.store');
+    Route::get('/repairs/payments', [AdminPaymentController::class, 'index'])->defaults('source', 'repair')->name('repair-payments.index');
+
+    Route::resource('shop/products', AdminProductController::class)->names('products')->except(['show']);
+    Route::resource('shop/product-brands', AdminProductBrandController::class)->names('product-brands')->except(['show']);
+    Route::resource('shop/product-categories', AdminProductCategoryController::class)->names('product-categories')->except(['show']);
+    Route::get('/shop/orders', [AdminOrderController::class, 'index'])->defaults('source', 'shop')->name('orders.index');
+    Route::get('/shop/orders/{order}', [AdminOrderController::class, 'show'])->name('orders.show');
+    Route::patch('/shop/orders/{order}', [AdminOrderController::class, 'update'])->name('orders.update');
+    Route::get('/shop/payments', [AdminPaymentController::class, 'index'])->defaults('source', 'shop')->name('shop-payments.index');
 
     Route::post('/parts/sync', [AdminPartController::class, 'sync'])->name('parts.sync');
     Route::resource('parts', AdminPartController::class)->except(['show']);
-    Route::resource('part-brands', AdminPartBrandController::class)->except(['show']);
-    Route::resource('part-categories', AdminPartCategoryController::class)->except(['show']);
+    Route::resource('parts/part-brands', AdminPartBrandController::class)->names('part-brands')->except(['show']);
+    Route::resource('parts/part-categories', AdminPartCategoryController::class)->names('part-categories')->except(['show']);
     Route::get('/payments', [AdminPaymentController::class, 'index'])->name('payments.index');
     Route::get('/payments/{payment}', [AdminPaymentController::class, 'show'])->name('payments.show');
-    Route::get('/quotes', [AdminQuoteController::class, 'index'])->name('quotes.index');
-    Route::get('/quotes/{quote}', [AdminQuoteController::class, 'show'])->name('quotes.show');
-    Route::patch('/quotes/{quote}', [AdminQuoteController::class, 'update'])->name('quotes.update');
-    Route::get('/quotes/{quote}/convert', [AdminQuoteController::class, 'createBooking'])->name('quotes.convert.create');
-    Route::post('/quotes/{quote}/convert', [AdminQuoteController::class, 'storeBooking'])->name('quotes.convert.store');
-    Route::resource('shipping-methods', AdminShippingMethodController::class)->except(['show']);
-    Route::resource('shipping-discounts', AdminShippingDiscountRuleController::class)->except(['show']);
+    Route::resource('shipping/methods', AdminShippingMethodController::class)->parameters(['methods' => 'shippingMethod'])->names('shipping-methods')->except(['show']);
+    Route::resource('shipping/discounts', AdminShippingDiscountRuleController::class)->parameters(['discounts' => 'shippingDiscount'])->names('shipping-discounts')->except(['show']);
+
+    Route::resource('users/permissions', AdminPermissionController::class)->names('permissions')->except(['show']);
+    Route::resource('users', AdminUserController::class)->except(['show', 'destroy']);
 
     Route::get('/customers', [AdminCustomerController::class, 'index'])->name('customers.index');
     Route::get('/customers/{customer}', [AdminCustomerController::class, 'show'])->name('customers.show');
 
-    Route::get('/contact-messages', [AdminContactMessageController::class, 'index'])->name('contact-messages.index');
-    Route::get('/contact-messages/{contactMessage}', [AdminContactMessageController::class, 'show'])->name('contact-messages.show');
-    Route::delete('/contact-messages/{contactMessage}', [AdminContactMessageController::class, 'destroy'])->name('contact-messages.destroy');
+    Route::get('/messages', [AdminContactMessageController::class, 'index'])->name('contact-messages.index');
+    Route::get('/messages/{contactMessage}', [AdminContactMessageController::class, 'show'])->name('contact-messages.show');
+    Route::delete('/messages/{contactMessage}', [AdminContactMessageController::class, 'destroy'])->name('contact-messages.destroy');
+
+    Route::get('/orders', fn () => redirect()->route('admin.orders.index'))->name('legacy.orders');
+    Route::get('/quotes', fn () => redirect()->route('admin.quotes.index'))->name('legacy.quotes');
+    Route::get('/contact-messages', fn () => redirect()->route('admin.contact-messages.index'))->name('legacy.contact-messages');
 });

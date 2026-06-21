@@ -11,7 +11,7 @@ class CustomerController extends Controller
     public function index(Request $request)
     {
         $customers = User::query()
-            ->where('role', 'customer')
+            ->customers()
             ->withCount(['repairBookings', 'orders'])
             ->when($request->filled('q'), function ($query) use ($request): void {
                 $search = $request->string('q');
@@ -31,7 +31,7 @@ class CustomerController extends Controller
 
     public function show(User $customer)
     {
-        abort_unless($customer->role === 'customer', 404);
+        abort_unless($customer->isCustomer(), 404);
 
         return view('admin.customers.show', [
             'customer' => $customer->load(['repairBookings.deviceBrand', 'repairBookings.deviceModel', 'repairBookings.issueCategory', 'orders.items']),

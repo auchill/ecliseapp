@@ -24,7 +24,6 @@
                             <label class="form-check-label" for="remember">Remember me</label>
                         </div>
                         <button class="btn btn-primary w-100" type="submit"><i class="bi bi-box-arrow-in-right me-2"></i>Login</button>
-                        <p class="muted small mb-0 mt-3">Demo admin: admin@eclisetech.com / password</p>
                     </form>
                 </div>
             </div>

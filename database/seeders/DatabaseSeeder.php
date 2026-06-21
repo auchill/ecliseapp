@@ -11,6 +11,7 @@ use App\Models\Part;
 use App\Models\PartBrand;
 use App\Models\PartCategory;
 use App\Models\PartModel;
+use App\Models\Permission;
 use App\Models\Product;
 use App\Models\ProductBrand;
 use App\Models\ProductCategory;
@@ -31,18 +32,14 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        $this->call(DefaultPermissionsSeeder::class);
         $this->call(ShippingSeeder::class);
         $this->call(CatalogTaxonomySeeder::class);
         $this->call(ReferenceDataSeeder::class);
 
-        $admin = User::query()->updateOrCreate(
-            ['email' => 'admin@eclisetech.com'],
-            [
-                'name' => 'Eclise Admin',
-                'password' => Hash::make('password'),
-                'role' => 'admin',
-            ],
-        );
+        $customerPermissionId = Permission::query()->where('name', 'customer')->value('id');
+
+        $this->call(AdminUserSeeder::class);
 
         $customer = User::query()->updateOrCreate(
             ['email' => 'customer@example.com'],
@@ -50,6 +47,8 @@ class DatabaseSeeder extends Seeder
                 'name' => 'Demo Customer',
                 'password' => Hash::make('password'),
                 'role' => 'customer',
+                'permission_id' => $customerPermissionId,
+                'status' => 'active',
             ],
         );
 

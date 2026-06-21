@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('layouts.admin')
 
 @section('title', $part->exists ? 'Edit Part' : 'Add Part')
 

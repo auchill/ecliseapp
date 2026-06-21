@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('layouts.admin')
 
 @section('title', $discountRule->exists ? 'Edit Shipping Discount' : 'Add Shipping Discount')
 

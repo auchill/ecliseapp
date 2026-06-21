@@ -10,6 +10,8 @@ class CartController extends Controller
 {
     public function index(Request $request)
     {
+        abort_if($request->user()?->isAdmin(), 403);
+
         $items = $this->cartItems($request);
 
         return view('cart.index', [
@@ -20,6 +22,7 @@ class CartController extends Controller
 
     public function store(Request $request, Product $product)
     {
+        abort_if($request->user()?->isAdmin(), 403);
         abort_unless($product->status === 'Active' && $product->quantity > 0, 404);
 
         $data = $request->validate([
@@ -43,6 +46,8 @@ class CartController extends Controller
 
     public function update(Request $request, Product $product)
     {
+        abort_if($request->user()?->isAdmin(), 403);
+
         $data = $request->validate([
             'quantity' => ['required', 'integer', 'min:1', 'max:'.$product->quantity],
         ]);
@@ -63,6 +68,8 @@ class CartController extends Controller
 
     public function destroy(Request $request, Product $product)
     {
+        abort_if($request->user()?->isAdmin(), 403);
+
         if ($request->user()) {
             $this->activeCart($request)->items()->where('product_id', $product->id)->delete();
         } else {

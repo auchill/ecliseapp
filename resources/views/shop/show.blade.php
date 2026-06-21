@@ -27,14 +27,16 @@
                         @endif
                         <strong class="display-6 d-block">${{ number_format($product->currentPrice(), 2) }}</strong>
                     </div>
-                    <form class="d-flex gap-2 align-items-end" method="POST" action="{{ route('cart.store', $product) }}">
-                        @csrf
-                        <div>
-                            <label class="form-label" for="quantity">Quantity</label>
-                            <input class="form-control" id="quantity" name="quantity" type="number" value="1" min="1" max="{{ $product->quantity }}" style="width: 110px;">
-                        </div>
-                        <button class="btn btn-primary btn-lg" type="submit"><i class="bi bi-bag-plus me-2"></i>Add to Cart</button>
-                    </form>
+                    @if(! auth()->user()?->isAdmin())
+                        <form class="d-flex gap-2 align-items-end" method="POST" action="{{ route('cart.store', $product) }}">
+                            @csrf
+                            <div>
+                                <label class="form-label" for="quantity">Quantity</label>
+                                <input class="form-control" id="quantity" name="quantity" type="number" value="1" min="1" max="{{ $product->quantity }}" style="width: 110px;">
+                            </div>
+                            <button class="btn btn-primary btn-lg" type="submit"><i class="bi bi-bag-plus me-2"></i>Add to Cart</button>
+                        </form>
+                    @endif
                 </div>
             </div>
 

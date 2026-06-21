@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('layouts.admin')
 
 @section('title', 'Payment #'.$payment->id)
 
@@ -21,6 +21,7 @@
                             <table class="table">
                                 <tbody>
                                     <tr><th scope="row">Gateway</th><td>{{ $payment->gatewayLabel() }}</td></tr>
+                                    <tr><th scope="row">Source</th><td>{{ $payment->sourceLabel() }}</td></tr>
                                     <tr><th scope="row">Status</th><td>{{ $payment->statusLabel() }}</td></tr>
                                     <tr><th scope="row">Amount</th><td>{{ strtoupper($payment->currency) }} ${{ number_format($payment->amount, 2) }}</td></tr>
                                     <tr><th scope="row">Gateway reference</th><td>{{ $payment->gateway_reference_id ?: 'Pending' }}</td></tr>

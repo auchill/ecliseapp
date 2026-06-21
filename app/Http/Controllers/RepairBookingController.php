@@ -13,11 +13,15 @@ class RepairBookingController extends Controller
 {
     public function create()
     {
+        abort_if(auth()->user()?->isAdmin(), 403);
+
         return view('repairs.book');
     }
 
     public function store(Request $request)
     {
+        abort_if($request->user()?->isAdmin(), 403);
+
         $data = $request->validate([
             'tracking_number' => ['required', 'string', 'max:40'],
         ]);
@@ -39,6 +43,8 @@ class RepairBookingController extends Controller
 
     public function complete(string $trackingNumber, Request $request, ShippingCostService $shippingCosts)
     {
+        abort_if($request->user()?->isAdmin(), 403);
+
         $booking = $this->bookingForCustomer($trackingNumber, $request);
         $baseSubtotal = (float) $booking->subtotal + (float) $booking->tax_amount;
         $shippingMethods = $shippingCosts->getAvailableShippingMethods();
@@ -58,6 +64,8 @@ class RepairBookingController extends Controller
 
     public function completeStore(string $trackingNumber, Request $request, ShippingCostService $shippingCosts, PaymentGatewayService $paymentGateways)
     {
+        abort_if($request->user()?->isAdmin(), 403);
+
         $booking = $this->bookingForCustomer($trackingNumber, $request);
 
         abort_unless($booking->canCustomerPay(), 422, 'This repair booking is not available for payment.');
@@ -147,6 +155,7 @@ class RepairBookingController extends Controller
 
         $payment = $booking->payments()->create([
             'repair_order_id' => $booking->id,
+            'source' => 'repair',
             'gateway' => $data['payment_gateway'],
             'amount' => $paymentAmount,
             'currency' => 'cad',
