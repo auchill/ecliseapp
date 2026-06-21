@@ -1,8 +1,10 @@
 <?php
 
+use App\Console\Commands\AuthenticateMobileSentrixCommand;
 use App\Console\Commands\RefreshMobileSentrixPartCommand;
 use App\Console\Commands\SyncMobileSentrixCategoriesCommand;
 use App\Console\Commands\SyncMobileSentrixPartsCommand;
+use App\Console\Commands\TestMobileSentrixConnectionCommand;
 use App\Http\Middleware\AdminMiddleware;
 use App\Http\Middleware\CustomerMiddleware;
 use App\Http\Middleware\NoAdminCartMiddleware;
@@ -18,9 +20,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withCommands([
+        AuthenticateMobileSentrixCommand::class,
         SyncMobileSentrixCategoriesCommand::class,
         SyncMobileSentrixPartsCommand::class,
         RefreshMobileSentrixPartCommand::class,
+        TestMobileSentrixConnectionCommand::class,
     ])
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([

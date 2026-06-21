@@ -32,19 +32,11 @@ class MobileSentrixController extends Controller
     public function startAuthorization(MobileSentrixAuthService $auth): RedirectResponse
     {
         try {
-            $temporaryCredentials = $auth->requestTemporaryCredentials();
-
-            if ($temporaryCredentials) {
-                $auth->exchangeToken($temporaryCredentials['oauth_token'], $temporaryCredentials['oauth_verifier']);
-
-                return redirect()
-                    ->route('admin.parts.mobilesentrix.index')
-                    ->with('status', 'MobileSentrix OAuth authentication completed. Access tokens were stored securely.');
-            }
-
             return redirect()->away($auth->authorizationUrl());
         } catch (MobileSentrixException $exception) {
-            return back()->withErrors(['mobilesentrix' => $exception->getMessage()]);
+            return back()
+                ->withErrors(['mobilesentrix' => $exception->getMessage()])
+                ->with('mobilesentrix_connection_status', 'Failed');
         }
     }
 
@@ -60,12 +52,14 @@ class MobileSentrixController extends Controller
         } catch (\Throwable $exception) {
             return redirect()
                 ->route('admin.parts.mobilesentrix.index')
-                ->withErrors(['mobilesentrix' => $exception->getMessage()]);
+                ->withErrors(['mobilesentrix' => $exception->getMessage()])
+                ->with('mobilesentrix_connection_status', 'Failed');
         }
 
         return redirect()
             ->route('admin.parts.mobilesentrix.index')
-            ->with('status', 'MobileSentrix OAuth exchange succeeded. Access tokens were stored securely.');
+            ->with('status', 'MobileSentrix OAuth exchange succeeded. Access tokens were stored securely.')
+            ->with('mobilesentrix_connection_status', 'Authenticated');
     }
 
     public function test(MobileSentrixClient $client): RedirectResponse
@@ -73,9 +67,13 @@ class MobileSentrixController extends Controller
         try {
             $result = $client->testConnection();
 
-            return back()->with('status', $result['message']);
+            return back()
+                ->with('status', $result['message'])
+                ->with('mobilesentrix_connection_status', 'Success');
         } catch (\Throwable $exception) {
-            return back()->withErrors(['mobilesentrix' => 'MobileSentrix API connection failed. Please verify credentials and authenticate again.']);
+            return back()
+                ->withErrors(['mobilesentrix' => 'MobileSentrix API connection failed. Please verify credentials and authenticate again.'])
+                ->with('mobilesentrix_connection_status', 'Failed');
         }
     }
 

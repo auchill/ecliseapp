@@ -122,7 +122,7 @@ class MobileSentrixAuthService
             }
 
             $payload = $response->json();
-            $tokens = data_get($payload, 'data', []);
+            $tokens = data_get($payload, 'data', $payload);
 
             if (blank($tokens['access_token'] ?? null) || blank($tokens['access_token_secret'] ?? null)) {
                 throw new MobileSentrixException('MobileSentrix returned an invalid access token response.');

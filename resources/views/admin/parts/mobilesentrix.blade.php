@@ -38,6 +38,8 @@
                             <dd class="col-6 text-end">{{ $configStatus['last_authenticated_at']?->format('M j, Y g:i A') ?? 'Never' }}</dd>
                             <dt class="col-6">Scheduled sync</dt>
                             <dd class="col-6 text-end">{{ $configStatus['sync_enabled'] ? 'Yes' : 'No' }}</dd>
+                            <dt class="col-6">Connection status</dt>
+                            <dd class="col-6 text-end">{{ session('mobilesentrix_connection_status', 'Not tested') }}</dd>
                         </dl>
                     </div>
                 </div>
@@ -65,11 +67,11 @@
                         <div class="d-flex flex-wrap gap-2">
                             <form method="POST" action="{{ route('admin.parts.mobilesentrix.test') }}">
                                 @csrf
-                                <button class="btn btn-primary" type="submit"><i class="bi bi-wifi me-2"></i>Test Connection</button>
+                                <button class="btn btn-primary" type="submit"><i class="bi bi-wifi me-2"></i>Test Live Connection</button>
                             </form>
                             <form method="POST" action="{{ route('admin.parts.mobilesentrix.authorize') }}">
                                 @csrf
-                                <button class="btn btn-outline-primary" type="submit"><i class="bi bi-key me-2"></i>{{ $configStatus['stored_access_tokens'] ? 'Re-authenticate' : 'Start OAuth' }}</button>
+                                <button class="btn btn-outline-primary" type="submit"><i class="bi bi-key me-2"></i>{{ $configStatus['stored_access_tokens'] ? 'Re-authenticate' : 'Start Live Authentication' }}</button>
                             </form>
                         </div>
                     </div>

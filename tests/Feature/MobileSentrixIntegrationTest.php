@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\MobileSentrix\MobileSentrixAuthService;
 use App\Services\MobileSentrix\MobileSentrixClient;
 use App\Services\MobileSentrix\MobileSentrixException;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
@@ -70,6 +71,78 @@ test('mobile sentrix can request temporary oauth token and verifier from identif
         && $request['consumer_key'] === 'consumer-key'
         && $request['consumer_secret'] === 'consumer-secret'
         && $request['callback'] === 'http://ecliseapp.test/admin/parts/mobilesentrix/callback');
+});
+
+test('mobile sentrix authenticate command exchanges live oauth responses and masks output', function () {
+    Http::fake([
+        'https://preprod.mobilesentrix.ca/oauth/authorize/identifiercallback' => Http::response([
+            'data' => [
+                'access_token' => 'live-access-token',
+                'access_token_secret' => 'live-access-secret',
+            ],
+        ]),
+        'https://preprod.mobilesentrix.ca/oauth/authorize/identifier*' => Http::response([
+            'oauth_token' => 'temporary-token',
+            'oauth_verifier' => 'temporary-verifier',
+        ]),
+    ]);
+
+    $exitCode = Artisan::call('mobilesentrix:authenticate');
+    $output = Artisan::output();
+    $settings = MobileSentrixApiSetting::query()->firstOrFail();
+
+    expect($exitCode)->toBe(0)
+        ->and($settings->access_token)->toBe('live-access-token')
+        ->and($settings->access_token_secret)->toBe('live-access-secret')
+        ->and($output)->toContain('MobileSentrix authentication completed')
+        ->and($output)->toContain('Access Token: live********oken')
+        ->and($output)->toContain('Access Token Secret: live********cret')
+        ->and($output)->not->toContain('live-access-token')
+        ->and($output)->not->toContain('live-access-secret');
+});
+
+test('mobile sentrix test connection command uses stored tokens', function () {
+    config([
+        'mobilesentrix.access_token' => null,
+        'mobilesentrix.access_token_secret' => null,
+    ]);
+
+    MobileSentrixApiSetting::query()->create([
+        'environment' => 'staging',
+        'base_url' => 'https://preprod.mobilesentrix.ca',
+        'consumer_key' => 'db-consumer-key',
+        'consumer_secret' => 'db-consumer-secret',
+        'access_token' => 'db-access-token',
+        'access_token_secret' => 'db-access-secret',
+        'is_active' => true,
+    ]);
+
+    Http::fake([
+        'https://preprod.mobilesentrix.ca/api/rest/categories' => Http::response([
+            ['entity_id' => '165', 'name' => 'iPhone Screens'],
+        ]),
+    ]);
+
+    $exitCode = Artisan::call('mobilesentrix:test-connection');
+    $output = Artisan::output();
+
+    expect($exitCode)->toBe(0)
+        ->and($output)->toContain('MobileSentrix API connection successful.')
+        ->and($output)->toContain('Category response count: 1')
+        ->and($output)->not->toContain('db-access-token')
+        ->and($output)->not->toContain('db-access-secret');
+});
+
+test('mobile sentrix test connection command explains missing authentication', function () {
+    config([
+        'mobilesentrix.access_token' => null,
+        'mobilesentrix.access_token_secret' => null,
+    ]);
+
+    $exitCode = Artisan::call('mobilesentrix:test-connection');
+
+    expect($exitCode)->toBe(1)
+        ->and(Artisan::output())->toContain('MobileSentrix is not authenticated yet. Run php artisan mobilesentrix:authenticate or use the admin authentication button.');
 });
 
 test('mobile sentrix category sync stores local categories and logs the run', function () {
@@ -247,6 +320,31 @@ test('mobile sentrix reauthentication updates stored encrypted tokens', function
         ->and(MobileSentrixApiSetting::query()->first()->access_token_secret)->toBe('new-access-secret');
 });
 
+test('mobile sentrix admin authentication starts browser oauth without server side api call', function () {
+    Http::fake();
+
+    $adminPermission = Permission::query()->where('name', 'admin')->firstOrFail();
+    $admin = User::query()->create([
+        'name' => 'Browser Auth Admin',
+        'email' => 'browser-auth-admin@example.com',
+        'password' => 'password',
+        'role' => 'admin',
+        'permission_id' => $adminPermission->id,
+        'status' => 'active',
+    ]);
+
+    $response = $this->actingAs($admin)->post(route('admin.parts.mobilesentrix.authorize'));
+    $location = $response->headers->get('Location');
+
+    $response->assertRedirect();
+
+    expect($location)->not->toBeNull()
+        ->and(str_starts_with((string) $location, 'https://preprod.mobilesentrix.ca/oauth/authorize/identifier'))->toBeTrue()
+        ->and($location)->toContain('callback=');
+
+    Http::assertNothingSent();
+});
+
 test('mobile sentrix admin page redacts configured secrets and uses admin login redirect', function () {
     config([
         'mobilesentrix.consumer_secret' => 'very-secret-value',
@@ -270,6 +368,9 @@ test('mobile sentrix admin page redacts configured secrets and uses admin login 
         ->assertOk()
         ->assertSee('MobileSentrix API')
         ->assertSee('Yes')
+        ->assertSee('Start Live Authentication')
+        ->assertSee('Test Live Connection')
+        ->assertSee('Connection status')
         ->assertDontSee('https://preprod.mobilesentrix.ca')
         ->assertDontSee('very-secret-value')
         ->assertDontSee('token-secret-value');
