@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\ContactMessageController as AdminContactMessageController;
 use App\Http\Controllers\Admin\CustomerController as AdminCustomerController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Admin\MobileSentrixController as AdminMobileSentrixController;
 use App\Http\Controllers\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Admin\PartBrandController as AdminPartBrandController;
 use App\Http\Controllers\Admin\PartCategoryController as AdminPartCategoryController;
@@ -97,7 +98,7 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
     Route::post('/logout', [AuthController::class, 'adminLogout'])->name('logout');
 });
 
-Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function (): void {
+Route::middleware('admin')->prefix('admin')->name('admin.')->group(function (): void {
     Route::get('/', fn () => redirect()->route('admin.dashboard'))->name('home');
     Route::get('/dashboard', AdminDashboardController::class)->name('dashboard');
 
@@ -136,6 +137,13 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::patch('/shop/orders/{order}', [AdminOrderController::class, 'update'])->name('orders.update');
     Route::get('/shop/payments', [AdminPaymentController::class, 'index'])->defaults('source', 'shop')->name('shop-payments.index');
 
+    Route::get('/parts/mobilesentrix', [AdminMobileSentrixController::class, 'index'])->name('parts.mobilesentrix.index');
+    Route::post('/parts/mobilesentrix/authorize', [AdminMobileSentrixController::class, 'startAuthorization'])->name('parts.mobilesentrix.authorize');
+    Route::get('/parts/mobilesentrix/callback', [AdminMobileSentrixController::class, 'callback'])->name('parts.mobilesentrix.callback');
+    Route::post('/parts/mobilesentrix/test', [AdminMobileSentrixController::class, 'test'])->name('parts.mobilesentrix.test');
+    Route::post('/parts/mobilesentrix/sync-categories', [AdminMobileSentrixController::class, 'syncCategories'])->name('parts.mobilesentrix.sync-categories');
+    Route::post('/parts/mobilesentrix/sync-parts', [AdminMobileSentrixController::class, 'syncParts'])->name('parts.mobilesentrix.sync-parts');
+    Route::post('/parts/mobilesentrix/refresh', [AdminMobileSentrixController::class, 'refreshPart'])->name('parts.mobilesentrix.refresh');
     Route::post('/parts/sync', [AdminPartController::class, 'sync'])->name('parts.sync');
     Route::resource('parts', AdminPartController::class)->except(['show']);
     Route::resource('parts/part-brands', AdminPartBrandController::class)->names('part-brands')->except(['show']);

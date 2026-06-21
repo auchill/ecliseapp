@@ -12,10 +12,14 @@ class PartBrand extends Model
     use HasFactory;
 
     protected $fillable = [
+        'mobilesentrix_manufacturer_id',
         'name',
         'slug',
         'description',
         'is_active',
+        'status',
+        'raw_payload',
+        'synced_at',
         'sort_order',
     ];
 
@@ -23,6 +27,8 @@ class PartBrand extends Model
     {
         return [
             'is_active' => 'boolean',
+            'raw_payload' => 'array',
+            'synced_at' => 'datetime',
             'sort_order' => 'integer',
         ];
     }
@@ -32,8 +38,13 @@ class PartBrand extends Model
         return $this->hasMany(Part::class);
     }
 
+    public function partModels(): HasMany
+    {
+        return $this->hasMany(PartModel::class);
+    }
+
     public function scopeActive(Builder $query): Builder
     {
-        return $query->where('is_active', true);
+        return $query->where('is_active', true)->where('status', 'active');
     }
 }

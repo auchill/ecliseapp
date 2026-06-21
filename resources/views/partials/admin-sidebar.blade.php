@@ -19,6 +19,8 @@
             ['label' => 'Payments', 'route' => 'admin.shop-payments.index', 'icon' => 'bi-credit-card', 'active' => 'admin.shop-payments.*'],
         ],
         'Parts' => [
+            ['label' => 'MobileSentrix API', 'route' => 'admin.parts.mobilesentrix.index', 'icon' => 'bi-cloud-arrow-down', 'active' => 'admin.parts.mobilesentrix.*'],
+            ['label' => 'Parts', 'route' => 'admin.parts.index', 'icon' => 'bi-box-seam', 'active' => 'admin.parts.index'],
             ['label' => 'Parts Brands', 'route' => 'admin.part-brands.index', 'icon' => 'bi-tags', 'active' => 'admin.part-brands.*'],
             ['label' => 'Parts Categories', 'route' => 'admin.part-categories.index', 'icon' => 'bi-grid', 'active' => 'admin.part-categories.*'],
             ['label' => 'Parts Models', 'route' => 'admin.part-models.index', 'icon' => 'bi-cpu-fill', 'active' => 'admin.part-models.*'],

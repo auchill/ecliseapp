@@ -63,6 +63,14 @@
                         <input class="form-control" id="sku" name="sku" value="{{ old('sku', $part->sku) }}">
                     </div>
                     <div class="col-md-4">
+                        <label class="form-label" for="new_sku">New SKU</label>
+                        <input class="form-control" id="new_sku" name="new_sku" value="{{ old('new_sku', $part->new_sku) }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="barcode">Barcode</label>
+                        <input class="form-control" id="barcode" name="barcode" value="{{ old('barcode', $part->barcode) }}">
+                    </div>
+                    <div class="col-md-4">
                         <label class="form-label" for="internal_sku">Internal SKU</label>
                         <input class="form-control" id="internal_sku" name="internal_sku" value="{{ old('internal_sku', $part->internal_sku) }}">
                     </div>
@@ -75,8 +83,24 @@
                         <input class="form-control" id="price" name="price" type="number" min="0" step="0.01" value="{{ old('price', $part->price) }}" required>
                     </div>
                     <div class="col-md-3">
+                        <label class="form-label" for="cost_price">Supplier cost</label>
+                        <input class="form-control" id="cost_price" name="cost_price" type="number" min="0" step="0.01" value="{{ old('cost_price', $part->cost_price) }}">
+                    </div>
+                    <div class="col-md-3">
                         <label class="form-label" for="selling_price">Selling price</label>
                         <input class="form-control" id="selling_price" name="selling_price" type="number" min="0" step="0.01" value="{{ old('selling_price', $part->selling_price) }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="markup_type">Markup type</label>
+                        <select class="form-select" id="markup_type" name="markup_type">
+                            @foreach ($markupTypes as $value => $label)
+                                <option value="{{ $value }}" @selected(old('markup_type', $part->markup_type ?: 'none') === $value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="markup_value">Markup value</label>
+                        <input class="form-control" id="markup_value" name="markup_value" type="number" min="0" step="0.01" value="{{ old('markup_value', $part->markup_value ?? 0) }}">
                     </div>
                     <div class="col-md-3">
                         <label class="form-label" for="api_price">API price</label>
@@ -93,6 +117,10 @@
                     <div class="col-md-3">
                         <label class="form-label" for="api_quantity">API quantity</label>
                         <input class="form-control" id="api_quantity" name="api_quantity" type="number" min="0" value="{{ old('api_quantity', $part->api_quantity) }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="in_stock_qty">API stock quantity</label>
+                        <input class="form-control" id="in_stock_qty" name="in_stock_qty" type="number" min="0" value="{{ old('in_stock_qty', $part->in_stock_qty) }}">
                     </div>
                     <div class="col-md-3">
                         <label class="form-label" for="stock_status">Legacy stock status</label>
@@ -113,6 +141,14 @@
                     <div class="col-md-4">
                         <label class="form-label" for="external_api_id">External API ID</label>
                         <input class="form-control" id="external_api_id" name="external_api_id" value="{{ old('external_api_id', $part->external_api_id) }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="mobilesentrix_product_id">MobileSentrix product ID</label>
+                        <input class="form-control" id="mobilesentrix_product_id" name="mobilesentrix_product_id" value="{{ old('mobilesentrix_product_id', $part->mobilesentrix_product_id) }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="api_status">API status</label>
+                        <input class="form-control" id="api_status" name="api_status" value="{{ old('api_status', $part->api_status) }}">
                     </div>
                     <div class="col-md-6">
                         <label class="form-label" for="image_url">Remote image URL</label>
@@ -138,6 +174,12 @@
                         <div class="form-check">
                             <input class="form-check-input" id="is_api_item" name="is_api_item" type="checkbox" value="1" @checked(old('is_api_item', $part->is_api_item))>
                             <label class="form-check-label" for="is_api_item">API-sourced item</label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check">
+                            <input class="form-check-input" id="is_in_stock" name="is_in_stock" type="checkbox" value="1" @checked(old('is_in_stock', $part->is_in_stock))>
+                            <label class="form-check-label" for="is_in_stock">In stock</label>
                         </div>
                     </div>
                     <div class="col-md-6">

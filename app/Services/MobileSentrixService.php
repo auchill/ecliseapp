@@ -2,13 +2,14 @@
 
 namespace App\Services;
 
+use App\Services\MobileSentrix\MobileSentrixSyncService;
+
 class MobileSentrixService
 {
-    public function syncParts(): array
+    public function __construct(private readonly MobileSentrixSyncService $syncService) {}
+
+    public function syncParts(?string $categoryId = null): array
     {
-        return [
-            'success' => false,
-            'message' => 'MobileSentrix sync is not connected yet. Add MOBILESENTRIX_API_KEY and MOBILESENTRIX_API_URL to enable imports.',
-        ];
+        return $this->syncService->syncParts($categoryId);
     }
 }

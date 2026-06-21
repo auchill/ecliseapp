@@ -1,5 +1,8 @@
 <?php
 
+use App\Console\Commands\RefreshMobileSentrixPartCommand;
+use App\Console\Commands\SyncMobileSentrixCategoriesCommand;
+use App\Console\Commands\SyncMobileSentrixPartsCommand;
 use App\Http\Middleware\AdminMiddleware;
 use App\Http\Middleware\CustomerMiddleware;
 use App\Http\Middleware\NoAdminCartMiddleware;
@@ -14,6 +17,11 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+    ->withCommands([
+        SyncMobileSentrixCategoriesCommand::class,
+        SyncMobileSentrixPartsCommand::class,
+        RefreshMobileSentrixPartCommand::class,
+    ])
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'admin' => AdminMiddleware::class,
