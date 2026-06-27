@@ -218,7 +218,9 @@ class MobileSentrixClient
 
         $this->assertConfigured($credentials);
 
-        $request = Http::timeout(config('mobilesentrix.timeout'))->acceptJson();
+        $request = Http::timeout(config('mobilesentrix.timeout'))
+            ->connectTimeout(config('mobilesentrix.connect_timeout'))
+            ->acceptJson();
 
         if ($transport === self::AUTH_TRANSPORT_OAUTH_HEADER) {
             $request = $request->withHeaders([

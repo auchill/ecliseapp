@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\MobileSentrix\SyncMobileSentrixCategoriesJob;
+use App\Jobs\MobileSentrix\SyncMobileSentrixPartsJob;
 use App\Models\MobileSentrixSyncLog;
 use App\Models\Part;
 use App\Models\PartCategory;
@@ -33,6 +35,7 @@ class MobileSentrixController extends Controller
             'lastPartLog' => MobileSentrixSyncLog::query()->whereIn('sync_type', ['parts', 'single_part'])->latest()->first(),
             'partsCount' => Part::query()->where('is_api_item', true)->count(),
             'categoriesCount' => PartCategory::query()->whereNotNull('mobilesentrix_category_id')->count(),
+            'queueConfigured' => $this->queueConfigured(),
         ]);
     }
 
@@ -133,26 +136,39 @@ class MobileSentrixController extends Controller
         }
     }
 
-    public function syncCategories(Request $request, MobileSentrixSyncService $syncService): RedirectResponse
+    public function syncCategories(Request $request): RedirectResponse
     {
         $validated = $request->validate([
             'category_id' => ['nullable', 'string', 'max:120'],
+            'depth' => ['nullable', 'integer', 'min:1', 'max:25'],
         ]);
 
-        $result = $syncService->syncCategories($validated['category_id'] ?? null);
+        if (! $this->queueConfigured()) {
+            return back()->withErrors([
+                'mobilesentrix' => 'Queue is not configured for long MobileSentrix syncs. Run from terminal: '.$this->categorySyncCommand($validated['category_id'] ?? null, $validated['depth'] ?? null),
+            ]);
+        }
 
-        return $this->redirectWithResult($result);
+        SyncMobileSentrixCategoriesJob::dispatch($validated['category_id'] ?? null, $validated['depth'] ?? null);
+
+        return back()->with('status', 'MobileSentrix category sync has been queued. Check Sync Logs for progress.');
     }
 
-    public function syncParts(Request $request, MobileSentrixSyncService $syncService): RedirectResponse
+    public function syncParts(Request $request): RedirectResponse
     {
         $validated = $request->validate([
             'category_id' => ['nullable', 'string', 'max:120'],
         ]);
 
-        $result = $syncService->syncParts($validated['category_id'] ?? null);
+        if (! $this->queueConfigured()) {
+            return back()->withErrors([
+                'mobilesentrix' => 'Queue is not configured for long MobileSentrix syncs. Run from terminal: '.$this->partsSyncCommand($validated['category_id'] ?? null),
+            ]);
+        }
 
-        return $this->redirectWithResult($result);
+        SyncMobileSentrixPartsJob::dispatch($validated['category_id'] ?? null);
+
+        return back()->with('status', 'MobileSentrix parts sync has been queued. Check Sync Logs for progress.');
     }
 
     public function refreshPart(Request $request, MobileSentrixSyncService $syncService): RedirectResponse
@@ -184,6 +200,37 @@ class MobileSentrixController extends Controller
         }
 
         return $redirect->with('status', $message);
+    }
+
+    private function queueConfigured(): bool
+    {
+        return config('queue.default') !== 'sync';
+    }
+
+    private function categorySyncCommand(?string $categoryId = null, ?int $depth = null): string
+    {
+        $command = 'php -d max_execution_time=0 artisan mobilesentrix:sync-categories';
+
+        if (filled($categoryId)) {
+            $command .= ' --category='.escapeshellarg($categoryId);
+        }
+
+        if ($depth) {
+            $command .= ' --depth='.$depth;
+        }
+
+        return $command;
+    }
+
+    private function partsSyncCommand(?string $categoryId = null): string
+    {
+        $command = 'php -d max_execution_time=0 artisan mobilesentrix:sync-parts';
+
+        if (filled($categoryId)) {
+            $command .= ' --category='.escapeshellarg($categoryId);
+        }
+
+        return $command;
     }
 
     private function preflightStatus(array $configStatus): array

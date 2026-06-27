@@ -1,6 +1,9 @@
 <?php
 
+use App\Jobs\MobileSentrix\SyncMobileSentrixCategoriesJob;
+use App\Jobs\MobileSentrix\SyncMobileSentrixPartsJob;
 use App\Models\MobileSentrixApiSetting;
+use App\Models\MobileSentrixSyncLog;
 use App\Models\Part;
 use App\Models\PartCategory;
 use App\Models\Permission;
@@ -12,6 +15,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Queue;
 
 beforeEach(function (): void {
     config([
@@ -25,8 +29,11 @@ beforeEach(function (): void {
         'mobilesentrix.callback_url' => 'http://ecliseapp.test/admin/parts/mobilesentrix/callback',
         'mobilesentrix.allow_browser_secret_redirect' => false,
         'mobilesentrix.auth_transport' => 'oauth_header',
+        'mobilesentrix.timeout' => 120,
+        'mobilesentrix.connect_timeout' => 20,
         'mobilesentrix.default_markup_type' => 'percentage',
         'mobilesentrix.default_markup_value' => 20,
+        'mobilesentrix.sync_request_delay_ms' => 0,
     ]);
 });
 
@@ -261,6 +268,62 @@ test('mobile sentrix category sync stores local categories and logs the run', fu
     ]);
 
     Http::assertSent(fn ($request) => $request->hasHeader('Authorization'));
+});
+
+test('mobile sentrix category sync skips recursive duplicates and respects depth option', function () {
+    Http::fake([
+        'https://preprod.mobilesentrix.ca/api/rest/categories' => Http::response([
+            [
+                'entity_id' => '100',
+                'name' => 'Root Screens',
+                'level' => 1,
+                'children_count' => 2,
+                'is_active' => 1,
+                'has_children' => true,
+                'is_part' => true,
+            ],
+        ]),
+        'https://preprod.mobilesentrix.ca/api/rest/categories/100' => Http::response([
+            [
+                'entity_id' => '100',
+                'name' => 'Root Screens Duplicate',
+                'level' => 1,
+                'children_count' => 2,
+                'is_active' => 1,
+                'has_children' => true,
+                'is_part' => true,
+            ],
+            [
+                'entity_id' => '101',
+                'name' => 'iPhone Screens',
+                'level' => 2,
+                'children_count' => 1,
+                'is_active' => 1,
+                'has_children' => true,
+                'is_part' => true,
+            ],
+        ]),
+    ]);
+
+    $this->artisan('mobilesentrix:sync-categories', ['--depth' => 2])->assertSuccessful();
+
+    $this->assertDatabaseHas('part_categories', [
+        'mobilesentrix_category_id' => '100',
+        'name' => 'Root Screens',
+    ]);
+    $this->assertDatabaseHas('part_categories', [
+        'mobilesentrix_category_id' => '101',
+        'name' => 'iPhone Screens',
+    ]);
+
+    $log = MobileSentrixSyncLog::query()->where('sync_type', 'categories')->latest()->firstOrFail();
+
+    expect($log->status)->toBe('success')
+        ->and($log->skipped_count)->toBeGreaterThanOrEqual(2)
+        ->and(json_encode($log->error_details))->toContain('Skipped duplicate MobileSentrix category 100')
+        ->and(json_encode($log->error_details))->toContain('maximum depth 2 reached');
+
+    Http::assertSentCount(2);
 });
 
 test('mobile sentrix parts sync maps products into parts without exposing supplier cost publicly', function () {
@@ -716,4 +779,76 @@ test('mobile sentrix admin page redacts configured secrets and uses admin login 
         ->assertDontSee('consumer-key')
         ->assertDontSee('very-secret-value')
         ->assertDontSee('token-secret-value');
+});
+
+test('mobile sentrix admin category sync queues instead of running inside the request', function () {
+    config(['queue.default' => 'database']);
+    Queue::fake();
+
+    $admin = mobileSentrixAdminUser('queue-categories-admin@example.com');
+
+    $response = $this->actingAs($admin)
+        ->withSession(['_token' => 'test-token'])
+        ->from(route('admin.parts.mobilesentrix.index'))
+        ->post(route('admin.parts.mobilesentrix.sync-categories'), [
+            '_token' => 'test-token',
+            'category_id' => '165',
+            'depth' => '3',
+        ]);
+
+    $response->assertRedirect(route('admin.parts.mobilesentrix.index'));
+    $response->assertSessionHas('status', 'MobileSentrix category sync has been queued. Check Sync Logs for progress.');
+
+    Queue::assertPushed(SyncMobileSentrixCategoriesJob::class, function (SyncMobileSentrixCategoriesJob $job): bool {
+        return $job->categoryId === '165' && $job->depth === 3;
+    });
+});
+
+test('mobile sentrix admin parts sync queues instead of running inside the request', function () {
+    config(['queue.default' => 'database']);
+    Queue::fake();
+
+    $admin = mobileSentrixAdminUser('queue-parts-admin@example.com');
+
+    $response = $this->actingAs($admin)
+        ->withSession(['_token' => 'test-token'])
+        ->from(route('admin.parts.mobilesentrix.index'))
+        ->post(route('admin.parts.mobilesentrix.sync-parts'), [
+            '_token' => 'test-token',
+            'category_id' => '165',
+        ]);
+
+    $response->assertRedirect(route('admin.parts.mobilesentrix.index'));
+    $response->assertSessionHas('status', 'MobileSentrix parts sync has been queued. Check Sync Logs for progress.');
+
+    Queue::assertPushed(SyncMobileSentrixPartsJob::class, function (SyncMobileSentrixPartsJob $job): bool {
+        return $job->categoryId === '165';
+    });
+});
+
+test('mobile sentrix admin sync shows cli command when queue is synchronous', function () {
+    config(['queue.default' => 'sync']);
+    Queue::fake();
+
+    $admin = mobileSentrixAdminUser('sync-queue-admin@example.com');
+
+    $response = $this->actingAs($admin)
+        ->withSession(['_token' => 'test-token'])
+        ->from(route('admin.parts.mobilesentrix.index'))
+        ->post(route('admin.parts.mobilesentrix.sync-categories'), [
+            '_token' => 'test-token',
+            'category_id' => '165',
+            'depth' => '3',
+        ]);
+
+    $response->assertRedirect(route('admin.parts.mobilesentrix.index'));
+    $response->assertSessionHasErrors('mobilesentrix');
+
+    $errors = session('errors')->get('mobilesentrix');
+
+    expect($errors[0])->toContain('php -d max_execution_time=0 artisan mobilesentrix:sync-categories')
+        ->and($errors[0])->toContain("--category='165'")
+        ->and($errors[0])->toContain('--depth=3');
+
+    Queue::assertNothingPushed();
 });

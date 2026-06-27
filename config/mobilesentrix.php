@@ -12,7 +12,9 @@ return [
     'allow_browser_secret_redirect' => env('MOBILESENTRIX_ALLOW_BROWSER_SECRET_REDIRECT', false),
     'auth_transport' => env('MOBILESENTRIX_AUTH_TRANSPORT', 'oauth_header'),
     'sync_enabled' => env('MOBILESENTRIX_SYNC_ENABLED', false),
-    'timeout' => (int) env('MOBILESENTRIX_TIMEOUT', 30),
+    'timeout' => (int) env('MOBILESENTRIX_TIMEOUT', 120),
+    'connect_timeout' => (int) env('MOBILESENTRIX_CONNECT_TIMEOUT', 20),
+    'sync_request_delay_ms' => (int) env('MOBILESENTRIX_SYNC_REQUEST_DELAY_MS', 200),
     'default_markup_type' => env('MOBILESENTRIX_DEFAULT_MARKUP_TYPE', 'none'),
     'default_markup_value' => (float) env('MOBILESENTRIX_DEFAULT_MARKUP_VALUE', 0),
 ];

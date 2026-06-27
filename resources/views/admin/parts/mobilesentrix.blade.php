@@ -137,18 +137,28 @@
                     <form class="surface p-4 h-100" method="POST" action="{{ route('admin.parts.mobilesentrix.sync-categories') }}">
                         @csrf
                         <p class="eyebrow mb-2">Categories</p>
+                        @unless ($queueConfigured)
+                            <div class="alert alert-warning small">Queue is not configured. Use the Artisan category sync command for large runs.</div>
+                        @endunless
                         <label class="form-label" for="category_id_categories">Category ID</label>
                         <input class="form-control mb-3" id="category_id_categories" name="category_id" placeholder="Optional root category">
-                        <button class="btn btn-primary w-100" type="submit"><i class="bi bi-cloud-arrow-down me-2"></i>Sync Categories</button>
+                        <label class="form-label" for="category_depth">Max depth</label>
+                        <input class="form-control mb-3" id="category_depth" name="depth" min="1" max="25" placeholder="Default 10" type="number">
+                        <button class="btn btn-primary w-100" type="submit"><i class="bi bi-cloud-arrow-down me-2"></i>Sync Categories Queue</button>
+                        <a class="btn btn-outline-primary w-100 mt-2" href="#mobilesentrix-sync-logs"><i class="bi bi-list-check me-2"></i>View Sync Logs</a>
                     </form>
                 </div>
                 <div class="col-lg-4">
                     <form class="surface p-4 h-100" method="POST" action="{{ route('admin.parts.mobilesentrix.sync-parts') }}">
                         @csrf
                         <p class="eyebrow mb-2">Parts</p>
+                        @unless ($queueConfigured)
+                            <div class="alert alert-warning small">Queue is not configured. Use the Artisan parts sync command for large runs.</div>
+                        @endunless
                         <label class="form-label" for="category_id_parts">Category ID</label>
                         <input class="form-control mb-3" id="category_id_parts" name="category_id" placeholder="Optional, for example 165">
-                        <button class="btn btn-primary w-100" type="submit"><i class="bi bi-arrow-repeat me-2"></i>Sync Parts</button>
+                        <button class="btn btn-primary w-100" type="submit"><i class="bi bi-arrow-repeat me-2"></i>Sync Parts Queue</button>
+                        <a class="btn btn-outline-primary w-100 mt-2" href="#mobilesentrix-sync-logs"><i class="bi bi-list-check me-2"></i>View Sync Logs</a>
                     </form>
                 </div>
                 <div class="col-lg-4">
@@ -162,7 +172,7 @@
                 </div>
             </div>
 
-            <div class="surface p-4">
+            <div class="surface p-4" id="mobilesentrix-sync-logs">
                 <div class="d-flex flex-wrap justify-content-between gap-3 mb-3">
                     <div>
                         <p class="eyebrow mb-1">Sync Logs</p>

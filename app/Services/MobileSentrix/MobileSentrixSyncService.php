@@ -9,31 +9,41 @@ use App\Models\PartCategory;
 use App\Models\PartModel;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class MobileSentrixSyncService
 {
     public function __construct(private readonly MobileSentrixClient $client) {}
 
-    public function syncCategories(?string $categoryId = null): array
+    public function syncCategories(?string $categoryId = null, ?int $maxDepth = null): array
     {
         $log = $this->startLog('categories', $categoryId ? "Syncing MobileSentrix category {$categoryId}." : 'Syncing MobileSentrix categories.');
         $summary = $this->emptySummary();
+        $state = [
+            'processed' => [],
+            'fetched' => [],
+        ];
+        $maxDepth = max(1, min((int) ($maxDepth ?: 10), 25));
 
         try {
+            if ($categoryId) {
+                $state['fetched'][(string) $categoryId] = true;
+            }
+
+            $this->updateProgress($log, $summary, $categoryId ? "Fetching MobileSentrix category {$categoryId}." : 'Fetching MobileSentrix root categories.');
+            $this->delayBetweenRequests();
+
             $payload = $categoryId ? $this->client->category($categoryId) : $this->client->categories();
             $records = $this->records($payload);
 
             foreach ($records as $record) {
                 try {
-                    $category = $this->upsertCategory($record, null, $summary);
-
-                    if ($category && $category->has_children) {
-                        $this->syncChildCategories($category, $summary);
-                    }
+                    $this->processCategoryRecord($record, null, $summary, $log, $state, 1, $maxDepth);
                 } catch (\Throwable $exception) {
                     $summary['failed_count']++;
                     $summary['errors'][] = $this->safeError($exception, $record);
+                    $this->updateProgress($log, $summary, 'MobileSentrix category record failed; continuing sync.');
                 }
             }
 
@@ -55,6 +65,9 @@ class MobileSentrixSyncService
         ]);
 
         try {
+            $this->updateProgress($log, $summary, $categoryId ? "Fetching MobileSentrix parts for category {$categoryId}." : 'Fetching MobileSentrix parts.');
+            $this->delayBetweenRequests();
+
             $payload = $this->client->products(array_filter(array_merge([
                 'category_id' => $categoryId,
                 'load' => 'image_gallery,related_product',
@@ -66,6 +79,7 @@ class MobileSentrixSyncService
                 } catch (\Throwable $exception) {
                     $summary['failed_count']++;
                     $summary['errors'][] = $this->safeError($exception, $record);
+                    $this->updateProgress($log, $summary, 'MobileSentrix part record failed; continuing sync.');
                 }
             }
 
@@ -87,6 +101,9 @@ class MobileSentrixSyncService
         ]);
 
         try {
+            $this->updateProgress($log, $summary, "Fetching MobileSentrix part {$sku}.");
+            $this->delayBetweenRequests();
+
             $payload = is_numeric($sku) && Part::query()->where('mobilesentrix_product_id', $sku)->exists()
                 ? $this->client->product($sku, ['load' => 'image_gallery,related_product'])
                 : $this->client->lookupBySku($sku);
@@ -239,22 +256,79 @@ class MobileSentrixSyncService
         });
     }
 
-    private function syncChildCategories(PartCategory $parent, array &$summary): void
+    private function processCategoryRecord(array $record, ?PartCategory $parent, array &$summary, MobileSentrixSyncLog $log, array &$state, int $depth, int $maxDepth): ?PartCategory
+    {
+        $categoryId = $this->categoryId($record);
+
+        if ($categoryId && isset($state['processed'][$categoryId])) {
+            $summary['skipped_count']++;
+            $summary['errors'][] = [
+                'message' => "Skipped duplicate MobileSentrix category {$categoryId}.",
+                'entity_id' => $categoryId,
+            ];
+            $this->updateProgress($log, $summary, "Skipped duplicate MobileSentrix category {$categoryId}.");
+
+            return null;
+        }
+
+        if ($categoryId) {
+            $state['processed'][$categoryId] = true;
+        }
+
+        $category = $this->upsertCategory($record, $parent, $summary);
+
+        if (! $category || ! $category->has_children) {
+            $this->updateProgress($log, $summary, $categoryId ? "Synced MobileSentrix category {$categoryId}." : 'Synced MobileSentrix category.');
+
+            return $category;
+        }
+
+        if ($depth >= $maxDepth) {
+            $summary['skipped_count']++;
+            $summary['errors'][] = [
+                'message' => "Skipped children for MobileSentrix category {$category->mobilesentrix_category_id}; maximum depth {$maxDepth} reached.",
+                'entity_id' => $category->mobilesentrix_category_id,
+            ];
+            $this->updateProgress($log, $summary, "Skipped children for MobileSentrix category {$category->mobilesentrix_category_id}; maximum depth reached.");
+
+            return $category;
+        }
+
+        $this->syncChildCategories($category, $summary, $log, $state, $depth + 1, $maxDepth);
+
+        return $category;
+    }
+
+    private function syncChildCategories(PartCategory $parent, array &$summary, MobileSentrixSyncLog $log, array &$state, int $depth, int $maxDepth): void
     {
         if (! $parent->mobilesentrix_category_id) {
             return;
         }
 
-        foreach ($this->records($this->client->category($parent->mobilesentrix_category_id)) as $record) {
-            try {
-                $child = $this->upsertCategory($record, $parent, $summary);
+        $parentCategoryId = (string) $parent->mobilesentrix_category_id;
 
-                if ($child && $child->has_children) {
-                    $this->syncChildCategories($child, $summary);
-                }
+        if (isset($state['fetched'][$parentCategoryId])) {
+            $summary['skipped_count']++;
+            $summary['errors'][] = [
+                'message' => "Skipped duplicate fetch for MobileSentrix category {$parentCategoryId}.",
+                'entity_id' => $parentCategoryId,
+            ];
+            $this->updateProgress($log, $summary, "Skipped duplicate fetch for MobileSentrix category {$parentCategoryId}.");
+
+            return;
+        }
+
+        $state['fetched'][$parentCategoryId] = true;
+        $this->updateProgress($log, $summary, "Fetching MobileSentrix child categories for {$parentCategoryId}.");
+        $this->delayBetweenRequests();
+
+        foreach ($this->records($this->client->category($parentCategoryId)) as $record) {
+            try {
+                $this->processCategoryRecord($record, $parent, $summary, $log, $state, $depth, $maxDepth);
             } catch (\Throwable $exception) {
                 $summary['failed_count']++;
                 $summary['errors'][] = $this->safeError($exception, $record);
+                $this->updateProgress($log, $summary, "MobileSentrix child category failed for parent {$parentCategoryId}; continuing sync.");
             }
         }
     }
@@ -450,6 +524,28 @@ class MobileSentrixSyncService
         ]);
     }
 
+    private function updateProgress(MobileSentrixSyncLog $log, array $summary, string $message): void
+    {
+        $log->update([
+            'created_count' => $summary['created_count'] ?? 0,
+            'updated_count' => $summary['updated_count'] ?? 0,
+            'skipped_count' => $summary['skipped_count'] ?? 0,
+            'failed_count' => $summary['failed_count'] ?? 0,
+            'message' => $message,
+            'error_details' => $summary['errors'] ?? [],
+        ]);
+
+        Log::info('MobileSentrix sync progress.', [
+            'sync_log_id' => $log->id,
+            'sync_type' => $log->sync_type,
+            'message' => $message,
+            'created_count' => $summary['created_count'] ?? 0,
+            'updated_count' => $summary['updated_count'] ?? 0,
+            'skipped_count' => $summary['skipped_count'] ?? 0,
+            'failed_count' => $summary['failed_count'] ?? 0,
+        ]);
+    }
+
     private function emptySummary(): array
     {
         return [
@@ -468,6 +564,20 @@ class MobileSentrixSyncService
             'entity_id' => $record['entity_id'] ?? $record['product_id'] ?? $record['category_id'] ?? null,
             'sku' => $record['sku'] ?? $record['product_code'] ?? null,
         ];
+    }
+
+    private function categoryId(array $record): ?string
+    {
+        return $this->stringValue($record, 'entity_id') ?: $this->stringValue($record, 'category_id');
+    }
+
+    private function delayBetweenRequests(): void
+    {
+        $delayMs = max(0, (int) config('mobilesentrix.sync_request_delay_ms', 200));
+
+        if ($delayMs > 0) {
+            usleep($delayMs * 1000);
+        }
     }
 
     private function stringValue(array $record, string $key): ?string

@@ -16,6 +16,9 @@ MOBILESENTRIX_CALLBACK_URL=http://127.0.0.1:8000/admin/parts/mobilesentrix/callb
 MOBILESENTRIX_ALLOW_BROWSER_SECRET_REDIRECT=false
 MOBILESENTRIX_AUTH_TRANSPORT=oauth_header
 MOBILESENTRIX_SYNC_ENABLED=false
+MOBILESENTRIX_TIMEOUT=120
+MOBILESENTRIX_CONNECT_TIMEOUT=20
+MOBILESENTRIX_SYNC_REQUEST_DELAY_MS=200
 ```
 
 Do not commit `.env`.
@@ -136,16 +139,39 @@ This command prints only environment, base URL, Yes/No credential presence, the 
 After authentication succeeds:
 
 ```bash
-php artisan mobilesentrix:sync-categories
-php artisan mobilesentrix:sync-parts
+php -d max_execution_time=0 artisan mobilesentrix:sync-categories
+php -d max_execution_time=0 artisan mobilesentrix:sync-parts
 ```
 
 Optional category-limited sync:
 
 ```bash
-php artisan mobilesentrix:sync-categories --category=165
-php artisan mobilesentrix:sync-parts --category=165
+php -d max_execution_time=0 artisan mobilesentrix:sync-categories --category=165
+php -d max_execution_time=0 artisan mobilesentrix:sync-categories --category=165 --depth=3
+php -d max_execution_time=0 artisan mobilesentrix:sync-parts --category=165
 ```
+
+The category command recursively syncs child categories, skips duplicate category IDs, stops at the configured depth, and continues when one record fails. Default depth is `10`; allowed range is `1` to `25`.
+
+The sync service uses explicit HTTP timeouts and a small configurable pause between API requests:
+
+```dotenv
+MOBILESENTRIX_TIMEOUT=120
+MOBILESENTRIX_CONNECT_TIMEOUT=20
+MOBILESENTRIX_SYNC_REQUEST_DELAY_MS=200
+```
+
+## Queued Admin Syncs
+
+The `/admin/parts/mobilesentrix` category and parts sync buttons queue long-running sync jobs instead of running the full sync inside the browser request. The buttons redirect immediately and progress appears in the Sync Logs table.
+
+Run a queue worker for large syncs:
+
+```bash
+php artisan queue:work --timeout=1800
+```
+
+If `QUEUE_CONNECTION=sync`, the admin page will not start a full sync from the browser. It will show the equivalent Artisan command to run from the terminal instead.
 
 Refresh one part:
 

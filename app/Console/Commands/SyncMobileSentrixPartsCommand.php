@@ -13,6 +13,10 @@ class SyncMobileSentrixPartsCommand extends Command
 
     public function handle(MobileSentrixSyncService $syncService): int
     {
+        if (function_exists('set_time_limit')) {
+            set_time_limit(0);
+        }
+
         $result = $syncService->syncParts($this->option('category'));
 
         $this->info($result['message'] ?? 'MobileSentrix parts sync finished.');

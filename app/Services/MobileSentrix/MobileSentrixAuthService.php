@@ -26,6 +26,7 @@ class MobileSentrixAuthService
 
         try {
             $response = Http::timeout(config('mobilesentrix.timeout'))
+                ->connectTimeout(config('mobilesentrix.connect_timeout'))
                 ->acceptJson()
                 ->get($this->url('/oauth/authorize/identifier').'?'.$this->identifierQueryString($credentials));
         } catch (\Throwable $exception) {
@@ -104,6 +105,7 @@ class MobileSentrixAuthService
 
         try {
             $response = Http::timeout(config('mobilesentrix.timeout'))
+                ->connectTimeout(config('mobilesentrix.connect_timeout'))
                 ->acceptJson()
                 ->asJson()
                 ->post($this->url('/oauth/authorize/identifiercallback'), [
