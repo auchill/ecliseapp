@@ -4,6 +4,7 @@ namespace App\Services\MobileSentrix;
 
 use App\Models\MobileSentrixApiSetting;
 use App\Models\MobileSentrixSyncLog;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -153,24 +154,32 @@ class MobileSentrixAuthService
 
     private function storeTokens(string $accessToken, string $accessTokenSecret, array $credentials): void
     {
-        $settings = MobileSentrixApiSetting::query()
-            ->active()
-            ->where('environment', $credentials['environment'])
-            ->latest('updated_at')
-            ->first() ?: new MobileSentrixApiSetting;
+        DB::transaction(function () use ($accessToken, $accessTokenSecret, $credentials): void {
+            $settings = MobileSentrixApiSetting::query()
+                ->where('environment', $credentials['environment'])
+                ->where('base_url', $credentials['base_url'])
+                ->latest('updated_at')
+                ->latest('id')
+                ->first() ?: new MobileSentrixApiSetting;
 
-        $settings->fill([
-            'environment' => $credentials['environment'],
-            'base_url' => $credentials['base_url'],
-            'consumer_name' => $credentials['consumer_name'],
-            'consumer_key' => $credentials['consumer_key'],
-            'consumer_secret' => $credentials['consumer_secret'],
-            'access_token' => $accessToken,
-            'access_token_secret' => $accessTokenSecret,
-            'callback_url' => $credentials['callback_url'],
-            'is_active' => true,
-            'last_authenticated_at' => now(),
-        ])->save();
+            $settings->fill([
+                'environment' => $credentials['environment'],
+                'base_url' => $credentials['base_url'],
+                'consumer_name' => $credentials['consumer_name'],
+                'consumer_key' => $credentials['consumer_key'],
+                'consumer_secret' => $credentials['consumer_secret'],
+                'access_token' => $accessToken,
+                'access_token_secret' => $accessTokenSecret,
+                'callback_url' => $credentials['callback_url'],
+                'is_active' => true,
+                'last_authenticated_at' => now(),
+            ])->save();
+
+            MobileSentrixApiSetting::query()
+                ->where('environment', $credentials['environment'])
+                ->whereKeyNot($settings->getKey())
+                ->update(['is_active' => false]);
+        });
     }
 
     public static function maskSecret(?string $value): string
@@ -212,8 +221,8 @@ class MobileSentrixAuthService
             'base_url' => $credentials['base_url'] ?? null,
             'callback_url' => $credentials['callback_url'] ?? null,
             'consumer_name_configured' => filled($credentials['consumer_name'] ?? null),
-            'consumer_key' => self::maskSecret($credentials['consumer_key'] ?? null),
-            'consumer_secret' => self::maskSecret($credentials['consumer_secret'] ?? null),
+            'consumer_key_configured' => filled($credentials['consumer_key'] ?? null),
+            'consumer_secret_configured' => filled($credentials['consumer_secret'] ?? null),
         ];
     }
 

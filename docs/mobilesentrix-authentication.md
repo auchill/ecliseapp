@@ -14,6 +14,7 @@ MOBILESENTRIX_CONSUMER_KEY=
 MOBILESENTRIX_CONSUMER_SECRET=
 MOBILESENTRIX_CALLBACK_URL=http://127.0.0.1:8000/admin/parts/mobilesentrix/callback
 MOBILESENTRIX_ALLOW_BROWSER_SECRET_REDIRECT=false
+MOBILESENTRIX_AUTH_TRANSPORT=oauth_header
 MOBILESENTRIX_SYNC_ENABLED=false
 ```
 
@@ -107,6 +108,29 @@ php artisan mobilesentrix:test-connection
 
 This uses active encrypted credentials from `mobilesentrix_api_settings` and calls `/api/rest/categories`.
 
+To test a specific protected API authorization format, run:
+
+```bash
+php artisan mobilesentrix:test-connection --auth-transport=oauth_header
+php artisan mobilesentrix:test-connection --auth-transport=query_params
+```
+
+The default is:
+
+```dotenv
+MOBILESENTRIX_AUTH_TRANSPORT=oauth_header
+```
+
+`oauth_header` sends OAuth 1.0 PLAINTEXT values in the server-side Authorization header. `query_params` appends the Consumer Key, Consumer Secret, Access Token, and Access Token Secret to server-side API requests only. Do not expose either request format in browser URLs, logs, screenshots, or support messages.
+
+For safe credential-source diagnostics, run:
+
+```bash
+php artisan mobilesentrix:debug-auth
+```
+
+This command prints only environment, base URL, Yes/No credential presence, the active DB settings row ID, last authentication timestamp, token source, and auth transport.
+
 ## Sync Commands
 
 After authentication succeeds:
@@ -169,3 +193,19 @@ If Cloudflare blocks the OAuth identifier URL with HTTP 403:
 6. Rotate Consumer Key and Consumer Secret if they were exposed in screenshots or logs.
 
 The app never logs or displays the full OAuth identifier URL because it contains sensitive query parameters.
+
+## Troubleshooting HTTP 401 After OAuth Success
+
+If OAuth succeeds and `php artisan mobilesentrix:test-connection` returns HTTP 401, the tokens exist but MobileSentrix rejected the protected API request authorization.
+
+1. Run `php artisan mobilesentrix:debug-auth`.
+2. Confirm access tokens exist in `mobilesentrix_api_settings`.
+3. Confirm only one active row exists for the current `MOBILESENTRIX_ENV`.
+4. Confirm the active row matches the current `MOBILESENTRIX_BASE_URL`.
+5. Confirm the current `.env` Consumer Key and Consumer Secret match the credentials used during token generation.
+6. Confirm `MOBILESENTRIX_BASE_URL` matches the environment where the token was generated. Canada preprod should use `https://preprod.mobilesentrix.ca`.
+7. Try `php artisan mobilesentrix:test-connection --auth-transport=oauth_header`.
+8. Try `php artisan mobilesentrix:test-connection --auth-transport=query_params`.
+9. If both transports fail, contact MobileSentrix and ask them to confirm the API auth transport, OAuth PLAINTEXT signature format, credential rotation status, environment, and account enablement.
+
+Do not send Consumer Key, Consumer Secret, Access Token, Access Token Secret, OAuth signature, Authorization header, or full signed request URLs to support. Send only the safe output from `mobilesentrix:debug-auth` and the HTTP status.

@@ -121,9 +121,12 @@ class MobileSentrixController extends Controller
             $httpStatus = $exception instanceof MobileSentrixException
                 ? $exception->httpStatus()
                 : null;
+            $message = $exception instanceof MobileSentrixException && $exception->httpStatus() === 401
+                ? $exception->getMessage()
+                : 'MobileSentrix API connection failed. Please verify credentials and authenticate again.';
 
             return back()
-                ->withErrors(['mobilesentrix' => 'MobileSentrix API connection failed. Please verify credentials and authenticate again.'])
+                ->withErrors(['mobilesentrix' => $message])
                 ->with('mobilesentrix_connection_status', 'Failed')
                 ->with('mobilesentrix_http_status', $httpStatus ?? 'Not captured')
                 ->with('mobilesentrix_failed_at', now()->toDateTimeString());

@@ -1,6 +1,7 @@
 <?php
 
 use App\Console\Commands\AuthenticateMobileSentrixCommand;
+use App\Console\Commands\DebugMobileSentrixAuthCommand;
 use App\Console\Commands\RefreshMobileSentrixPartCommand;
 use App\Console\Commands\SyncMobileSentrixCategoriesCommand;
 use App\Console\Commands\SyncMobileSentrixPartsCommand;
@@ -21,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withCommands([
         AuthenticateMobileSentrixCommand::class,
+        DebugMobileSentrixAuthCommand::class,
         SyncMobileSentrixCategoriesCommand::class,
         SyncMobileSentrixPartsCommand::class,
         RefreshMobileSentrixPartCommand::class,

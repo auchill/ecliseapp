@@ -11,6 +11,7 @@ use App\Services\MobileSentrix\MobileSentrixException;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 beforeEach(function (): void {
     config([
@@ -23,6 +24,7 @@ beforeEach(function (): void {
         'mobilesentrix.access_token_secret' => 'access-secret',
         'mobilesentrix.callback_url' => 'http://ecliseapp.test/admin/parts/mobilesentrix/callback',
         'mobilesentrix.allow_browser_secret_redirect' => false,
+        'mobilesentrix.auth_transport' => 'oauth_header',
         'mobilesentrix.default_markup_type' => 'percentage',
         'mobilesentrix.default_markup_value' => 20,
     ]);
@@ -51,6 +53,48 @@ test('mobile sentrix oauth exchange stores access tokens encrypted', function ()
         ->and($raw->consumer_key)->not->toBe('consumer-key')
         ->and($settings->last_authenticated_at)->not->toBeNull()
         ->and($settings->toArray())->not->toHaveKeys(['consumer_key', 'consumer_secret', 'access_token', 'access_token_secret']);
+});
+
+test('mobile sentrix oauth exchange deactivates older active rows for the same environment', function () {
+    $oldBaseRow = MobileSentrixApiSetting::query()->create([
+        'environment' => 'staging',
+        'base_url' => 'https://old-preprod.mobilesentrix.ca',
+        'consumer_key' => 'old-consumer-key',
+        'consumer_secret' => 'old-consumer-secret',
+        'access_token' => 'old-access-token',
+        'access_token_secret' => 'old-access-secret',
+        'is_active' => true,
+        'updated_at' => now()->subDays(2),
+    ]);
+
+    MobileSentrixApiSetting::query()->create([
+        'environment' => 'staging',
+        'base_url' => 'https://preprod.mobilesentrix.ca',
+        'consumer_key' => 'previous-consumer-key',
+        'consumer_secret' => 'previous-consumer-secret',
+        'access_token' => 'previous-access-token',
+        'access_token_secret' => 'previous-access-secret',
+        'is_active' => true,
+        'updated_at' => now()->subDay(),
+    ]);
+
+    Http::fake([
+        'https://preprod.mobilesentrix.ca/oauth/authorize/identifiercallback' => Http::response([
+            'data' => [
+                'access_token' => 'new-active-access-token',
+                'access_token_secret' => 'new-active-access-secret',
+            ],
+        ]),
+    ]);
+
+    app(MobileSentrixAuthService::class)->exchangeToken('oauth-token', 'oauth-verifier');
+
+    $activeRows = MobileSentrixApiSetting::query()->active()->where('environment', 'staging')->get();
+
+    expect($activeRows)->toHaveCount(1)
+        ->and($activeRows->first()->base_url)->toBe('https://preprod.mobilesentrix.ca')
+        ->and($activeRows->first()->access_token)->toBe('new-active-access-token')
+        ->and($oldBaseRow->fresh()->is_active)->toBeFalse();
 });
 
 test('mobile sentrix can request temporary oauth token and verifier from identifier endpoint', function () {
@@ -168,6 +212,7 @@ test('mobile sentrix test connection command uses stored tokens', function () {
 
     expect($exitCode)->toBe(0)
         ->and($output)->toContain('MobileSentrix API connection successful.')
+        ->and($output)->toContain('Auth transport: oauth_header')
         ->and($output)->toContain('Category response count: 1')
         ->and($output)->not->toContain('db-access-token')
         ->and($output)->not->toContain('db-access-secret');
@@ -227,6 +272,8 @@ test('mobile sentrix parts sync maps products into parts without exposing suppli
     MobileSentrixApiSetting::query()->create([
         'environment' => 'staging',
         'base_url' => 'https://preprod.mobilesentrix.ca',
+        'consumer_key' => 'db-consumer-key',
+        'consumer_secret' => 'db-consumer-secret',
         'access_token' => 'db-access-token',
         'access_token_secret' => 'db-access-secret',
         'is_active' => true,
@@ -318,9 +365,196 @@ test('mobile sentrix client uses stored encrypted credentials before env fallbac
         return str_contains($request->url(), '/api/rest/searchproduct')
             && str_contains($authorization, 'db-consumer-key')
             && str_contains($authorization, 'db-access-token')
+            && str_contains($authorization, 'oauth_version="1.0"')
             && ! str_contains($authorization, 'env-consumer-key')
             && ! str_contains($authorization, 'env-access-token');
     });
+});
+
+test('mobile sentrix client uses newest active database row matching configured environment and base url', function () {
+    config([
+        'mobilesentrix.consumer_key' => 'env-consumer-key',
+        'mobilesentrix.consumer_secret' => 'env-consumer-secret',
+        'mobilesentrix.access_token' => 'env-access-token',
+        'mobilesentrix.access_token_secret' => 'env-access-secret',
+    ]);
+
+    MobileSentrixApiSetting::query()->create([
+        'environment' => 'staging',
+        'base_url' => 'https://wrong.mobilesentrix.ca',
+        'consumer_key' => 'wrong-consumer-key',
+        'consumer_secret' => 'wrong-consumer-secret',
+        'access_token' => 'wrong-access-token',
+        'access_token_secret' => 'wrong-access-secret',
+        'is_active' => true,
+        'updated_at' => now()->addMinute(),
+    ]);
+
+    MobileSentrixApiSetting::query()->create([
+        'environment' => 'staging',
+        'base_url' => 'https://preprod.mobilesentrix.ca',
+        'consumer_key' => 'matching-consumer-key',
+        'consumer_secret' => 'matching-consumer-secret',
+        'access_token' => 'matching-access-token',
+        'access_token_secret' => 'matching-access-secret',
+        'is_active' => true,
+        'updated_at' => now(),
+    ]);
+
+    Http::fake([
+        'https://preprod.mobilesentrix.ca/api/rest/categories' => Http::response([
+            ['entity_id' => '165', 'name' => 'iPhone Screens'],
+        ]),
+    ]);
+
+    app(MobileSentrixClient::class)->categories();
+
+    Http::assertSent(function ($request) {
+        $authorization = $request->header('Authorization')[0] ?? '';
+
+        return $request->url() === 'https://preprod.mobilesentrix.ca/api/rest/categories'
+            && str_contains($authorization, 'matching-consumer-key')
+            && str_contains($authorization, 'matching-access-token')
+            && ! str_contains($authorization, 'wrong-consumer-key')
+            && ! str_contains($authorization, 'env-consumer-key');
+    });
+});
+
+test('mobile sentrix client supports query parameter auth transport server side', function () {
+    config(['mobilesentrix.auth_transport' => 'query_params']);
+
+    MobileSentrixApiSetting::query()->create([
+        'environment' => 'staging',
+        'base_url' => 'https://preprod.mobilesentrix.ca',
+        'consumer_key' => 'db-consumer-key',
+        'consumer_secret' => 'db-consumer-secret',
+        'access_token' => 'db-access-token',
+        'access_token_secret' => 'db-access-secret',
+        'is_active' => true,
+    ]);
+
+    Http::fake([
+        'https://preprod.mobilesentrix.ca/api/rest/categories*' => Http::response([
+            ['entity_id' => '165', 'name' => 'iPhone Screens'],
+        ]),
+    ]);
+
+    app(MobileSentrixClient::class)->categories();
+
+    Http::assertSent(function ($request) {
+        parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
+
+        return ! $request->hasHeader('Authorization')
+            && $query['consumer_key'] === 'db-consumer-key'
+            && $query['consumer_secret'] === 'db-consumer-secret'
+            && $query['access_token'] === 'db-access-token'
+            && $query['access_token_secret'] === 'db-access-secret';
+    });
+});
+
+test('mobile sentrix test connection command accepts auth transport override', function () {
+    MobileSentrixApiSetting::query()->create([
+        'environment' => 'staging',
+        'base_url' => 'https://preprod.mobilesentrix.ca',
+        'consumer_key' => 'db-consumer-key',
+        'consumer_secret' => 'db-consumer-secret',
+        'access_token' => 'db-access-token',
+        'access_token_secret' => 'db-access-secret',
+        'is_active' => true,
+    ]);
+
+    Http::fake([
+        'https://preprod.mobilesentrix.ca/api/rest/categories*' => Http::response([
+            ['entity_id' => '165', 'name' => 'iPhone Screens'],
+        ]),
+    ]);
+
+    $exitCode = Artisan::call('mobilesentrix:test-connection', [
+        '--auth-transport' => 'query_params',
+    ]);
+    $output = Artisan::output();
+
+    expect($exitCode)->toBe(0)
+        ->and($output)->toContain('Auth transport: query_params')
+        ->and($output)->not->toContain('db-consumer-secret')
+        ->and($output)->not->toContain('db-access-secret');
+});
+
+test('mobile sentrix debug auth command prints credential presence only', function () {
+    $settings = MobileSentrixApiSetting::query()->create([
+        'environment' => 'staging',
+        'base_url' => 'https://preprod.mobilesentrix.ca',
+        'consumer_name' => 'Database Consumer',
+        'consumer_key' => 'db-consumer-key',
+        'consumer_secret' => 'db-consumer-secret',
+        'access_token' => 'db-access-token',
+        'access_token_secret' => 'db-access-secret',
+        'is_active' => true,
+        'last_authenticated_at' => now(),
+    ]);
+
+    $exitCode = Artisan::call('mobilesentrix:debug-auth');
+    $output = Artisan::output();
+
+    expect($exitCode)->toBe(0)
+        ->and($output)->toContain('Environment: staging')
+        ->and($output)->toContain('Base URL: https://preprod.mobilesentrix.ca')
+        ->and($output)->toContain('Consumer Key configured: Yes')
+        ->and($output)->toContain('Access Token Secret configured: Yes')
+        ->and($output)->toContain('Active DB settings row ID: '.$settings->id)
+        ->and($output)->toContain('Token source: database')
+        ->and($output)->toContain('Auth transport: oauth_header')
+        ->and($output)->not->toContain('db-consumer-key')
+        ->and($output)->not->toContain('db-consumer-secret')
+        ->and($output)->not->toContain('db-access-token')
+        ->and($output)->not->toContain('db-access-secret');
+});
+
+test('mobile sentrix http 401 diagnostics are safe and actionable', function () {
+    Log::spy();
+
+    MobileSentrixApiSetting::query()->create([
+        'environment' => 'staging',
+        'base_url' => 'https://preprod.mobilesentrix.ca',
+        'consumer_key' => 'db-consumer-key',
+        'consumer_secret' => 'db-consumer-secret',
+        'access_token' => 'db-access-token',
+        'access_token_secret' => 'db-access-secret',
+        'is_active' => true,
+    ]);
+
+    Http::fake([
+        'https://preprod.mobilesentrix.ca/api/rest/categories' => Http::response('Invalid OAuth credentials', 401),
+    ]);
+
+    $exitCode = Artisan::call('mobilesentrix:test-connection');
+    $output = Artisan::output();
+
+    expect($exitCode)->toBe(1)
+        ->and($output)->toContain(MobileSentrixClient::HTTP_401_MESSAGE)
+        ->and($output)->not->toContain('db-consumer-key')
+        ->and($output)->not->toContain('db-consumer-secret')
+        ->and($output)->not->toContain('db-access-token')
+        ->and($output)->not->toContain('db-access-secret');
+
+    Log::shouldHaveReceived('warning')
+        ->once()
+        ->withArgs(function (string $message, array $context): bool {
+            $encoded = json_encode($context);
+
+            return $message === 'MobileSentrix API request rejected with HTTP 401.'
+                && $context['endpoint_path'] === '/api/rest/categories'
+                && $context['status'] === 401
+                && $context['auth_transport'] === 'oauth_header'
+                && $context['token_source'] === 'database'
+                && $context['environment'] === 'staging'
+                && $context['base_url'] === 'https://preprod.mobilesentrix.ca'
+                && str_contains($context['response_body'], 'Invalid OAuth credentials')
+                && ! str_contains($encoded, 'db-consumer-key')
+                && ! str_contains($encoded, 'db-consumer-secret')
+                && ! str_contains($encoded, 'db-access-token')
+                && ! str_contains($encoded, 'db-access-secret');
+        });
 });
 
 test('mobile sentrix client fails safely when access tokens are missing', function () {
