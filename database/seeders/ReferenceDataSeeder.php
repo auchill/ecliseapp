@@ -24,13 +24,13 @@ class ReferenceDataSeeder extends Seeder
             'MacBook Pro',
         ]);
 
-        $this->seed(PartModel::class, [
-            'iPhone 13',
-            'Galaxy S22',
-            'A2337',
-            'XPS 13 9310',
-            'MacBook Pro',
-        ]);
+        // $this->seed(PartModel::class, [
+        //     'iPhone 13',
+        //     'Galaxy S22',
+        //     'A2337',
+        //     'XPS 13 9310',
+        //     'MacBook Pro',
+        // ]);
 
         $this->seed(DeviceType::class, [
             'Phone',

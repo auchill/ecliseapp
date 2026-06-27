@@ -148,41 +148,41 @@ class DatabaseSeeder extends Seeder
             );
         }
 
-        $parts = [
-            ['iPhone 13 OLED Screen', 'Phone', 'Apple', 'iPhone 13', 'Screens', 139.99, 'In stock'],
-            ['Galaxy S22 Battery', 'Phone', 'Samsung', 'Galaxy S22', 'Batteries', 64.99, 'In stock'],
-            ['MacBook Air 13-inch Keyboard', 'Laptop', 'Apple', 'A2337', 'Keyboards', 189.00, 'Special order'],
-            ['Dell XPS 13 Laptop Screen', 'Laptop', 'Dell', 'XPS 13 9310', 'Laptop Screens', 249.00, 'Check availability'],
-        ];
+        // $parts = [
+        //     ['iPhone 13 OLED Screen', 'Phone', 'Apple', 'iPhone 13', 'Screens', 139.99, 'In stock'],
+        //     ['Galaxy S22 Battery', 'Phone', 'Samsung', 'Galaxy S22', 'Batteries', 64.99, 'In stock'],
+        //     ['MacBook Air 13-inch Keyboard', 'Laptop', 'Apple', 'A2337', 'Keyboards', 189.00, 'Special order'],
+        //     ['Dell XPS 13 Laptop Screen', 'Laptop', 'Dell', 'XPS 13 9310', 'Laptop Screens', 249.00, 'Check availability'],
+        // ];
 
-        foreach ($parts as [$name, $deviceType, $brand, $modelCompatibility, $partCategory, $price, $stockStatus]) {
-            Part::query()->updateOrCreate(
-                [
-                    'name' => $name,
-                    'brand' => $brand,
-                    'model_compatibility' => $modelCompatibility,
-                ],
-                [
-                    'device_type' => $deviceType,
-                    'part_brand_id' => PartBrand::query()->where('slug', Str::slug($brand.' Parts'))->value('id')
-                        ?: PartBrand::query()->where('slug', Str::slug($brand))->value('id'),
-                    'part_category_id' => PartCategory::query()->where('slug', Str::slug($partCategory))->value('id'),
-                    'part_model_id' => PartModel::query()->where('slug', Str::slug($modelCompatibility))->value('id'),
-                    'part_category' => $partCategory,
-                    'price' => $price,
-                    'selling_price' => $price,
-                    'final_price' => $price,
-                    'quantity' => $stockStatus === 'In stock' ? 5 : 0,
-                    'availability_status' => $stockStatus,
-                    'external_api_source' => 'MobileSentrix',
-                    'is_api_item' => false,
-                    'is_active' => true,
-                    'stock_status' => $stockStatus,
-                    'supplier' => 'MobileSentrix',
-                    'last_synced_at' => now(),
-                ],
-            );
-        }
+        // foreach ($parts as [$name, $deviceType, $brand, $modelCompatibility, $partCategory, $price, $stockStatus]) {
+        //     Part::query()->updateOrCreate(
+        //         [
+        //             'name' => $name,
+        //             'brand' => $brand,
+        //             'model_compatibility' => $modelCompatibility,
+        //         ],
+        //         [
+        //             'device_type' => $deviceType,
+        //             'part_brand_id' => PartBrand::query()->where('slug', Str::slug($brand.' Parts'))->value('id')
+        //                 ?: PartBrand::query()->where('slug', Str::slug($brand))->value('id'),
+        //             'part_category_id' => PartCategory::query()->where('slug', Str::slug($partCategory))->value('id'),
+        //             'part_model_id' => PartModel::query()->where('slug', Str::slug($modelCompatibility))->value('id'),
+        //             'part_category' => $partCategory,
+        //             'price' => $price,
+        //             'selling_price' => $price,
+        //             'final_price' => $price,
+        //             'quantity' => $stockStatus === 'In stock' ? 5 : 0,
+        //             'availability_status' => $stockStatus,
+        //             'external_api_source' => 'MobileSentrix',
+        //             'is_api_item' => false,
+        //             'is_active' => true,
+        //             'stock_status' => $stockStatus,
+        //             'supplier' => 'MobileSentrix',
+        //             'last_synced_at' => now(),
+        //         ],
+        //     );
+        // }
 
         $booking = RepairBooking::query()->updateOrCreate(
             ['tracking_number' => 'ECL-REP-2026-0001'],

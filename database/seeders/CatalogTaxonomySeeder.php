@@ -27,18 +27,18 @@ class CatalogTaxonomySeeder extends Seeder
             );
         }
 
-        foreach (['Apple Parts', 'Samsung Parts', 'HP Parts', 'Dell Parts', 'Lenovo Parts'] as $index => $name) {
-            PartBrand::query()->updateOrCreate(
-                ['slug' => Str::slug($name)],
-                ['name' => $name, 'is_active' => true, 'sort_order' => ($index + 1) * 10],
-            );
-        }
+        // foreach (['Apple Parts', 'Samsung Parts', 'HP Parts', 'Dell Parts', 'Lenovo Parts'] as $index => $name) {
+        //     PartBrand::query()->updateOrCreate(
+        //         ['slug' => Str::slug($name)],
+        //         ['name' => $name, 'is_active' => true, 'sort_order' => ($index + 1) * 10],
+        //     );
+        // }
 
-        foreach (['Screens', 'Batteries', 'Charging Ports', 'Keyboards', 'Cameras', 'Motherboards'] as $index => $name) {
-            PartCategory::query()->updateOrCreate(
-                ['slug' => Str::slug($name)],
-                ['name' => $name, 'is_active' => true, 'sort_order' => ($index + 1) * 10],
-            );
-        }
+        // foreach (['Screens', 'Batteries', 'Charging Ports', 'Keyboards', 'Cameras', 'Motherboards'] as $index => $name) {
+        //     PartCategory::query()->updateOrCreate(
+        //         ['slug' => Str::slug($name)],
+        //         ['name' => $name, 'is_active' => true, 'sort_order' => ($index + 1) * 10],
+        //     );
+        // }
     }
 }
