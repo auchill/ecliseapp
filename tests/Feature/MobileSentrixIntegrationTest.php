@@ -22,6 +22,7 @@ beforeEach(function (): void {
         'mobilesentrix.access_token' => 'access-token',
         'mobilesentrix.access_token_secret' => 'access-secret',
         'mobilesentrix.callback_url' => 'http://ecliseapp.test/admin/parts/mobilesentrix/callback',
+        'mobilesentrix.allow_browser_secret_redirect' => false,
         'mobilesentrix.default_markup_type' => 'percentage',
         'mobilesentrix.default_markup_value' => 20,
     ]);

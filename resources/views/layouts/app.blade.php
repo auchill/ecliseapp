@@ -13,15 +13,36 @@
     <body>
         <div class="site-shell">
             <nav class="navbar navbar-expand-xl bg-white sticky-top">
+                @php
+                    $publicNavUser = auth()->user();
+                    $publicNavIsAdmin = $publicNavUser?->isAdmin() === true;
+                    $publicNavIsCustomer = $publicNavUser?->isCustomer() === true;
+                @endphp
                 <div class="container">
                     <a class="navbar-brand d-flex align-items-center" href="{{ route('home') }}" aria-label="Eclise Technology Inc. home">
                         <img class="brand-logo" src="{{ asset('images/brand/header_logo.png') }}" alt="Eclise Technology Inc.">
                     </a>
-                    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
+                    <div class="mobile-header-actions d-flex d-xl-none align-items-center ms-auto">
+                        @unless($publicNavIsAdmin)
+                            <x-cart-icon :count="$cartItemCount ?? 0" variant="compact" />
+
+                            @if($publicNavIsCustomer)
+                                <x-customer-avatar-dropdown :user="$publicNavUser" menu-id="mobileCustomerAccountDropdown" />
+                            @elseif(! $publicNavUser)
+                                <a class="btn btn-outline-primary btn-sm mobile-auth-btn" href="{{ route('login') }}">
+                                    <i class="bi bi-box-arrow-in-right me-1" aria-hidden="true"></i>Login
+                                </a>
+                                <a class="btn btn-primary btn-sm mobile-auth-btn" href="{{ route('register') }}">
+                                    <i class="bi bi-person-plus me-1" aria-hidden="true"></i>Register
+                                </a>
+                            @endif
+                        @endunless
+                    </div>
+                    <button class="navbar-toggler ms-2" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Open navigation menu">
                         <span class="navbar-toggler-icon"></span>
                     </button>
                     <div class="collapse navbar-collapse" id="mainNav">
-                        <ul class="navbar-nav ms-auto align-items-xl-center gap-xl-1">
+                        <ul class="navbar-nav ms-xl-auto align-items-xl-center gap-xl-1">
                             <li class="nav-item"><a class="nav-link {{ request()->routeIs('home') ? 'active' : '' }}" href="{{ route('home') }}">Home</a></li>
                             <li class="nav-item"><a class="nav-link {{ request()->routeIs('about') ? 'active' : '' }}" href="{{ route('about') }}">About</a></li>
                             <li class="nav-item"><a class="nav-link {{ request()->routeIs('services') ? 'active' : '' }}" href="{{ route('services') }}">Services</a></li>
@@ -42,39 +63,19 @@
                             </li>
                             <li class="nav-item"><a class="nav-link {{ request()->routeIs('parts.*') ? 'active' : '' }}" href="{{ route('parts.index') }}">Parts</a></li>
                             <li class="nav-item"><a class="nav-link {{ request()->routeIs('contact.*') ? 'active' : '' }}" href="{{ route('contact.create') }}">Contact</a></li>
-                            @if(! auth()->user()?->isAdmin())
-                                <li class="nav-item">
-                                    <a class="nav-link position-relative {{ request()->routeIs('cart.*') ? 'active' : '' }}" href="{{ route('cart.index') }}">
-                                        <i class="bi bi-bag"></i><span class="visually-hidden">Cart</span>
-                                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-primary">{{ $cartItemCount ?? 0 }}</span>
-                                    </a>
-                                </li>
-                            @endif
-                            @auth
-                                <li class="nav-item dropdown">
-                                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">{{ auth()->user()->name }}</a>
-                                    <ul class="dropdown-menu dropdown-menu-end">
-                                        @if(auth()->user()->isAdmin())
-                                            <li><a class="dropdown-item" href="{{ route('admin.dashboard') }}">Admin</a></li>
-                                        @else
-                                            <li><a class="dropdown-item" href="{{ route('dashboard') }}">Dashboard</a></li>
-                                            <li><a class="dropdown-item" href="{{ route('customer.repairs') }}">My Repairs</a></li>
-                                            <li><a class="dropdown-item" href="{{ route('customer.orders') }}">My Orders</a></li>
-                                        @endif
-                                        <li><hr class="dropdown-divider"></li>
-                                        <li>
-                                            <form method="POST" action="{{ auth()->user()->isAdmin() ? route('admin.logout') : route('logout') }}">
-                                                @csrf
-                                                <button class="dropdown-item" type="submit">Logout</button>
-                                            </form>
-                                        </li>
-                                    </ul>
-                                </li>
-                            @else
-                                <li class="nav-item ms-xl-2"><a class="btn btn-outline-primary btn-sm px-3" href="{{ route('login') }}"><i class="bi bi-box-arrow-in-right me-1"></i>Login</a></li>
-                                <li class="nav-item"><a class="btn btn-primary btn-sm px-3" href="{{ route('register') }}"><i class="bi bi-person-plus me-1"></i>Register</a></li>
-                            @endauth
                         </ul>
+                        @unless($publicNavIsAdmin)
+                            <div class="public-nav-actions d-none d-xl-flex align-items-center gap-2 ms-xl-3">
+                                <x-cart-icon :count="$cartItemCount ?? 0" variant="nav" class="{{ request()->routeIs('cart.*') ? 'active' : '' }}" />
+
+                                @if($publicNavIsCustomer)
+                                    <x-customer-avatar-dropdown :user="$publicNavUser" menu-id="desktopCustomerAccountDropdown" />
+                                @elseif(! $publicNavUser)
+                                    <a class="btn btn-outline-primary btn-sm px-3" href="{{ route('login') }}"><i class="bi bi-box-arrow-in-right me-1" aria-hidden="true"></i>Login</a>
+                                    <a class="btn btn-primary btn-sm px-3" href="{{ route('register') }}"><i class="bi bi-person-plus me-1" aria-hidden="true"></i>Register</a>
+                                @endif
+                            </div>
+                        @endunless
                     </div>
                 </div>
             </nav>
