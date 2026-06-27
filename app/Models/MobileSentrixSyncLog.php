@@ -15,6 +15,8 @@ class MobileSentrixSyncLog extends Model
         'authentication',
         'categories',
         'parts',
+        'parts_full',
+        'parts_category',
         'single_part',
         'search',
     ];

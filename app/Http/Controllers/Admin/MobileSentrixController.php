@@ -32,7 +32,7 @@ class MobileSentrixController extends Controller
             'missingCredentials' => $client->missingCredentialNames(),
             'latestLogs' => MobileSentrixSyncLog::query()->latest()->limit(12)->get(),
             'lastCategoryLog' => MobileSentrixSyncLog::query()->where('sync_type', 'categories')->latest()->first(),
-            'lastPartLog' => MobileSentrixSyncLog::query()->whereIn('sync_type', ['parts', 'single_part'])->latest()->first(),
+            'lastPartLog' => MobileSentrixSyncLog::query()->whereIn('sync_type', ['parts_full', 'parts_category', 'parts', 'single_part'])->latest()->first(),
             'partsCount' => Part::query()->where('is_api_item', true)->count(),
             'categoriesCount' => PartCategory::query()->whereNotNull('mobilesentrix_category_id')->count(),
             'queueConfigured' => $this->queueConfigured(),
@@ -158,17 +158,22 @@ class MobileSentrixController extends Controller
     {
         $validated = $request->validate([
             'category_id' => ['nullable', 'string', 'max:120'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:100000'],
         ]);
+        $categoryId = $validated['category_id'] ?? null;
+        $limit = $validated['limit'] ?? null;
 
         if (! $this->queueConfigured()) {
             return back()->withErrors([
-                'mobilesentrix' => 'Queue is not configured for long MobileSentrix syncs. Run from terminal: '.$this->partsSyncCommand($validated['category_id'] ?? null),
+                'mobilesentrix' => 'Queue is not configured for long MobileSentrix syncs. Run from terminal: '.$this->partsSyncCommand($categoryId, $limit),
             ]);
         }
 
-        SyncMobileSentrixPartsJob::dispatch($validated['category_id'] ?? null);
+        SyncMobileSentrixPartsJob::dispatch($categoryId, $limit);
 
-        return back()->with('status', 'MobileSentrix parts sync has been queued. Check Sync Logs for progress.');
+        return back()->with('status', $categoryId
+            ? 'MobileSentrix parts sync for category '.$categoryId.' has been queued. Check Sync Logs for progress.'
+            : 'Full MobileSentrix parts sync has been queued. Check Sync Logs for progress.');
     }
 
     public function refreshPart(Request $request, MobileSentrixSyncService $syncService): RedirectResponse
@@ -222,12 +227,16 @@ class MobileSentrixController extends Controller
         return $command;
     }
 
-    private function partsSyncCommand(?string $categoryId = null): string
+    private function partsSyncCommand(?string $categoryId = null, ?int $limit = null): string
     {
         $command = 'php -d max_execution_time=0 artisan mobilesentrix:sync-parts';
 
         if (filled($categoryId)) {
             $command .= ' --category='.escapeshellarg($categoryId);
+        }
+
+        if ($limit) {
+            $command .= ' --limit='.$limit;
         }
 
         return $command;

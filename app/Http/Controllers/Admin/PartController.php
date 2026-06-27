@@ -9,57 +9,37 @@ use App\Models\Part;
 use App\Models\PartBrand;
 use App\Models\PartCategory;
 use App\Models\PartModel;
+use App\Services\Parts\PartSearchService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 class PartController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, PartSearchService $partSearch)
     {
-        $parts = Part::query()
-            ->with('partBrand', 'partCategory', 'partModel', 'partCategories')
-            ->when($request->filled('q'), function ($query) use ($request): void {
-                $search = $request->string('q');
-                $query->where(function ($query) use ($search): void {
-                    $query->where('name', 'like', "%{$search}%")
-                        ->orWhere('sku', 'like', "%{$search}%")
-                        ->orWhere('new_sku', 'like', "%{$search}%")
-                        ->orWhere('brand', 'like', "%{$search}%")
-                        ->orWhere('manufacturer_text', 'like', "%{$search}%")
-                        ->orWhere('model_compatibility', 'like', "%{$search}%")
-                        ->orWhere('model_text', 'like', "%{$search}%")
-                        ->orWhere('part_category', 'like', "%{$search}%")
-                        ->orWhere('front_position_text', 'like', "%{$search}%");
-                });
-            })
-            ->when($request->filled('brand'), fn ($query) => $query->where('part_brand_id', $request->integer('brand')))
-            ->when($request->filled('category'), function ($query) use ($request): void {
-                $categoryId = $request->integer('category');
-                $query->where(function ($query) use ($categoryId): void {
-                    $query->where('part_category_id', $categoryId)
-                        ->orWhereHas('partCategories', fn ($query) => $query->whereKey($categoryId));
-                });
-            })
-            ->when($request->filled('model'), fn ($query) => $query->where('part_model_id', $request->integer('model')))
-            ->when($request->filled('stock'), function ($query) use ($request): void {
-                $request->string('stock')->toString() === 'in'
-                    ? $query->where(function ($query): void {
-                        $query->where('is_in_stock', true)->orWhere('quantity', '>', 0)->orWhere('in_stock_qty', '>', 0);
-                    })
-                    : $query->where(function ($query): void {
-                        $query->where('is_in_stock', false)->where('quantity', '<=', 0)->where('in_stock_qty', '<=', 0);
-                    });
-            })
-            ->when($request->filled('api_status'), fn ($query) => $query->where('api_status', $request->string('api_status')->toString()))
-            ->latest()
-            ->paginate(20)
-            ->withQueryString();
-
         return view('admin.parts.index', [
-            'parts' => $parts,
+            'parts' => $partSearch->adminResults($request),
             'partBrands' => PartBrand::query()->active()->orderBy('name')->get(),
             'partCategories' => PartCategory::query()->active()->orderBy('name')->get(),
             'partModels' => PartModel::query()->active()->orderBy('name')->get(),
+        ]);
+    }
+
+    public function search(Request $request, PartSearchService $partSearch): JsonResponse
+    {
+        $parts = $partSearch->adminResults($request);
+
+        return response()->json([
+            'html' => view('admin.parts.partials.table', ['parts' => $parts])->render(),
+            'count' => $parts->total(),
+        ]);
+    }
+
+    public function suggestions(Request $request, PartSearchService $partSearch): JsonResponse
+    {
+        return response()->json([
+            'suggestions' => $partSearch->adminSuggestions($request),
         ]);
     }
 

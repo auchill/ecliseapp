@@ -11,7 +11,7 @@ class PublicPageController extends Controller
     {
         return view('pages.home', [
             'featuredProducts' => Product::query()->with('category')->active()->latest()->take(4)->get(),
-            'featuredParts' => Part::query()->latest()->take(4)->get(),
+            'featuredParts' => Part::query()->where('is_active', true)->where('status', 'active')->latest()->take(4)->get(),
         ]);
     }
 

@@ -49,6 +49,9 @@ Route::get('/products/{product}', [ShopController::class, 'show'])->name('produc
 Route::get('/orders/track', [OrderTrackingController::class, 'form'])->name('orders.track');
 Route::post('/orders/track/result', [OrderTrackingController::class, 'result'])->name('orders.track.result');
 Route::get('/parts', [PartController::class, 'index'])->name('parts.index');
+Route::get('/parts/search', [PartController::class, 'search'])->name('parts.search');
+Route::get('/parts/suggestions', [PartController::class, 'suggestions'])->name('parts.suggestions');
+Route::get('/parts/{part}', [PartController::class, 'show'])->whereNumber('part')->name('parts.show');
 Route::get('/contact', [ContactController::class, 'create'])->name('contact.create');
 Route::post('/contact', [ContactController::class, 'store'])->name('contact.store');
 Route::post('/webhooks/stripe', [PaymentWebhookController::class, 'stripe'])->name('webhooks.stripe');
@@ -146,6 +149,8 @@ Route::middleware('admin')->prefix('admin')->name('admin.')->group(function (): 
     Route::post('/parts/mobilesentrix/sync-parts', [AdminMobileSentrixController::class, 'syncParts'])->name('parts.mobilesentrix.sync-parts');
     Route::post('/parts/mobilesentrix/refresh', [AdminMobileSentrixController::class, 'refreshPart'])->name('parts.mobilesentrix.refresh');
     Route::post('/parts/sync', [AdminPartController::class, 'sync'])->name('parts.sync');
+    Route::get('/parts/search', [AdminPartController::class, 'search'])->name('parts.search');
+    Route::get('/parts/suggestions', [AdminPartController::class, 'suggestions'])->name('parts.suggestions');
     Route::resource('parts', AdminPartController::class)->except(['show']);
     Route::resource('parts/part-brands', AdminPartBrandController::class)->names('part-brands')->except(['show']);
     Route::resource('parts/part-categories', AdminPartCategoryController::class)->names('part-categories')->except(['show']);

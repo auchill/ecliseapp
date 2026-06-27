@@ -396,6 +396,124 @@ test('mobile sentrix parts sync maps products into parts without exposing suppli
         ->assertDontSee('MobileSentrix');
 });
 
+test('mobile sentrix full parts sync paginates products and logs parts full', function () {
+    Http::fake(function ($request) {
+        parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
+        $page = (int) ($query['page'] ?? 1);
+
+        $records = [
+            1 => [
+                [
+                    'entity_id' => '9101',
+                    'sku' => 'MS-9101',
+                    'name' => 'iPhone 15 Battery',
+                    'price' => '25.00',
+                    'category_ids' => ['200'],
+                    'is_in_stock' => true,
+                    'in_stock_qty' => 4,
+                    'manufacturer_text' => 'Apple',
+                    'model_text' => ['iPhone 15'],
+                ],
+                [
+                    'entity_id' => '9102',
+                    'sku' => 'MS-9102',
+                    'name' => 'Galaxy S24 Screen',
+                    'price' => '80.00',
+                    'category_ids' => ['201'],
+                    'is_in_stock' => true,
+                    'in_stock_qty' => 2,
+                    'manufacturer_text' => 'Samsung',
+                    'model_text' => ['Galaxy S24'],
+                ],
+            ],
+            2 => [
+                [
+                    'entity_id' => '9103',
+                    'sku' => 'MS-9103',
+                    'name' => 'Pixel 9 Charging Port',
+                    'price' => '15.00',
+                    'category_ids' => ['202'],
+                    'is_in_stock' => false,
+                    'in_stock_qty' => 0,
+                    'manufacturer_text' => 'Google',
+                    'model_text' => ['Pixel 9'],
+                ],
+                [
+                    'entity_id' => '9104',
+                    'sku' => 'MS-9104',
+                    'name' => 'Generic Tablet Cable',
+                    'price' => '6.00',
+                    'category_ids' => ['203'],
+                    'is_in_stock' => true,
+                    'in_stock_qty' => 8,
+                    'model' => '111,222,333',
+                    'model_text' => ['Tablet'],
+                    'url' => 'https://preprod.mobilesentrix.ca/'.str_repeat('very-long-url-segment-', 20),
+                ],
+            ],
+        ];
+
+        return Http::response([
+            'data' => [
+                'items' => $records[$page] ?? [],
+                'page_info' => [
+                    'current_page' => $page,
+                    'total_pages' => 2,
+                    'page_size' => 2,
+                    'total_count' => 4,
+                ],
+            ],
+        ]);
+    });
+
+    $this->artisan('mobilesentrix:sync-parts')->assertSuccessful();
+
+    $this->assertDatabaseHas('parts', ['mobilesentrix_product_id' => '9101', 'sku' => 'MS-9101']);
+    $this->assertDatabaseHas('parts', ['mobilesentrix_product_id' => '9102', 'sku' => 'MS-9102']);
+    $this->assertDatabaseHas('parts', ['mobilesentrix_product_id' => '9103', 'sku' => 'MS-9103']);
+    $this->assertDatabaseHas('parts', ['mobilesentrix_product_id' => '9104', 'sku' => 'MS-9104', 'brand' => 'MobileSentrix', 'model_id' => '111']);
+    expect(strlen((string) Part::query()->where('sku', 'MS-9104')->value('mobilesentrix_url')))->toBeLessThanOrEqual(255);
+    $this->assertDatabaseHas('mobilesentrix_sync_logs', [
+        'sync_type' => 'parts_full',
+        'status' => 'success',
+        'created_count' => 4,
+    ]);
+
+    Http::assertSentCount(2);
+    Http::assertSent(fn ($request) => str_contains($request->url(), '/api/rest/products')
+        && ! str_contains($request->url(), 'category_id='));
+});
+
+test('mobile sentrix parts dry run fetches products without saving', function () {
+    Http::fake([
+        'https://preprod.mobilesentrix.ca/api/rest/products*' => Http::response([
+            'data' => [
+                'items' => [
+                    [
+                        'entity_id' => '9201',
+                        'sku' => 'MS-9201',
+                        'name' => 'Dry Run Screen',
+                        'price' => '42.00',
+                        'is_in_stock' => true,
+                        'in_stock_qty' => 5,
+                    ],
+                ],
+            ],
+        ]),
+    ]);
+
+    $this->artisan('mobilesentrix:sync-parts', ['--dry-run' => true, '--limit' => 1])
+        ->assertSuccessful()
+        ->expectsOutputToContain('Dry run only');
+
+    $this->assertDatabaseMissing('parts', ['mobilesentrix_product_id' => '9201']);
+    $this->assertDatabaseHas('mobilesentrix_sync_logs', [
+        'sync_type' => 'parts_full',
+        'status' => 'success',
+        'created_count' => 1,
+    ]);
+});
+
 test('mobile sentrix client uses stored encrypted credentials before env fallback for search', function () {
     config([
         'mobilesentrix.consumer_key' => 'env-consumer-key',
@@ -819,10 +937,32 @@ test('mobile sentrix admin parts sync queues instead of running inside the reque
         ]);
 
     $response->assertRedirect(route('admin.parts.mobilesentrix.index'));
-    $response->assertSessionHas('status', 'MobileSentrix parts sync has been queued. Check Sync Logs for progress.');
+    $response->assertSessionHas('status', 'MobileSentrix parts sync for category 165 has been queued. Check Sync Logs for progress.');
 
     Queue::assertPushed(SyncMobileSentrixPartsJob::class, function (SyncMobileSentrixPartsJob $job): bool {
         return $job->categoryId === '165';
+    });
+});
+
+test('mobile sentrix admin all parts sync queues without a category', function () {
+    config(['queue.default' => 'database']);
+    Queue::fake();
+
+    $admin = mobileSentrixAdminUser('queue-all-parts-admin@example.com');
+
+    $response = $this->actingAs($admin)
+        ->withSession(['_token' => 'test-token'])
+        ->from(route('admin.parts.mobilesentrix.index'))
+        ->post(route('admin.parts.mobilesentrix.sync-parts'), [
+            '_token' => 'test-token',
+            'limit' => '500',
+        ]);
+
+    $response->assertRedirect(route('admin.parts.mobilesentrix.index'));
+    $response->assertSessionHas('status', 'Full MobileSentrix parts sync has been queued. Check Sync Logs for progress.');
+
+    Queue::assertPushed(SyncMobileSentrixPartsJob::class, function (SyncMobileSentrixPartsJob $job): bool {
+        return $job->categoryId === null && $job->limit === 500;
     });
 });
 

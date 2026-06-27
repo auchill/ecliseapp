@@ -133,7 +133,7 @@
             </div>
 
             <div class="row g-4 mb-4">
-                <div class="col-lg-4">
+                <div class="col-lg-3">
                     <form class="surface p-4 h-100" method="POST" action="{{ route('admin.parts.mobilesentrix.sync-categories') }}">
                         @csrf
                         <p class="eyebrow mb-2">Categories</p>
@@ -148,20 +148,33 @@
                         <a class="btn btn-outline-primary w-100 mt-2" href="#mobilesentrix-sync-logs"><i class="bi bi-list-check me-2"></i>View Sync Logs</a>
                     </form>
                 </div>
-                <div class="col-lg-4">
+                <div class="col-lg-3">
                     <form class="surface p-4 h-100" method="POST" action="{{ route('admin.parts.mobilesentrix.sync-parts') }}">
                         @csrf
-                        <p class="eyebrow mb-2">Parts</p>
+                        <p class="eyebrow mb-2">All Parts</p>
+                        @unless ($queueConfigured)
+                            <div class="alert alert-warning small">Queue is not configured. Use the Artisan parts sync command for large runs.</div>
+                        @endunless
+                        <label class="form-label" for="parts_limit">Limit</label>
+                        <input class="form-control mb-3" id="parts_limit" name="limit" min="1" placeholder="Optional test limit" type="number">
+                        <button class="btn btn-primary w-100" type="submit"><i class="bi bi-database-down me-2"></i>Sync All Parts</button>
+                        <a class="btn btn-outline-primary w-100 mt-2" href="#mobilesentrix-sync-logs"><i class="bi bi-list-check me-2"></i>View Sync Logs</a>
+                    </form>
+                </div>
+                <div class="col-lg-3">
+                    <form class="surface p-4 h-100" method="POST" action="{{ route('admin.parts.mobilesentrix.sync-parts') }}">
+                        @csrf
+                        <p class="eyebrow mb-2">Parts by Category</p>
                         @unless ($queueConfigured)
                             <div class="alert alert-warning small">Queue is not configured. Use the Artisan parts sync command for large runs.</div>
                         @endunless
                         <label class="form-label" for="category_id_parts">Category ID</label>
                         <input class="form-control mb-3" id="category_id_parts" name="category_id" placeholder="Optional, for example 165">
-                        <button class="btn btn-primary w-100" type="submit"><i class="bi bi-arrow-repeat me-2"></i>Sync Parts Queue</button>
+                        <button class="btn btn-primary w-100" type="submit"><i class="bi bi-arrow-repeat me-2"></i>Sync Parts by Category</button>
                         <a class="btn btn-outline-primary w-100 mt-2" href="#mobilesentrix-sync-logs"><i class="bi bi-list-check me-2"></i>View Sync Logs</a>
                     </form>
                 </div>
-                <div class="col-lg-4">
+                <div class="col-lg-3">
                     <form class="surface p-4 h-100" method="POST" action="{{ route('admin.parts.mobilesentrix.refresh') }}">
                         @csrf
                         <p class="eyebrow mb-2">Single Part</p>

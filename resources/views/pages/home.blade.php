@@ -133,7 +133,7 @@
                                     <strong>{{ $part->name }}</strong>
                                     <div class="small muted">{{ $part->brand }} &middot; {{ $part->model_compatibility }}</div>
                                 </div>
-                                <strong>${{ number_format($part->price, 2) }}</strong>
+                                <strong>${{ number_format($part->displayPrice(), 2) }}</strong>
                             </div>
                         @empty
                             <p class="mb-0">Parts will appear after the catalog is seeded.</p>

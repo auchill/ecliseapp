@@ -16,11 +16,12 @@
                 </div>
             </div>
 
-            <form class="surface p-4 mb-4" method="GET" action="{{ route('admin.parts.index') }}">
+            <form class="surface p-4 mb-4" method="GET" action="{{ route('admin.parts.index') }}" data-parts-search-form data-search-url="{{ route('admin.parts.search') }}" data-suggestions-url="{{ route('admin.parts.suggestions') }}">
                 <div class="row g-3 align-items-end">
-                    <div class="col-lg-4">
+                    <div class="col-lg-3 position-relative">
                         <label class="form-label" for="q">Search</label>
-                        <input class="form-control" id="q" name="q" value="{{ request('q') }}" placeholder="Part, SKU, brand, model">
+                        <input class="form-control" id="q" name="q" value="{{ request('q') }}" placeholder="Part, SKU, brand, model, MS ID" autocomplete="off" data-parts-autocomplete>
+                        <div class="list-group position-absolute start-0 end-0 shadow-sm d-none" style="z-index: 20;" data-parts-suggestions></div>
                     </div>
                     <div class="col-sm-6 col-lg-2">
                         <label class="form-label" for="brand">Brand</label>
@@ -65,81 +66,165 @@
                             <option value="inactive" @selected(request('api_status') === 'inactive')>Inactive</option>
                         </select>
                     </div>
+                    <div class="col-sm-6 col-lg-1">
+                        <label class="form-label" for="status">Local</label>
+                        <select class="form-select" id="status" name="status">
+                            <option value="">All</option>
+                            <option value="active" @selected(request('status') === 'active')>Active</option>
+                            <option value="inactive" @selected(request('status') === 'inactive')>Inactive</option>
+                        </select>
+                    </div>
                     <div class="col-12 col-lg-1">
                         <button class="btn btn-primary w-100" type="submit"><i class="bi bi-search"></i><span class="visually-hidden">Search</span></button>
+                    </div>
+                    <div class="col-12 col-lg-1">
+                        <button class="btn btn-outline-primary w-100" type="button" data-parts-clear><i class="bi bi-x-lg"></i><span class="visually-hidden">Clear</span></button>
                     </div>
                 </div>
             </form>
 
-            <div class="surface p-4">
-                <div class="table-responsive">
-                    <table class="table align-middle">
-                        <thead>
-                            <tr>
-                                <th>Part</th>
-                                <th>SKU</th>
-                                <th>Brand</th>
-                                <th>Category</th>
-                                <th>Model</th>
-                                <th>Cost</th>
-                                <th>Selling</th>
-                                <th>Stock</th>
-                                <th>Sync</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse ($parts as $part)
-                                <tr>
-                                    <td>
-                                        <div class="fw-semibold">{{ $part->name }}</div>
-                                        <div class="small muted">{{ $part->device_type }}</div>
-                                    </td>
-                                    <td>
-                                        <div>{{ $part->sku ?: 'N/A' }}</div>
-                                        @if ($part->new_sku)
-                                            <div class="small muted">{{ $part->new_sku }}</div>
-                                        @endif
-                                    </td>
-                                    <td>{{ $part->brandName() }}</td>
-                                    <td>{{ $part->categoryName() }}</td>
-                                    <td>{{ $part->modelName() }}</td>
-                                    <td>${{ number_format((float) ($part->cost_price ?: $part->api_price ?: $part->price), 2) }}</td>
-                                    <td>${{ number_format($part->displayPrice(), 2) }}</td>
-                                    <td>
-                                        <div>{{ $part->stockLabel() }}</div>
-                                        <div class="small muted">{{ $part->in_stock_qty ?: $part->quantity }} available</div>
-                                    </td>
-                                    <td>
-                                        <div><span class="badge text-bg-{{ $part->api_status === 'inactive' ? 'secondary' : 'success' }}">{{ $part->api_status ?: 'local' }}</span></div>
-                                        <div class="small muted">{{ $part->synced_at?->diffForHumans() ?? 'Not synced' }}</div>
-                                    </td>
-                                    <td class="text-end">
-                                        <div class="d-inline-flex gap-2">
-                                            @if ($part->sku)
-                                                <form method="POST" action="{{ route('admin.parts.mobilesentrix.refresh') }}">
-                                                    @csrf
-                                                    <input type="hidden" name="sku" value="{{ $part->sku }}">
-                                                    <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-arrow-repeat"></i><span class="visually-hidden">Refresh</span></button>
-                                                </form>
-                                            @endif
-                                            <a class="btn btn-outline-primary btn-sm" href="{{ route('admin.parts.edit', $part) }}"><i class="bi bi-pencil"></i><span class="visually-hidden">Edit</span></a>
-                                            <form method="POST" action="{{ route('admin.parts.destroy', $part) }}">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-trash"></i><span class="visually-hidden">Delete</span></button>
-                                            </form>
-                                        </div>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr><td colspan="10">No parts found.</td></tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-                {{ $parts->links() }}
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <p class="mb-0 muted"><span data-parts-count>{{ number_format($parts->total()) }}</span> result{{ $parts->total() === 1 ? '' : 's' }}</p>
+                <p class="mb-0 muted d-none" data-parts-loading>Searching...</p>
+            </div>
+
+            <div class="surface p-4" data-parts-results>
+                @include('admin.parts.partials.table', ['parts' => $parts])
             </div>
         </div>
     </section>
+    <script>
+        (() => {
+            const form = document.querySelector('[data-parts-search-form]');
+            if (!form || form.dataset.bound === '1') return;
+            form.dataset.bound = '1';
+
+            const results = document.querySelector('[data-parts-results]');
+            const count = document.querySelector('[data-parts-count]');
+            const loading = document.querySelector('[data-parts-loading]');
+            const suggestions = document.querySelector('[data-parts-suggestions]');
+            const autocomplete = document.querySelector('[data-parts-autocomplete]');
+            let searchController;
+            let suggestController;
+            let searchTimer;
+            let suggestTimer;
+
+            const formParams = () => new URLSearchParams(new FormData(form));
+            const ajaxUrl = (url = null) => {
+                if (url) {
+                    const parsed = new URL(url, window.location.origin);
+                    const target = new URL(form.dataset.searchUrl, window.location.origin);
+                    target.search = parsed.search;
+                    return target;
+                }
+
+                const target = new URL(form.dataset.searchUrl, window.location.origin);
+                target.search = formParams().toString();
+                return target;
+            };
+            const setLoading = (active) => loading?.classList.toggle('d-none', !active);
+            const hideSuggestions = () => suggestions?.classList.add('d-none');
+
+            const runSearch = (url) => {
+                searchController?.abort();
+                searchController = new AbortController();
+                setLoading(true);
+
+                fetch(ajaxUrl(url), {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    signal: searchController.signal,
+                })
+                    .then((response) => response.ok ? response.json() : Promise.reject())
+                    .then((payload) => {
+                        results.innerHTML = payload.html;
+                        if (count) count.textContent = new Intl.NumberFormat().format(payload.count || 0);
+                    })
+                    .catch((error) => {
+                        if (error.name !== 'AbortError') {
+                            results.innerHTML = '<div class="p-4">Search failed. Please try again.</div>';
+                        }
+                    })
+                    .finally(() => setLoading(false));
+            };
+
+            const scheduleSearch = () => {
+                window.clearTimeout(searchTimer);
+                searchTimer = window.setTimeout(() => runSearch(), 300);
+            };
+
+            const renderSuggestions = (items) => {
+                if (!suggestions) return;
+                suggestions.innerHTML = '';
+                if (!items.length) {
+                    hideSuggestions();
+                    return;
+                }
+                items.slice(0, 10).forEach((item) => {
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'list-group-item list-group-item-action';
+                    button.textContent = `${item.label} (${item.type})`;
+                    button.addEventListener('click', () => {
+                        const field = form.elements[item.field];
+                        if (field) field.value = item.value;
+                        hideSuggestions();
+                        runSearch();
+                    });
+                    suggestions.appendChild(button);
+                });
+                suggestions.classList.remove('d-none');
+            };
+
+            const scheduleSuggestions = () => {
+                const term = autocomplete?.value || '';
+                window.clearTimeout(suggestTimer);
+                if (term.length < 2) {
+                    hideSuggestions();
+                    return;
+                }
+                suggestTimer = window.setTimeout(() => {
+                    suggestController?.abort();
+                    suggestController = new AbortController();
+                    const url = new URL(form.dataset.suggestionsUrl, window.location.origin);
+                    url.searchParams.set('q', term);
+                    fetch(url, {
+                        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                        signal: suggestController.signal,
+                    })
+                        .then((response) => response.ok ? response.json() : Promise.reject())
+                        .then((payload) => renderSuggestions(payload.suggestions || []))
+                        .catch((error) => {
+                            if (error.name !== 'AbortError') hideSuggestions();
+                        });
+                }, 250);
+            };
+
+            form.addEventListener('submit', (event) => {
+                event.preventDefault();
+                hideSuggestions();
+                runSearch();
+            });
+            form.querySelectorAll('input, select').forEach((field) => {
+                field.addEventListener('input', () => {
+                    scheduleSearch();
+                    if (field === autocomplete) scheduleSuggestions();
+                });
+                field.addEventListener('change', scheduleSearch);
+            });
+            document.querySelector('[data-parts-clear]')?.addEventListener('click', () => {
+                form.reset();
+                hideSuggestions();
+                runSearch();
+            });
+            results.addEventListener('click', (event) => {
+                const link = event.target.closest('[data-parts-pagination] a');
+                if (!link) return;
+                event.preventDefault();
+                runSearch(link.href);
+            });
+            document.addEventListener('click', (event) => {
+                if (!event.target.closest('[data-parts-search-form]')) hideSuggestions();
+            });
+        })();
+    </script>
 @endsection

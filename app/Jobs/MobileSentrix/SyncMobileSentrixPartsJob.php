@@ -12,11 +12,15 @@ class SyncMobileSentrixPartsJob implements ShouldQueue
 {
     use Queueable;
 
-    public int $timeout = 1800;
+    public int $timeout = 3600;
 
     public int $tries = 1;
 
-    public function __construct(public readonly ?string $categoryId = null) {}
+    public function __construct(
+        public readonly ?string $categoryId = null,
+        public readonly ?int $limit = null,
+        public readonly bool $force = false,
+    ) {}
 
     public function handle(MobileSentrixSyncService $syncService): void
     {
@@ -24,13 +28,16 @@ class SyncMobileSentrixPartsJob implements ShouldQueue
             set_time_limit(0);
         }
 
-        $syncService->syncParts($this->categoryId);
+        $syncService->syncParts($this->categoryId, [], [
+            'limit' => $this->limit,
+            'force' => $this->force,
+        ]);
     }
 
     public function failed(?Throwable $exception): void
     {
         MobileSentrixSyncLog::query()->create([
-            'sync_type' => 'parts',
+            'sync_type' => $this->categoryId ? 'parts_category' : 'parts_full',
             'status' => 'failed',
             'started_at' => now(),
             'finished_at' => now(),

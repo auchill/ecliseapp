@@ -153,6 +153,20 @@ php -d max_execution_time=0 artisan mobilesentrix:sync-parts --category=165
 
 The category command recursively syncs child categories, skips duplicate category IDs, stops at the configured depth, and continues when one record fails. Default depth is `10`; allowed range is `1` to `25`.
 
+The parts command supports full and category-limited product sync:
+
+```bash
+php -d max_execution_time=0 artisan mobilesentrix:sync-parts
+php -d max_execution_time=0 artisan mobilesentrix:sync-parts --category=165
+php artisan mobilesentrix:sync-parts --dry-run --limit=10
+php -d max_execution_time=0 artisan mobilesentrix:sync-parts --limit=500
+php -d max_execution_time=0 artisan mobilesentrix:sync-parts --force
+```
+
+Without `--category`, the command syncs all MobileSentrix products returned by `/api/rest/products`. With `--category`, it calls `/api/rest/products?category_id=...`. The sync processes records in local chunks, supports page/limit API responses, skips repeated pages, continues after malformed products, and records progress in `mobilesentrix_sync_logs` using `parts_full` or `parts_category`.
+
+Bulk product sync intentionally avoids requesting expanded related-product payloads. Stored `raw_payload` values are compacted for traceability, while large nested relationship blobs are omitted so full catalog syncs stay within normal CLI memory limits. Sync log error details are also capped to representative errors; `failed_count` remains exact.
+
 The sync service uses explicit HTTP timeouts and a small configurable pause between API requests:
 
 ```dotenv
@@ -163,15 +177,21 @@ MOBILESENTRIX_SYNC_REQUEST_DELAY_MS=200
 
 ## Queued Admin Syncs
 
-The `/admin/parts/mobilesentrix` category and parts sync buttons queue long-running sync jobs instead of running the full sync inside the browser request. The buttons redirect immediately and progress appears in the Sync Logs table.
+The `/admin/parts/mobilesentrix` category, all-parts, and category-parts sync buttons queue long-running sync jobs instead of running the full sync inside the browser request. The buttons redirect immediately and progress appears in the Sync Logs table.
 
 Run a queue worker for large syncs:
 
 ```bash
-php artisan queue:work --timeout=1800
+php artisan queue:work --timeout=3600
 ```
 
 If `QUEUE_CONNECTION=sync`, the admin page will not start a full sync from the browser. It will show the equivalent Artisan command to run from the terminal instead.
+
+## Parts Search
+
+Public `/parts` and admin `/admin/parts` support debounced dynamic search with AJAX fallbacks to normal GET forms. Search covers part name, SKU, new SKU, brand/manufacturer, model, category, front position, and description. The public page also supports category, brand, model, stock status, and price-range filters, plus autocomplete suggestions for matching part names, SKUs, brands, models, and categories.
+
+Public result cards and the homepage parts teaser use `displayPrice()` only. They do not render MobileSentrix supplier cost, raw payload, access tokens, or supplier-only API identifiers.
 
 Refresh one part:
 

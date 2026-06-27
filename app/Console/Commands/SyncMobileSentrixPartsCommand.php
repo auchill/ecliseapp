@@ -7,7 +7,11 @@ use Illuminate\Console\Command;
 
 class SyncMobileSentrixPartsCommand extends Command
 {
-    protected $signature = 'mobilesentrix:sync-parts {--category= : Optional MobileSentrix category ID}';
+    protected $signature = 'mobilesentrix:sync-parts
+        {--category= : Optional MobileSentrix category ID}
+        {--limit= : Maximum number of products to process}
+        {--dry-run : Fetch and analyze products without saving changes}
+        {--force : Force updates even when local data appears current}';
 
     protected $description = 'Sync MobileSentrix products into the local parts catalog.';
 
@@ -17,11 +21,23 @@ class SyncMobileSentrixPartsCommand extends Command
             set_time_limit(0);
         }
 
-        $result = $syncService->syncParts($this->option('category'));
+        $limit = $this->option('limit') !== null
+            ? max(1, (int) $this->option('limit'))
+            : null;
+
+        $result = $syncService->syncParts($this->option('category'), [], [
+            'limit' => $limit,
+            'dry_run' => (bool) $this->option('dry-run'),
+            'force' => (bool) $this->option('force'),
+        ]);
 
         $this->info($result['message'] ?? 'MobileSentrix parts sync finished.');
+        if ($this->option('dry-run')) {
+            $this->warn('Dry run only. No parts, brands, models, or categories were saved.');
+        }
         $this->line(sprintf(
-            'Created: %d, Updated: %d, Skipped: %d, Failed: %d, Price changes: %d, Stock changes: %d',
+            'Processed: %d, Created: %d, Updated: %d, Skipped: %d, Failed: %d, Price changes: %d, Stock changes: %d',
+            $result['processed_count'] ?? 0,
             $result['created_count'] ?? 0,
             $result['updated_count'] ?? 0,
             $result['skipped_count'] ?? 0,
