@@ -31,7 +31,7 @@ class PartSearchService
     public function publicQuery(Request $request): Builder
     {
         return Part::query()
-            ->with('partBrand', 'partCategory', 'partModel', 'partCategories')
+            ->with('brand', 'partCategory', 'partModel', 'categories', 'models')
             ->where('is_active', true)
             ->where('status', 'active')
             ->when($request->filled('q'), fn (Builder $query) => $this->applyKeyword($query, $request->string('q')->toString()))
@@ -46,7 +46,8 @@ class PartSearchService
             ->when($request->filled('model'), function (Builder $query) use ($request): void {
                 $model = $request->string('model')->toString();
                 $query->where(function (Builder $query) use ($model): void {
-                    $query->whereHas('partModel', fn (Builder $query) => $query->where('name', 'like', "%{$model}%"))
+                    $query->whereHas('models', fn (Builder $query) => $query->where('name', 'like', "%{$model}%"))
+                        ->orWhereHas('partModel', fn (Builder $query) => $query->where('name', 'like', "%{$model}%"))
                         ->orWhere('model_compatibility', 'like', "%{$model}%")
                         ->orWhere('model_text', 'like', "%{$model}%");
                 });
@@ -56,7 +57,7 @@ class PartSearchService
                 $category = $request->string('part_category')->toString();
                 $query->where(function (Builder $query) use ($category): void {
                     $query->whereHas('partCategory', fn (Builder $query) => $query->where('slug', $category))
-                        ->orWhereHas('partCategories', fn (Builder $query) => $query->where('slug', $category))
+                        ->orWhereHas('categories', fn (Builder $query) => $query->where('slug', $category))
                         ->orWhere('part_category', $category);
                 });
             })
@@ -68,17 +69,23 @@ class PartSearchService
     public function adminQuery(Request $request): Builder
     {
         return Part::query()
-            ->with('partBrand', 'partCategory', 'partModel', 'partCategories')
+            ->with('brand', 'partCategory', 'partModel', 'categories', 'models')
             ->when($request->filled('q'), fn (Builder $query) => $this->applyKeyword($query, $request->string('q')->toString(), true))
             ->when($request->filled('brand'), fn (Builder $query) => $query->where('part_brand_id', $request->integer('brand')))
             ->when($request->filled('category'), function (Builder $query) use ($request): void {
                 $categoryId = $request->integer('category');
                 $query->where(function (Builder $query) use ($categoryId): void {
-                    $query->where('part_category_id', $categoryId)
-                        ->orWhereHas('partCategories', fn (Builder $query) => $query->whereKey($categoryId));
+                    $query->whereHas('categories', fn (Builder $query) => $query->whereKey($categoryId))
+                        ->orWhere('part_category_id', $categoryId);
                 });
             })
-            ->when($request->filled('model'), fn (Builder $query) => $query->where('part_model_id', $request->integer('model')))
+            ->when($request->filled('model'), function (Builder $query) use ($request): void {
+                $modelId = $request->integer('model');
+                $query->where(function (Builder $query) use ($modelId): void {
+                    $query->whereHas('models', fn (Builder $query) => $query->whereKey($modelId))
+                        ->orWhere('part_model_id', $modelId);
+                });
+            })
             ->when($request->filled('stock'), fn (Builder $query) => $this->applyStock($query, $request->string('stock')->toString()))
             ->when($request->filled('api_status'), fn (Builder $query) => $query->where('api_status', $request->string('api_status')->toString()))
             ->when($request->filled('status'), fn (Builder $query) => $query->where('status', $request->string('status')->toString()));
@@ -132,10 +139,11 @@ class PartSearchService
                 ->orWhereHas('partBrand', fn (Builder $query) => $query->where('name', 'like', "%{$search}%"))
                 ->orWhereHas('partModel', fn (Builder $query) => $query->where('name', 'like', "%{$search}%"))
                 ->orWhereHas('partCategory', fn (Builder $query) => $query->where('name', 'like', "%{$search}%"))
-                ->orWhereHas('partCategories', fn (Builder $query) => $query->where('name', 'like', "%{$search}%"));
+                ->orWhereHas('categories', fn (Builder $query) => $query->where('name', 'like', "%{$search}%"))
+                ->orWhereHas('models', fn (Builder $query) => $query->where('name', 'like', "%{$search}%"));
 
             if ($admin) {
-                $query->orWhere('mobilesentrix_product_id', 'like', "%{$search}%");
+                $query->orWhere('id', 'like', "%{$search}%");
             }
         });
     }

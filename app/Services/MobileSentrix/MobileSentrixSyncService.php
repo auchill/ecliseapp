@@ -6,6 +6,7 @@ use App\Models\MobileSentrixSyncLog;
 use App\Models\Part;
 use App\Models\PartBrand;
 use App\Models\PartCategory;
+use App\Models\PartImage;
 use App\Models\PartModel;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -173,7 +174,7 @@ class MobileSentrixSyncService
             $this->updateProgress($log, $summary, "Fetching MobileSentrix part {$sku}.");
             $this->delayBetweenRequests();
 
-            $payload = is_numeric($sku) && Part::query()->where('mobilesentrix_product_id', $sku)->exists()
+            $payload = is_numeric($sku) && Part::query()->whereKey((int) $sku)->exists()
                 ? $this->client->product($sku, ['load' => 'image_gallery,related_product'])
                 : $this->client->lookupBySku($sku);
 
@@ -217,13 +218,15 @@ class MobileSentrixSyncService
             $oldStock = $part->is_in_stock;
 
             $brand = $this->brandFromProduct($record);
-            $model = $this->modelFromProduct($record, $brand);
+            $models = $this->modelsFromProduct($record, $brand);
+            $model = $models->first();
             $categories = $this->categoriesFromProduct($record);
             $primaryCategory = $categories->first();
             $brandName = $brand?->name
-                ?: $this->stringValue($record, 'manufacturer_text')
-                ?: $this->stringValue($record, 'device_manufacturer_text')
                 ?: $this->stringValue($record, 'brand_text')
+                ?: $this->stringValue($record, 'manufacturer_text')
+                ?: $this->stringValue($record, 'manufacture_text')
+                ?: $this->stringValue($record, 'device_manufacturer_text')
                 ?: $this->stringValue($record, 'brand')
                 ?: 'MobileSentrix';
             $name = $this->limitString($this->stringValue($record, 'name') ?: $this->stringValue($record, 'title') ?: 'MobileSentrix Part '.$productId);
@@ -242,8 +245,11 @@ class MobileSentrixSyncService
             $featured = $part->exists ? (bool) $part->featured : ($this->boolValue($record, 'featured') ?? false);
             $now = now();
 
+            if ($productId && is_numeric($productId)) {
+                $part->id = (int) $productId;
+            }
+
             $part->fill([
-                'mobilesentrix_product_id' => $productId,
                 'external_api_id' => $productId,
                 'external_api_source' => 'MobileSentrix',
                 'sku' => $this->limitString($sku),
@@ -251,11 +257,11 @@ class MobileSentrixSyncService
                 'barcode' => $this->limitString($this->stringValue($record, 'barcode')),
                 'name' => $name,
                 'slug' => $this->limitString(Str::slug($name.' '.($productId ?: $sku))),
+                'url_key' => $urlKey,
                 'description' => $this->stringValue($record, 'description'),
                 'short_description' => $this->stringValue($record, 'short_description'),
                 'product_extra_info' => $this->stringValue($record, 'product_extra_info'),
-                'mobilesentrix_url_key' => $urlKey,
-                'mobilesentrix_url' => $mobilesentrixUrl,
+                'url' => $mobilesentrixUrl,
                 'default_image' => $imageUrl,
                 'image_url' => $imageUrl,
                 'part_brand_id' => $brand?->id,
@@ -268,6 +274,11 @@ class MobileSentrixSyncService
                 'price' => $costPrice,
                 'cost_price' => $costPrice,
                 'api_price' => $costPrice,
+                'customer_price' => $this->decimalValue($record, 'customer_price'),
+                'regular_price_with_tax' => $this->decimalValue($record, 'regular_price_with_tax'),
+                'regular_price_without_tax' => $this->decimalValue($record, 'regular_price_without_tax'),
+                'final_price_with_tax' => $this->decimalValue($record, 'final_price_with_tax'),
+                'final_price_without_tax' => $this->decimalValue($record, 'final_price_without_tax'),
                 'selling_price' => $sellingPrice,
                 'final_price' => $sellingPrice,
                 'markup_type' => $markupType,
@@ -285,25 +296,60 @@ class MobileSentrixSyncService
                 'length' => $this->decimalValue($record, 'length'),
                 'hst_code' => $this->limitString($this->stringValue($record, 'hst_code')),
                 'hst_description' => $this->stringValue($record, 'hst_description'),
-                'manufacturer_id' => $this->primaryStringValue($record['manufacturer'] ?? $record['device_manufacturer'] ?? null),
+                'manufacturer' => $this->primaryStringValue($record['manufacturer'] ?? $record['device_manufacturer'] ?? null),
                 'manufacturer_text' => $this->limitString($this->stringValue($record, 'manufacturer_text') ?: $this->stringValue($record, 'device_manufacturer_text') ?: $this->stringValue($record, 'brand_text') ?: $brandName),
-                'model_id' => $this->primaryStringValue($record['model'] ?? $record['device_model'] ?? null),
+                'model' => $this->stringValue($record, 'model') ?: $this->stringValue($record, 'device_model'),
                 'model_text' => $this->arrayValue($record['model_text'] ?? $record['device_model_text'] ?? null),
                 'front_position' => $this->limitString($this->stringValue($record, 'front_position')),
                 'front_position_text' => $this->limitString($this->stringValue($record, 'front_position_text')),
                 'warranty_period' => $this->limitString($this->stringValue($record, 'warranty_period')),
-                'warranty_period_text' => $this->limitString($this->warrantyText($this->stringValue($record, 'warranty_period'))),
+                'warranty_period_text' => $this->limitString($this->stringValue($record, 'warranty_period_text') ?: $this->warrantyText($this->stringValue($record, 'warranty_period'))),
                 'product_badges' => $this->limitString($this->stringValue($record, 'product_badges')),
                 'product_badges_text' => $this->limitString($this->stringValue($record, 'product_badges_text')),
                 'featured' => $featured,
                 'premium' => $this->boolValue($record, 'premium') ?? false,
                 'end_of_life' => $this->boolValue($record, 'end_of_life') ?? false,
+                'print_invoice_name' => $this->limitString($this->stringValue($record, 'print_invoice_name')),
+                'battery_volt' => $this->limitString($this->stringValue($record, 'battery_volt')),
+                'battery_mah' => $this->limitString($this->stringValue($record, 'battery_mah')),
+                'battery_wh' => $this->limitString($this->stringValue($record, 'battery_wh')),
+                'battery_weight' => $this->limitString($this->stringValue($record, 'battery_weight')),
+                'product_hold_date' => $this->dateValue($record, 'product_hold_date'),
+                'meta_title' => $this->stringValue($record, 'meta_title'),
+                'meta_keyword' => $this->stringValue($record, 'meta_keyword'),
+                'meta_description' => $this->stringValue($record, 'meta_description'),
+                'category_ids' => $this->arrayValue($record['category_ids'] ?? null),
+                'display_currency' => $this->limitString($this->stringValue($record, 'display_currency')),
+                'is_saleable' => $this->boolValue($record, 'is_saleable'),
+                'image_gallery' => $this->arrayValue($record['image_gallery'] ?? null),
+                'is_preorder' => $this->boolValue($record, 'is_preorder') ?? false,
+                'attribute_set' => $this->limitString($this->stringValue($record, 'attribute_set')),
+                'related_product' => $this->arrayValue($record['related_product'] ?? null),
+                'brand_text' => $this->limitString($this->stringValue($record, 'brand_text')),
+                'color_bg' => $this->limitString($this->stringValue($record, 'color_bg')),
+                'color_text' => $this->limitString($this->stringValue($record, 'color_text')),
+                'device_carrier_text' => $this->limitString($this->stringValue($record, 'device_carrier_text')),
+                'device_color_text' => $this->limitString($this->stringValue($record, 'device_color_text')),
+                'device_grade_text' => $this->limitString($this->stringValue($record, 'device_grade_text')),
+                'device_manufacturer_text' => $this->limitString($this->stringValue($record, 'device_manufacturer_text')),
+                'device_model_text' => $this->limitString($this->stringValue($record, 'device_model_text')),
+                'device_size_text' => $this->limitString($this->stringValue($record, 'device_size_text')),
+                'product_badges_bg' => $this->limitString($this->stringValue($record, 'product_badges_bg')),
+                'product_order_status' => $this->limitString($this->stringValue($record, 'product_order_status')),
+                'product_order_status_text' => $this->limitString($this->stringValue($record, 'product_order_status_text')),
+                'specification' => $this->stringValue($record, 'specification'),
+                'specification_text' => $this->stringValue($record, 'specification_text'),
+                'color' => $this->limitString($this->stringValue($record, 'color')),
+                'total_reviews_count' => $this->intValue($record, 'total_reviews_count'),
+                'tier_price' => $this->arrayValue($record['tier_price'] ?? null),
+                'has_custom_options' => $this->boolValue($record, 'has_custom_options'),
+                'buy_now_url' => $this->stringValue($record, 'buy_now_url'),
                 'api_status' => $apiStatus,
                 'status' => $active ? 'active' : 'inactive',
                 'is_active' => $active,
                 'is_api_item' => true,
                 'supplier' => 'MobileSentrix',
-                'raw_payload' => $this->compactRawPayload($record),
+                'raw_payload' => $record,
                 'api_updated_at' => $this->dateValue($record, 'updated_at'),
                 'last_price_synced_at' => $now,
                 'last_stock_synced_at' => $now,
@@ -313,6 +359,9 @@ class MobileSentrixSyncService
 
             $part->save();
             $this->syncPartCategories($part, $categories);
+            $this->syncPartModels($part, $models);
+            $this->syncPartImages($part, $record, $imageUrl);
+            $this->syncRelatedParts($part, $record);
 
             $summary['processed_count']++;
             $summary[$exists ? 'updated_count' : 'created_count']++;
@@ -401,10 +450,10 @@ class MobileSentrixSyncService
         if ($depth >= $maxDepth) {
             $summary['skipped_count']++;
             $this->addError($summary, [
-                'message' => "Skipped children for MobileSentrix category {$category->mobilesentrix_category_id}; maximum depth {$maxDepth} reached.",
-                'entity_id' => $category->mobilesentrix_category_id,
+                'message' => "Skipped children for MobileSentrix category {$category->id}; maximum depth {$maxDepth} reached.",
+                'entity_id' => $category->id,
             ]);
-            $this->updateProgress($log, $summary, "Skipped children for MobileSentrix category {$category->mobilesentrix_category_id}; maximum depth reached.");
+            $this->updateProgress($log, $summary, "Skipped children for MobileSentrix category {$category->id}; maximum depth reached.");
 
             return $category;
         }
@@ -416,11 +465,11 @@ class MobileSentrixSyncService
 
     private function syncChildCategories(PartCategory $parent, array &$summary, MobileSentrixSyncLog $log, array &$state, int $depth, int $maxDepth): void
     {
-        if (! $parent->mobilesentrix_category_id) {
+        if (! $parent->id) {
             return;
         }
 
-        $parentCategoryId = (string) $parent->mobilesentrix_category_id;
+        $parentCategoryId = (string) $parent->id;
 
         if (isset($state['fetched'][$parentCategoryId])) {
             $summary['skipped_count']++;
@@ -459,7 +508,7 @@ class MobileSentrixSyncService
             return null;
         }
 
-        $category = PartCategory::query()->firstOrNew(['mobilesentrix_category_id' => $categoryId]);
+        $category = PartCategory::query()->firstOrNew(['id' => (int) $categoryId]);
         $exists = $category->exists;
         $isActive = $this->boolValue($record, 'is_active') ?? true;
 
@@ -490,10 +539,20 @@ class MobileSentrixSyncService
 
     private function brandFromProduct(array $record): ?PartBrand
     {
-        $name = $this->stringValue($record, 'manufacturer_text')
-            ?: $this->stringValue($record, 'device_manufacturer_text')
-            ?: $this->stringValue($record, 'brand_text')
-            ?: $this->stringValue($record, 'brand');
+        $sourceField = null;
+        $name = null;
+
+        foreach (['brand_text', 'manufacturer_text', 'manufacture_text', 'device_manufacturer_text', 'brand', 'manufacturer', 'device_manufacturer'] as $field) {
+            $value = $this->stringValue($record, $field);
+
+            if (! filled($value)) {
+                continue;
+            }
+
+            $sourceField = $field;
+            $name = $value;
+            break;
+        }
 
         if (! $name) {
             return null;
@@ -502,13 +561,18 @@ class MobileSentrixSyncService
         return PartBrand::query()->updateOrCreate(
             ['slug' => Str::slug($name)],
             [
-                'mobilesentrix_manufacturer_id' => $this->stringValue($record, 'manufacturer') ?: $this->stringValue($record, 'device_manufacturer'),
+                'external_brand_id' => $this->stringValue($record, 'brand') ?: $this->stringValue($record, 'manufacturer') ?: $this->stringValue($record, 'device_manufacturer'),
                 'name' => $name,
+                'source_field' => $sourceField,
+                'raw_value' => $sourceField ? $this->stringValue($record, $sourceField) : null,
                 'is_active' => true,
                 'status' => 'active',
                 'raw_payload' => [
+                    'brand' => $record['brand'] ?? null,
+                    'brand_text' => $record['brand_text'] ?? null,
                     'manufacturer' => $record['manufacturer'] ?? null,
                     'manufacturer_text' => $record['manufacturer_text'] ?? null,
+                    'manufacture_text' => $record['manufacture_text'] ?? null,
                     'device_manufacturer' => $record['device_manufacturer'] ?? null,
                     'device_manufacturer_text' => $record['device_manufacturer_text'] ?? null,
                 ],
@@ -517,43 +581,51 @@ class MobileSentrixSyncService
         );
     }
 
-    private function modelFromProduct(array $record, ?PartBrand $brand): ?PartModel
+    private function modelsFromProduct(array $record, ?PartBrand $brand): Collection
     {
-        $models = $this->arrayValue($record['model_text'] ?? $record['device_model_text'] ?? null);
         $modelIds = $this->arrayValue($record['model'] ?? $record['device_model'] ?? null);
-        $firstRecord = null;
+        $modelTexts = $this->arrayValue($record['model_text'] ?? $record['device_model_text'] ?? null);
+        $models = collect();
+        $max = max(count($modelIds), count($modelTexts));
 
-        foreach ($models as $index => $modelName) {
-            if (! $modelName) {
+        for ($index = 0; $index < $max; $index++) {
+            $modelId = $modelIds[$index] ?? $modelIds[0] ?? null;
+            $modelName = $modelTexts[$index] ?? $modelId;
+
+            if (! filled($modelName)) {
                 continue;
             }
 
             $model = PartModel::query()->updateOrCreate(
-                ['slug' => Str::slug($modelName)],
+                ['slug' => Str::slug((string) $modelName)],
                 [
-                    'mobilesentrix_model_id' => $modelIds[$index] ?? $modelIds[0] ?? null,
+                    'external_model_id' => $modelId ? (string) $modelId : null,
                     'part_brand_id' => $brand?->id,
-                    'name' => $modelName,
+                    'name' => (string) $modelName,
+                    'source_field' => isset($modelTexts[$index]) ? 'model_text' : 'model',
+                    'raw_value' => $modelId ? (string) $modelId : (string) $modelName,
                     'status' => 'active',
                     'raw_payload' => ['model' => $record['model'] ?? null, 'model_text' => $record['model_text'] ?? null],
                     'synced_at' => now(),
                 ],
             );
 
-            $firstRecord ??= $model;
+            $models->push($model);
         }
 
-        return $firstRecord;
+        return $models->unique('id')->values();
     }
 
     private function categoriesFromProduct(array $record): Collection
     {
         return collect($this->arrayValue($record['category_ids'] ?? []))
             ->map(function ($categoryId) {
-                $categoryId = (string) $categoryId;
+                $categoryId = (int) $categoryId;
 
+                // Product pages often arrive before category sync has visited every category.
+                // Keep the relationship by creating a placeholder and let category sync fill details later.
                 return PartCategory::query()->firstOrCreate(
-                    ['mobilesentrix_category_id' => $categoryId],
+                    ['id' => $categoryId],
                     [
                         'name' => 'MobileSentrix Category '.$categoryId,
                         'slug' => Str::slug('MobileSentrix Category '.$categoryId),
@@ -570,10 +642,76 @@ class MobileSentrixSyncService
     private function syncPartCategories(Part $part, Collection $categories): void
     {
         $sync = $categories->mapWithKeys(fn (PartCategory $category) => [
-            $category->id => ['mobilesentrix_category_id' => $category->mobilesentrix_category_id],
+            $category->id => [],
         ])->all();
 
-        $part->partCategories()->sync($sync);
+        $part->categories()->sync($sync);
+    }
+
+    private function syncPartModels(Part $part, Collection $models): void
+    {
+        $part->models()->sync($models->pluck('id')->all());
+    }
+
+    private function syncPartImages(Part $part, array $record, ?string $defaultImage): void
+    {
+        PartImage::query()->where('part_id', $part->id)->delete();
+
+        $images = collect();
+
+        if (filled($defaultImage)) {
+            $images->push([
+                'image_url' => $defaultImage,
+                'position' => 0,
+                'label' => 'default',
+                'is_default' => true,
+                'raw_payload' => ['image_url' => $defaultImage],
+            ]);
+        }
+
+        foreach ($this->arrayValue($record['image_gallery'] ?? null) as $index => $image) {
+            $imageUrl = is_array($image)
+                ? ($image['url'] ?? $image['image_url'] ?? $image['file'] ?? null)
+                : $image;
+
+            if (! filled($imageUrl)) {
+                continue;
+            }
+
+            $images->push([
+                'image_url' => (string) $imageUrl,
+                'position' => $index + 1,
+                'label' => is_array($image) ? ($image['label'] ?? null) : null,
+                'is_default' => false,
+                'raw_payload' => is_array($image) ? $image : ['image_url' => $imageUrl],
+            ]);
+        }
+
+        $images
+            ->unique('image_url')
+            ->each(fn (array $image): PartImage => $part->images()->create($image));
+    }
+
+    private function syncRelatedParts(Part $part, array $record): void
+    {
+        $relatedIds = collect($this->arrayValue($record['related_product'] ?? null))
+            ->filter(fn ($value): bool => is_numeric($value))
+            ->map(fn ($value): int => (int) $value)
+            ->filter(fn (int $id): bool => $id !== (int) $part->id)
+            ->values();
+
+        if ($relatedIds->isEmpty()) {
+            $part->relatedParts()->sync([]);
+
+            return;
+        }
+
+        $existingIds = Part::query()
+            ->whereKey($relatedIds->all())
+            ->pluck('id')
+            ->all();
+
+        $part->relatedParts()->sync($existingIds);
     }
 
     private function partIdentifiers(array $record): array
@@ -588,7 +726,7 @@ class MobileSentrixSyncService
     private function findExistingPart(?string $productId, ?string $sku, ?string $newSku): ?Part
     {
         if ($productId) {
-            $part = Part::query()->where('mobilesentrix_product_id', $productId)->first();
+            $part = is_numeric($productId) ? Part::query()->whereKey((int) $productId)->first() : null;
 
             if ($part) {
                 return $part;
@@ -826,59 +964,6 @@ class MobileSentrixSyncService
             'entity_id' => $record['entity_id'] ?? $record['product_id'] ?? $record['category_id'] ?? null,
             'sku' => $record['sku'] ?? $record['product_code'] ?? null,
         ];
-    }
-
-    private function compactRawPayload(array $record): array
-    {
-        $omittedKeys = [
-            'related_product',
-            'related_products',
-            'upsell_products',
-            'crosssell_products',
-            'configurable_product_options',
-            'tier_prices',
-        ];
-        $payload = [];
-
-        foreach ($record as $key => $value) {
-            if (in_array($key, $omittedKeys, true)) {
-                continue;
-            }
-
-            $payload[$key] = $this->compactPayloadValue($value);
-        }
-
-        return $payload;
-    }
-
-    private function compactPayloadValue(mixed $value, int $depth = 0): mixed
-    {
-        if ($value === null || is_scalar($value)) {
-            return $value;
-        }
-
-        if (! is_array($value)) {
-            return (string) $value;
-        }
-
-        if ($depth >= 2) {
-            return '[nested payload omitted]';
-        }
-
-        $result = [];
-        $count = 0;
-
-        foreach ($value as $key => $nestedValue) {
-            if ($count >= 25) {
-                $result['_truncated'] = true;
-                break;
-            }
-
-            $result[$key] = $this->compactPayloadValue($nestedValue, $depth + 1);
-            $count++;
-        }
-
-        return $result;
     }
 
     private function categoryId(array $record): ?string

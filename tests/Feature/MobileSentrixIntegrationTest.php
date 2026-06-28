@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Schema;
 
 beforeEach(function (): void {
     config([
@@ -256,10 +257,12 @@ test('mobile sentrix category sync stores local categories and logs the run', fu
     $this->artisan('mobilesentrix:sync-categories')->assertSuccessful();
 
     $this->assertDatabaseHas('part_categories', [
-        'mobilesentrix_category_id' => '165',
+        'id' => 165,
         'name' => 'iPhone Screens',
         'status' => 'active',
     ]);
+    expect(PartCategory::query()->findOrFail(165)->raw_payload['entity_id'])->toBe('165');
+    expect(Schema::hasColumn('part_categories', 'mobilesentrix_category_id'))->toBeFalse();
 
     $this->assertDatabaseHas('mobilesentrix_sync_logs', [
         'sync_type' => 'categories',
@@ -308,11 +311,11 @@ test('mobile sentrix category sync skips recursive duplicates and respects depth
     $this->artisan('mobilesentrix:sync-categories', ['--depth' => 2])->assertSuccessful();
 
     $this->assertDatabaseHas('part_categories', [
-        'mobilesentrix_category_id' => '100',
+        'id' => 100,
         'name' => 'Root Screens',
     ]);
     $this->assertDatabaseHas('part_categories', [
-        'mobilesentrix_category_id' => '101',
+        'id' => 101,
         'name' => 'iPhone Screens',
     ]);
 
@@ -343,7 +346,7 @@ test('mobile sentrix parts sync maps products into parts without exposing suppli
     ]);
 
     $category = PartCategory::query()->create([
-        'mobilesentrix_category_id' => '165',
+        'id' => 165,
         'name' => 'iPhone Screens',
         'slug' => 'iphone-screens',
         'is_active' => true,
@@ -368,7 +371,10 @@ test('mobile sentrix parts sync maps products into parts without exposing suppli
                 'model' => ['141'],
                 'model_text' => ['iPhone 14'],
                 'front_position_text' => 'Front',
-                'default_image' => 'https://cdn.example.test/part.jpg',
+                'image_url' => 'https://cdn.example.test/part.jpg',
+                'image_gallery' => ['https://cdn.example.test/gallery.jpg'],
+                'attribute_set' => 20,
+                'related_product' => ['9002'],
             ],
         ]),
     ]);
@@ -377,13 +383,18 @@ test('mobile sentrix parts sync maps products into parts without exposing suppli
 
     $part = Part::query()->where('sku', 'MS-9001')->firstOrFail();
 
-    expect($part->mobilesentrix_product_id)->toBe('9001')
+    expect($part->id)->toBe(9001)
         ->and($part->new_sku)->toBe('NEW-9001')
         ->and($part->brandName())->toBe('Apple')
         ->and($part->modelName())->toBe('iPhone 14')
+        ->and($part->attribute_set)->toBe('20')
+        ->and($part->raw_payload['related_product'])->toBe(['9002'])
         ->and((float) $part->cost_price)->toBe(50.0)
         ->and((float) $part->selling_price)->toBe(60.0)
-        ->and($part->partCategories()->whereKey($category->id)->exists())->toBeTrue();
+        ->and($part->categories()->whereKey($category->id)->exists())->toBeTrue()
+        ->and($part->models()->where('name', 'iPhone 14')->exists())->toBeTrue()
+        ->and($part->images()->where('image_url', 'https://cdn.example.test/part.jpg')->exists())->toBeTrue();
+    expect(Schema::hasColumn('parts', 'mobilesentrix_product_id'))->toBeFalse();
 
     $this->assertDatabaseHas('part_brands', ['name' => 'Apple', 'status' => 'active']);
     $this->assertDatabaseHas('part_models', ['name' => 'iPhone 14']);
@@ -468,11 +479,12 @@ test('mobile sentrix full parts sync paginates products and logs parts full', fu
 
     $this->artisan('mobilesentrix:sync-parts')->assertSuccessful();
 
-    $this->assertDatabaseHas('parts', ['mobilesentrix_product_id' => '9101', 'sku' => 'MS-9101']);
-    $this->assertDatabaseHas('parts', ['mobilesentrix_product_id' => '9102', 'sku' => 'MS-9102']);
-    $this->assertDatabaseHas('parts', ['mobilesentrix_product_id' => '9103', 'sku' => 'MS-9103']);
-    $this->assertDatabaseHas('parts', ['mobilesentrix_product_id' => '9104', 'sku' => 'MS-9104', 'brand' => 'MobileSentrix', 'model_id' => '111']);
-    expect(strlen((string) Part::query()->where('sku', 'MS-9104')->value('mobilesentrix_url')))->toBeLessThanOrEqual(255);
+    $this->assertDatabaseHas('parts', ['id' => 9101, 'sku' => 'MS-9101']);
+    $this->assertDatabaseHas('parts', ['id' => 9102, 'sku' => 'MS-9102']);
+    $this->assertDatabaseHas('parts', ['id' => 9103, 'sku' => 'MS-9103']);
+    $this->assertDatabaseHas('parts', ['id' => 9104, 'sku' => 'MS-9104', 'brand' => 'MobileSentrix', 'model' => '111,222,333']);
+    expect(strlen((string) Part::query()->where('sku', 'MS-9104')->value('url')))->toBeLessThanOrEqual(255);
+    expect(Part::query()->findOrFail(9104)->models()->count())->toBe(3);
     $this->assertDatabaseHas('mobilesentrix_sync_logs', [
         'sync_type' => 'parts_full',
         'status' => 'success',
@@ -506,7 +518,7 @@ test('mobile sentrix parts dry run fetches products without saving', function ()
         ->assertSuccessful()
         ->expectsOutputToContain('Dry run only');
 
-    $this->assertDatabaseMissing('parts', ['mobilesentrix_product_id' => '9201']);
+    $this->assertDatabaseMissing('parts', ['id' => 9201]);
     $this->assertDatabaseHas('mobilesentrix_sync_logs', [
         'sync_type' => 'parts_full',
         'status' => 'success',

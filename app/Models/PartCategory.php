@@ -8,31 +8,39 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 class PartCategory extends Model
 {
     use HasFactory;
 
-    protected $fillable = [
-        'mobilesentrix_category_id',
-        'parent_id',
-        'name',
-        'slug',
-        'level',
-        'children_count',
-        'description',
-        'meta_keywords',
-        'meta_title',
-        'is_active',
-        'is_anchor',
-        'is_part',
-        'has_children',
-        'image_url',
-        'status',
-        'raw_payload',
-        'synced_at',
-        'sort_order',
-    ];
+    private const LOCAL_ID_FLOOR = 900000000000000000;
+
+    public $incrementing = false;
+
+    protected $keyType = 'int';
+
+    protected $guarded = [];
+
+    protected static function booted(): void
+    {
+        static::creating(function (PartCategory $category): void {
+            if (filled($category->getKey())) {
+                return;
+            }
+
+            $category->id = (int) max(
+                self::LOCAL_ID_FLOOR,
+                ((int) static::query()->where('id', '>=', self::LOCAL_ID_FLOOR)->max('id')) + 1,
+            );
+        });
+
+        static::saving(function (PartCategory $category): void {
+            if (blank($category->slug) && filled($category->name)) {
+                $category->slug = Str::slug($category->name.' '.$category->id);
+            }
+        });
+    }
 
     protected function casts(): array
     {
@@ -49,9 +57,10 @@ class PartCategory extends Model
         ];
     }
 
-    public function parts(): HasMany
+    public function parts(): BelongsToMany
     {
-        return $this->hasMany(Part::class);
+        return $this->belongsToMany(Part::class, 'part_category_part', 'category_id', 'part_id')
+            ->withTimestamps();
     }
 
     public function parentCategory(): BelongsTo
@@ -66,9 +75,7 @@ class PartCategory extends Model
 
     public function syncedParts(): BelongsToMany
     {
-        return $this->belongsToMany(Part::class, 'part_category_part')
-            ->withPivot('mobilesentrix_category_id')
-            ->withTimestamps();
+        return $this->parts();
     }
 
     public function scopeActive(Builder $query): Builder

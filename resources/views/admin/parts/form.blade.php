@@ -142,10 +142,12 @@
                         <label class="form-label" for="external_api_id">External API ID</label>
                         <input class="form-control" id="external_api_id" name="external_api_id" value="{{ old('external_api_id', $part->external_api_id) }}">
                     </div>
-                    <div class="col-md-4">
-                        <label class="form-label" for="mobilesentrix_product_id">MobileSentrix product ID</label>
-                        <input class="form-control" id="mobilesentrix_product_id" name="mobilesentrix_product_id" value="{{ old('mobilesentrix_product_id', $part->mobilesentrix_product_id) }}">
-                    </div>
+                    @if ($part->exists && $part->is_api_item)
+                        <div class="col-md-4">
+                            <label class="form-label">MobileSentrix product ID</label>
+                            <input class="form-control" value="{{ $part->id }}" readonly>
+                        </div>
+                    @endif
                     <div class="col-md-4">
                         <label class="form-label" for="api_status">API status</label>
                         <input class="form-control" id="api_status" name="api_status" value="{{ old('api_status', $part->api_status) }}">

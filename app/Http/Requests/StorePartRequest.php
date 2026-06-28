@@ -24,7 +24,6 @@ class StorePartRequest extends FormRequest
             'new_sku' => ['nullable', 'string', 'max:120'],
             'barcode' => ['nullable', 'string', 'max:120'],
             'internal_sku' => ['nullable', 'string', 'max:120'],
-            'mobilesentrix_product_id' => ['nullable', 'string', 'max:255'],
             'external_api_id' => ['nullable', 'string', 'max:255'],
             'external_api_source' => ['nullable', 'string', 'max:120'],
             'description' => ['nullable', 'string'],

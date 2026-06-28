@@ -12,9 +12,11 @@ class PartBrand extends Model
     use HasFactory;
 
     protected $fillable = [
-        'mobilesentrix_manufacturer_id',
+        'external_brand_id',
         'name',
         'slug',
+        'source_field',
+        'raw_value',
         'description',
         'is_active',
         'status',

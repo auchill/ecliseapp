@@ -78,6 +78,24 @@ class MobileSentrixClient
         return $this->get('/api/rest/searchproduct', array_merge($params, ['q' => $query]), $authTransport);
     }
 
+    public function tags(array $query = [], ?string $authTransport = null): array
+    {
+        return $this->get('/api/rest/tags', $query, $authTransport);
+    }
+
+    public function tagsForSkus(array $skus, ?string $authTransport = null): array
+    {
+        $query = [
+            'filter[1][attribute]' => 'sku',
+        ];
+
+        foreach (array_values(array_filter($skus)) as $index => $sku) {
+            $query["filter[1][in][{$index}]"] = $sku;
+        }
+
+        return $this->tags($query, $authTransport);
+    }
+
     public function lookupBySku(string $sku, bool $filterByBothSku = true, bool $includeDisabled = true): array
     {
         $query = [

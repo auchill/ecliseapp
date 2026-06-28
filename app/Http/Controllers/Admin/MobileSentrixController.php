@@ -34,7 +34,7 @@ class MobileSentrixController extends Controller
             'lastCategoryLog' => MobileSentrixSyncLog::query()->where('sync_type', 'categories')->latest()->first(),
             'lastPartLog' => MobileSentrixSyncLog::query()->whereIn('sync_type', ['parts_full', 'parts_category', 'parts', 'single_part'])->latest()->first(),
             'partsCount' => Part::query()->where('is_api_item', true)->count(),
-            'categoriesCount' => PartCategory::query()->whereNotNull('mobilesentrix_category_id')->count(),
+            'categoriesCount' => PartCategory::query()->whereNotNull('raw_payload')->count(),
             'queueConfigured' => $this->queueConfigured(),
         ]);
     }

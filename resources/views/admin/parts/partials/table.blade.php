@@ -21,8 +21,8 @@
                     <td>
                         <div class="fw-semibold">{{ $part->name }}</div>
                         <div class="small muted">{{ $part->device_type }}</div>
-                        @if ($part->mobilesentrix_product_id)
-                            <div class="small muted">MS ID: {{ $part->mobilesentrix_product_id }}</div>
+                        @if ($part->is_api_item)
+                            <div class="small muted">MS ID: {{ $part->id }}</div>
                         @endif
                     </td>
                     <td>

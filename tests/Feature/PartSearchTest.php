@@ -30,10 +30,10 @@ function createSearchPart(array $overrides = []): Part
     unset($overrides['partBrand'], $overrides['partCategory'], $overrides['partModel']);
 
     $part = Part::query()->create(array_merge([
+        'id' => 1001,
         'part_brand_id' => $brand->id,
         'part_category_id' => $category->id,
         'part_model_id' => $model->id,
-        'mobilesentrix_product_id' => 'MSP-1001',
         'name' => 'iPhone 15 OLED Screen',
         'slug' => 'iphone-15-oled-screen',
         'sku' => 'MS-1001',
@@ -122,7 +122,7 @@ test('admin parts search can find mobilesentrix ids and show admin-only cost', f
     $admin = partSearchAdminUser('parts-search-admin@example.com');
 
     $response = $this->actingAs($admin)->getJson(route('admin.parts.search', [
-        'q' => 'MSP-1001',
+        'q' => '1001',
         'api_status' => 'active',
         'status' => 'active',
     ]));
@@ -133,7 +133,7 @@ test('admin parts search can find mobilesentrix ids and show admin-only cost', f
     $html = $response->json('html');
 
     expect($html)->toContain('iPhone 15 OLED Screen')
-        ->and($html)->toContain('MS ID: MSP-1001')
+        ->and($html)->toContain('MS ID: 1001')
         ->and($html)->toContain('$50.00')
         ->and($html)->toContain('$65.00')
         ->and($html)->not->toContain('should-never-render');

@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class PartModel extends Model
 {
@@ -15,10 +15,12 @@ class PartModel extends Model
     public const STATUSES = ['active', 'inactive'];
 
     protected $fillable = [
-        'mobilesentrix_model_id',
+        'external_model_id',
         'part_brand_id',
         'name',
         'slug',
+        'source_field',
+        'raw_value',
         'status',
         'description',
         'raw_payload',
@@ -40,9 +42,10 @@ class PartModel extends Model
         return $this->belongsTo(PartBrand::class);
     }
 
-    public function parts(): HasMany
+    public function parts(): BelongsToMany
     {
-        return $this->hasMany(Part::class);
+        return $this->belongsToMany(Part::class, 'part_model_part')
+            ->withTimestamps();
     }
 
     public function scopeActive(Builder $query): Builder
