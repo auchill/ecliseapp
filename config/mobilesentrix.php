@@ -15,6 +15,7 @@ return [
     'timeout' => (int) env('MOBILESENTRIX_TIMEOUT', 120),
     'connect_timeout' => (int) env('MOBILESENTRIX_CONNECT_TIMEOUT', 20),
     'sync_request_delay_ms' => (int) env('MOBILESENTRIX_SYNC_REQUEST_DELAY_MS', 200),
+    'product_enrichment_ttl_hours' => (int) env('MOBILESENTRIX_PRODUCT_ENRICHMENT_TTL_HOURS', 12),
     'default_markup_type' => env('MOBILESENTRIX_DEFAULT_MARKUP_TYPE', 'none'),
     'default_markup_value' => (float) env('MOBILESENTRIX_DEFAULT_MARKUP_VALUE', 0),
 ];

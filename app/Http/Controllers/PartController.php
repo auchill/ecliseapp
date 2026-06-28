@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\Part;
 use App\Models\PartBrand;
 use App\Models\PartCategory;
+use App\Services\MobileSentrix\MobileSentrixProductEnrichmentService;
 use App\Services\Parts\PartSearchService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 
 class PartController extends Controller
@@ -39,11 +41,35 @@ class PartController extends Controller
         ]);
     }
 
-    public function show(Part $part): View
+    public function show(Part $part, MobileSentrixProductEnrichmentService $enrichmentService): View
     {
         abort_unless($part->is_active && $part->status === 'active', 404);
 
-        $part->load('brand', 'partCategory', 'partModel', 'categories', 'models', 'images');
+        try {
+            $part = $enrichmentService->enrichPart($part);
+        } catch (\Throwable $exception) {
+            Log::warning('Unable to enrich part before rendering product page.', [
+                'part_id' => $part->id,
+                'sku' => $part->sku,
+                'message' => $exception->getMessage(),
+            ]);
+        }
+
+        abort_unless($part->is_active && $part->status === 'active', 404);
+
+        $part->load([
+            'brand',
+            'partCategory',
+            'partModel',
+            'categories',
+            'models',
+            'tags',
+            'badges',
+            'compatibilities',
+            'images' => fn ($query) => $query->orderByDesc('is_default')->orderBy('position'),
+            'relatedParts.images' => fn ($query) => $query->orderByDesc('is_default')->orderBy('position'),
+            'relatedParts.badges',
+        ]);
 
         return view('parts.show', ['part' => $part]);
     }

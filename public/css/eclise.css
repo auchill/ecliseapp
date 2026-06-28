@@ -323,6 +323,184 @@ a {
     color: #dce8fb;
 }
 
+.part-detail-hero {
+    background: linear-gradient(135deg, #0d1321 0%, #12356b 100%);
+    color: #fff;
+    padding: 3.25rem 0;
+}
+
+.part-detail-hero .eyebrow {
+    color: #8fc8ff;
+}
+
+.part-hero-pill {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2rem;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 999px;
+    padding: 0.35rem 0.75rem;
+    color: #eaf4ff;
+    background: rgba(255, 255, 255, 0.08);
+    font-size: 0.85rem;
+    font-weight: 800;
+}
+
+.part-gallery {
+    display: grid;
+    gap: 1rem;
+}
+
+.part-gallery-main {
+    display: grid;
+    place-items: center;
+    min-height: 430px;
+    border-radius: 8px;
+    background: #f1f5f9;
+    overflow: hidden;
+}
+
+.part-gallery-main img {
+    width: 100%;
+    height: 430px;
+    object-fit: contain;
+    padding: 1.5rem;
+}
+
+.part-gallery-thumbs {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+    gap: 0.75rem;
+}
+
+.part-gallery-thumb {
+    height: 78px;
+    border: 1px solid var(--eclise-border);
+    border-radius: 8px;
+    background: #fff;
+    padding: 0.35rem;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.part-gallery-thumb.active,
+.part-gallery-thumb:hover {
+    border-color: var(--eclise-blue);
+    box-shadow: 0 0 0 0.18rem rgba(22, 119, 255, 0.12);
+}
+
+.part-gallery-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.part-purchase-panel {
+    position: sticky;
+    top: 6rem;
+}
+
+.status-pill-success {
+    color: #065f46;
+    background: #d1fae5;
+}
+
+.status-pill-muted {
+    color: #475569;
+    background: #e2e8f0;
+}
+
+.part-badge,
+.part-tag {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.35rem 0.75rem;
+    color: #0b3a72;
+    background: #e5f2ff;
+    font-size: 0.82rem;
+    font-weight: 800;
+}
+
+.part-badge-muted {
+    color: #475569;
+    background: #e2e8f0;
+}
+
+.part-summary-list,
+.part-details-table {
+    display: grid;
+    gap: 0;
+}
+
+.part-summary-list > div,
+.part-details-table > div {
+    display: grid;
+    grid-template-columns: minmax(108px, 34%) 1fr;
+    gap: 1rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--eclise-border);
+}
+
+.part-summary-list > div:last-child,
+.part-details-table > div:last-child {
+    border-bottom: 0;
+}
+
+.part-summary-list dt,
+.part-details-table dt {
+    color: var(--eclise-gray);
+    font-size: 0.84rem;
+    font-weight: 800;
+}
+
+.part-summary-list dd,
+.part-details-table dd {
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-weight: 700;
+}
+
+.part-description {
+    color: #253044;
+    line-height: 1.7;
+}
+
+.part-description p:last-child,
+.part-description ul:last-child,
+.part-description ol:last-child,
+.part-description table:last-child {
+    margin-bottom: 0;
+}
+
+.part-description table {
+    width: 100%;
+    margin: 1rem 0;
+    border-collapse: collapse;
+}
+
+.part-description td,
+.part-description th {
+    padding: 0.65rem;
+    border: 1px solid var(--eclise-border);
+}
+
+.part-compatibility-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.75rem;
+}
+
+.part-compatibility-grid span {
+    display: block;
+    padding: 0.75rem;
+    border: 1px solid var(--eclise-border);
+    border-radius: 8px;
+    background: #f8fafc;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
 @media (max-width: 991.98px) {
     .brand-logo {
         width: 162px;
@@ -339,6 +517,18 @@ a {
 
     .section-pad {
         padding: 3.5rem 0;
+    }
+
+    .part-gallery-main {
+        min-height: 340px;
+    }
+
+    .part-gallery-main img {
+        height: 340px;
+    }
+
+    .part-purchase-panel {
+        position: static;
     }
 }
 
@@ -372,6 +562,33 @@ a {
 
     .navbar-toggler {
         padding: 0.25rem 0.45rem;
+    }
+
+    .part-detail-hero {
+        padding: 2.5rem 0;
+    }
+
+    .part-gallery-main {
+        min-height: 260px;
+    }
+
+    .part-gallery-main img {
+        height: 260px;
+        padding: 1rem;
+    }
+
+    .part-gallery-thumbs {
+        grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+    }
+
+    .part-gallery-thumb {
+        height: 64px;
+    }
+
+    .part-summary-list > div,
+    .part-details-table > div {
+        grid-template-columns: 1fr;
+        gap: 0.25rem;
     }
 }
 

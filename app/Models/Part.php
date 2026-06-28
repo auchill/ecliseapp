@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\ProductDescriptionSanitizer;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -95,10 +96,12 @@ class Part extends Model
             'is_api_item' => 'boolean',
             'is_active' => 'boolean',
             'raw_payload' => 'array',
+            'tags_raw_payload' => 'array',
             'last_price_synced_at' => 'datetime',
             'last_stock_synced_at' => 'datetime',
             'synced_at' => 'datetime',
             'last_synced_at' => 'datetime',
+            'last_enriched_at' => 'datetime',
         ];
     }
 
@@ -142,6 +145,12 @@ class Part extends Model
     public function tags(): BelongsToMany
     {
         return $this->belongsToMany(PartTag::class, 'part_part_tag')
+            ->withTimestamps();
+    }
+
+    public function badges(): BelongsToMany
+    {
+        return $this->belongsToMany(PartBadge::class, 'part_part_badge')
             ->withTimestamps();
     }
 
@@ -208,6 +217,37 @@ class Part extends Model
         }
 
         return asset('images/brand/logo.png');
+    }
+
+    public function mainImageUrl(): string
+    {
+        $image = $this->relationLoaded('images')
+            ? $this->images->sortByDesc('is_default')->sortBy('position')->first()
+            : $this->images()->orderByDesc('is_default')->orderBy('position')->first();
+
+        return $image?->image_url ?: $this->imageUrl();
+    }
+
+    public function displayDescription(): string
+    {
+        return ProductDescriptionSanitizer::sanitize($this->description ?: $this->short_description);
+    }
+
+    public function isAvailableForPartsPurchase(): bool
+    {
+        return (bool) ($this->is_saleable ?? false)
+            || (bool) $this->is_in_stock
+            || (int) $this->quantity > 0
+            || (int) $this->in_stock_qty > 0;
+    }
+
+    public function sourceSkus(): array
+    {
+        return collect([$this->sku, $this->new_sku])
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 
     public function stockLabel(): string
