@@ -5,7 +5,9 @@ namespace App\Services\MobileSentrix;
 use App\Models\Part;
 use App\Models\PartBadge;
 use App\Models\PartCompatibility;
+use App\Models\PartImage;
 use App\Models\PartTag;
+use App\Models\PartWarranty;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -24,37 +26,15 @@ class MobileSentrixProductEnrichmentService
         }
 
         $summary = $this->emptySummary();
-        $productRecord = null;
-        $remoteFetchSucceeded = false;
+        $productRecord = $this->fetchProductRecord($part);
+        $remoteFetchSucceeded = $productRecord !== [];
 
-        try {
-            $baseRecord = $this->records($this->client->product($part->getKey()))->first();
-
-            if (is_array($baseRecord)) {
-                $productRecord = $baseRecord;
-                $remoteFetchSucceeded = true;
-            }
-        } catch (\Throwable $exception) {
-            $this->logEnrichmentFailure($exception, $part, 'product_detail');
-        }
-
-        try {
-            $loadedRecord = $this->records($this->client->product($part->getKey(), [
-                'load' => 'image_gallery,related_product',
-            ]))->first();
-
-            if (is_array($loadedRecord)) {
-                $productRecord = array_merge($productRecord ?? [], $loadedRecord);
-                $remoteFetchSucceeded = true;
-            }
-        } catch (\Throwable $exception) {
-            $this->logEnrichmentFailure($exception, $part, 'product_gallery');
-        }
-
-        if ($productRecord) {
+        if ($productRecord !== []) {
             $syncedPart = $this->syncService->upsertPart($productRecord, $summary);
             $part = $syncedPart ?: $part->fresh() ?: $part;
 
+            $this->syncImages($part, $productRecord);
+            $this->syncWarranty($part, $productRecord);
             $this->syncBadges($part, $productRecord);
             $this->syncRelatedParts($part, $productRecord, $summary);
         }
@@ -70,6 +50,28 @@ class MobileSentrixProductEnrichmentService
         return $part->fresh() ?: $part;
     }
 
+    public function enrichPartBySku(string $sku, bool $force = false): ?Part
+    {
+        $part = Part::query()
+            ->where('sku', $sku)
+            ->orWhere('new_sku', $sku)
+            ->first();
+
+        if (! $part) {
+            $summary = $this->emptySummary();
+            $records = $this->records($this->client->lookupBySku($sku));
+            $record = $records->first();
+
+            if (! is_array($record)) {
+                return null;
+            }
+
+            $part = $this->syncService->upsertPart($record, $summary);
+        }
+
+        return $part ? $this->enrichPart($part, $force) : null;
+    }
+
     public function shouldEnrich(Part $part): bool
     {
         if (! $part->is_api_item) {
@@ -83,6 +85,142 @@ class MobileSentrixProductEnrichmentService
         $ttlHours = max(1, (int) config('mobilesentrix.product_enrichment_ttl_hours', 12));
 
         return $part->last_enriched_at->lte(now()->subHours($ttlHours));
+    }
+
+    private function fetchProductRecord(Part $part): array
+    {
+        $record = [];
+
+        foreach ([
+            'product_detail' => [],
+            'product_gallery' => ['load' => 'image_gallery'],
+            'product_related' => ['load' => 'related_product'],
+            'product_gallery_related' => ['load' => 'image_gallery,related_product'],
+        ] as $stage => $query) {
+            try {
+                $loadedRecord = $this->records($this->client->product($part->getKey(), $query))->first();
+
+                if (is_array($loadedRecord)) {
+                    $record = $this->mergeProductRecords($record, $loadedRecord);
+                }
+            } catch (\Throwable $exception) {
+                $this->logEnrichmentFailure($exception, $part, $stage);
+            }
+        }
+
+        return $record;
+    }
+
+    private function mergeProductRecords(array $base, array $incoming): array
+    {
+        foreach ($incoming as $key => $value) {
+            if (is_array($value) && $value === [] && ! empty($base[$key])) {
+                continue;
+            }
+
+            if (($value === null || $value === '') && filled($base[$key] ?? null)) {
+                continue;
+            }
+
+            $base[$key] = $value;
+        }
+
+        return $base;
+    }
+
+    private function syncImages(Part $part, array $record): void
+    {
+        $rows = $this->imageRows($record);
+
+        if ($rows->isEmpty()) {
+            return;
+        }
+
+        PartImage::query()->where('part_id', $part->id)->delete();
+
+        $rows->each(fn (array $row): PartImage => $part->images()->create($row));
+    }
+
+    private function imageRows(array $record): Collection
+    {
+        $rows = collect();
+        $defaultImage = $this->stringFromRecord($record, 'default_image')
+            ?: $this->stringFromRecord($record, 'image_url')
+            ?: $this->stringFromRecord($record, 'image_link');
+
+        if (filled($defaultImage)) {
+            $rows->push([
+                'image_url' => $defaultImage,
+                'thumbnail_url' => $defaultImage,
+                'large_image_url' => $defaultImage,
+                'position' => 0,
+                'label' => 'Default',
+                'alt_text' => $this->stringFromRecord($record, 'name'),
+                'is_default' => true,
+                'raw_payload' => ['image_url' => $defaultImage],
+            ]);
+        }
+
+        foreach ($this->valuesFromMixed($record['image_gallery'] ?? null, preserveArrays: true) as $index => $image) {
+            $imageUrl = is_array($image)
+                ? $this->firstStringFromKeys($image, ['image_url', 'url', 'file', 'large_image_url', 'thumbnail_url', 'image'])
+                : (string) $image;
+
+            if (! filled($imageUrl)) {
+                continue;
+            }
+
+            $rows->push([
+                'image_url' => $imageUrl,
+                'thumbnail_url' => is_array($image) ? $this->firstStringFromKeys($image, ['thumbnail_url', 'small_image_url', 'thumb_url', 'url', 'image_url']) : $imageUrl,
+                'large_image_url' => is_array($image) ? $this->firstStringFromKeys($image, ['large_image_url', 'full_image_url', 'url', 'image_url']) : $imageUrl,
+                'position' => $index + 1,
+                'label' => is_array($image) ? $this->firstStringFromKeys($image, ['label', 'name', 'title']) : null,
+                'alt_text' => is_array($image) ? $this->firstStringFromKeys($image, ['alt_text', 'alt', 'label', 'name']) : null,
+                'is_default' => false,
+                'raw_payload' => is_array($image) ? $image : ['image_url' => $imageUrl],
+            ]);
+        }
+
+        return $rows
+            ->filter(fn (array $row): bool => filled($row['image_url'] ?? null))
+            ->unique('image_url')
+            ->values();
+    }
+
+    private function syncWarranty(Part $part, array $record): void
+    {
+        $externalId = $this->stringFromRecord($record, 'warranty_period');
+        $label = $this->stringFromRecord($record, 'warranty_period_text')
+            ?: ($externalId ? (PartWarranty::WARRANTY_LABELS[$externalId] ?? null) : null);
+
+        if (! filled($externalId) && ! filled($label)) {
+            return;
+        }
+
+        $warranty = $externalId
+            ? PartWarranty::query()->firstOrNew(['external_warranty_id' => $externalId])
+            : PartWarranty::query()->firstOrNew(['name' => $label]);
+
+        $warranty->fill([
+            'external_warranty_id' => $externalId,
+            'name' => $label,
+            'duration_label' => $label,
+            'icon_url' => $this->firstStringFromKeys($record, ['warranty_icon_url', 'warranty_period_icon_url', 'warranty_icon']),
+            'photo_url' => $this->firstStringFromKeys($record, ['warranty_photo_url', 'warranty_period_photo_url', 'warranty_photo']),
+            'image_url' => $this->firstStringFromKeys($record, ['warranty_image_url', 'warranty_period_image_url', 'warranty_image']),
+            'raw_value' => $externalId ?: $label,
+            'raw_payload' => [
+                'warranty_period' => $record['warranty_period'] ?? null,
+                'warranty_period_text' => $record['warranty_period_text'] ?? null,
+            ],
+        ]);
+        $warranty->save();
+
+        $part->forceFill([
+            'part_warranty_id' => $warranty->id,
+            'warranty_period_text' => $label ?: $part->warranty_period_text,
+        ])->save();
     }
 
     private function syncTagsAndCompatibility(Part $part): bool
@@ -134,22 +272,29 @@ class MobileSentrixProductEnrichmentService
         $badgeIds = $this->valuesFromMixed($record['product_badges'] ?? null);
         $badgeNames = $this->valuesFromMixed($record['product_badges_text'] ?? null);
         $badgeColors = $this->valuesFromMixed($record['product_badges_bg'] ?? null);
-        $max = max(count($badgeIds), count($badgeNames), count($badgeColors));
+        $badgeIcons = $this->valuesFromMixed($record['product_badges_icon_url'] ?? $record['product_badges_icon'] ?? $record['badge_icon_url'] ?? null);
+        $badgePhotos = $this->valuesFromMixed($record['product_badges_photo_url'] ?? $record['product_badges_photo'] ?? $record['badge_photo_url'] ?? null);
+        $badgeImages = $this->valuesFromMixed($record['product_badges_image_url'] ?? $record['product_badges_image'] ?? $record['badge_image_url'] ?? null);
+        $max = max(count($badgeIds), count($badgeNames), count($badgeColors), count($badgeIcons), count($badgePhotos), count($badgeImages));
         $syncIds = [];
 
         for ($index = 0; $index < $max; $index++) {
-            $name = $badgeNames[$index] ?? $badgeIds[$index] ?? null;
+            $rawName = $badgeNames[$index] ?? $badgeIds[$index] ?? null;
 
-            if (! filled($name)) {
+            if (! filled($rawName)) {
                 continue;
             }
 
             $externalId = isset($badgeIds[$index]) ? (string) $badgeIds[$index] : null;
-            $badge = $this->firstOrNewBadge((string) $name, $externalId);
+            $badge = $this->firstOrNewBadge((string) $rawName, $externalId);
             $badge->fill([
                 'external_badge_id' => $externalId,
-                'name' => Str::limit((string) $name, 255, ''),
+                'name' => Str::limit($this->badgeDisplayName((string) $rawName), 255, ''),
                 'color' => isset($badgeColors[$index]) ? Str::limit((string) $badgeColors[$index], 255, '') : null,
+                'icon_url' => $badgeIcons[$index] ?? null,
+                'photo_url' => $badgePhotos[$index] ?? null,
+                'image_url' => $badgeImages[$index] ?? null,
+                'raw_value' => (string) $rawName,
                 'raw_payload' => [
                     'product_badges' => $record['product_badges'] ?? null,
                     'product_badges_text' => $record['product_badges_text'] ?? null,
@@ -185,7 +330,7 @@ class MobileSentrixProductEnrichmentService
             }
 
             try {
-                $relatedRecord = $this->records($this->client->product($relatedId))->first();
+                $relatedRecord = $this->records($this->client->product($relatedId, ['load' => 'image_gallery']))->first();
 
                 if (is_array($relatedRecord)) {
                     $this->syncService->upsertPart($relatedRecord, $summary);
@@ -213,7 +358,7 @@ class MobileSentrixProductEnrichmentService
             }
         }
 
-        $slug = Str::slug($name) ?: 'badge-'.sha1($name);
+        $slug = Str::slug($this->badgeDisplayName($name)) ?: 'badge-'.sha1($name);
         $badge = PartBadge::query()->where('slug', $slug)->first();
 
         if ($badge) {
@@ -236,6 +381,23 @@ class MobileSentrixProductEnrichmentService
         return $candidate;
     }
 
+    private function badgeDisplayName(string $value): string
+    {
+        $value = trim($value);
+
+        foreach (['Basic', 'Pro', 'Core', 'Genuine', 'AmpSentrix', 'Refurb', 'Pull'] as $name) {
+            if (Str::contains(Str::lower($value), Str::lower($name))) {
+                return $name;
+            }
+        }
+
+        if (str_contains($value, '-')) {
+            return trim(Str::afterLast($value, '-'));
+        }
+
+        return $value;
+    }
+
     private function records(array $payload): Collection
     {
         if (isset($payload['data']['items']) && is_array($payload['data']['items'])) {
@@ -246,6 +408,10 @@ class MobileSentrixProductEnrichmentService
             return collect($payload['data'])
                 ->filter(fn ($value, $key): bool => $key !== 'page_info' && is_array($value))
                 ->values();
+        }
+
+        if (isset($payload['data']) && is_array($payload['data']) && $this->looksLikeRecord($payload['data'])) {
+            return collect([$payload['data']]);
         }
 
         if ($this->looksLikeRecord($payload)) {
@@ -332,7 +498,7 @@ class MobileSentrixProductEnrichmentService
             ->values();
     }
 
-    private function valuesFromMixed(mixed $value): array
+    private function valuesFromMixed(mixed $value, bool $preserveArrays = false): array
     {
         if (! is_array($value)) {
             if (is_string($value) && str_contains($value, ',')) {
@@ -342,8 +508,12 @@ class MobileSentrixProductEnrichmentService
             return filled($value) ? [(string) $value] : [];
         }
 
+        if ($preserveArrays && array_is_list($value)) {
+            return collect($value)->filter(fn ($item): bool => filled($item))->values()->all();
+        }
+
         return collect($value)
-            ->flatMap(fn ($item): array => $this->valuesFromMixed($item))
+            ->flatMap(fn ($item): array => $this->valuesFromMixed($item, $preserveArrays))
             ->filter()
             ->values()
             ->all();
@@ -409,6 +579,38 @@ class MobileSentrixProductEnrichmentService
         }
 
         return $records;
+    }
+
+    private function firstStringFromKeys(array $record, array $keys): ?string
+    {
+        foreach ($keys as $key) {
+            $value = $record[$key] ?? null;
+
+            if (is_array($value)) {
+                $value = collect($value)->filter(fn ($item): bool => filled($item) && ! is_array($item))->first();
+            }
+
+            if (filled($value) && ! is_array($value)) {
+                return (string) $value;
+            }
+        }
+
+        return null;
+    }
+
+    private function stringFromRecord(array $record, string $key): ?string
+    {
+        $value = $record[$key] ?? null;
+
+        if (is_bool($value)) {
+            return $value ? '1' : null;
+        }
+
+        if (is_array($value) || $value === null || $value === '') {
+            return null;
+        }
+
+        return (string) $value;
     }
 
     private function logEnrichmentFailure(\Throwable $exception, Part $part, string $stage, array $context = []): void

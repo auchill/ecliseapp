@@ -63,12 +63,14 @@ class PartController extends Controller
             'partModel',
             'categories',
             'models',
+            'warranty',
             'tags',
             'badges',
             'compatibilities',
             'images' => fn ($query) => $query->orderByDesc('is_default')->orderBy('position'),
             'relatedParts.images' => fn ($query) => $query->orderByDesc('is_default')->orderBy('position'),
             'relatedParts.badges',
+            'relatedParts.warranty',
         ]);
 
         return view('parts.show', ['part' => $part]);

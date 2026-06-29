@@ -2,8 +2,10 @@
 
 use App\Models\Part;
 use App\Models\PartCategory;
+use App\Models\PartWarranty;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 
 beforeEach(function (): void {
     config([
@@ -66,6 +68,59 @@ function fakeMobileSentrixProductEnrichmentHttp(): void
     Http::fake(function ($request) {
         $url = $request->url();
 
+        if (str_contains($url, '/api/rest/products/151485')) {
+            parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+
+            $record = [
+                'entity_id' => '151485',
+                'sku' => '107082022487',
+                'status' => 1,
+                'name' => 'Replacement Battery For iPhone 14 Pro Max',
+                'description' => '<ul><li>Battery replacement.</li></ul>',
+                'price' => '25.41',
+                'category_ids' => ['165'],
+                'is_in_stock' => true,
+                'in_stock_qty' => 5,
+                'image_url' => 'https://cdn.example.test/battery-small.jpg',
+                'warranty_period' => '5941',
+                'warranty_period_text' => '1 Year',
+                'product_badges' => '33755',
+                'product_badges_text' => 'Batteries - Ampsentrix Basic',
+                'product_badges_icon_url' => 'https://cdn.example.test/basic-badge.png',
+            ];
+
+            if (str_contains((string) ($query['load'] ?? ''), 'image_gallery')) {
+                $record['image_gallery'] = [
+                    'https://cdn.example.test/battery-1.jpg',
+                    'https://cdn.example.test/battery-2.jpg',
+                    'https://cdn.example.test/battery-1.jpg',
+                ];
+            }
+
+            if (str_contains((string) ($query['load'] ?? ''), 'related_product')) {
+                $record['related_product'] = ['74'];
+            }
+
+            return Http::response(['data' => $record]);
+        }
+
+        if (str_contains($url, '/api/rest/products?')) {
+            return Http::response([
+                [
+                    'entity_id' => '151485',
+                    'sku' => '107082022487',
+                    'status' => 1,
+                    'name' => 'Replacement Battery For iPhone 14 Pro Max',
+                    'description' => 'Battery replacement.',
+                    'price' => '25.41',
+                    'category_ids' => ['165'],
+                    'is_in_stock' => true,
+                    'in_stock_qty' => 5,
+                    'image_url' => 'https://cdn.example.test/battery-small.jpg',
+                ],
+            ]);
+        }
+
         if (str_contains($url, '/api/rest/products/73')) {
             parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
 
@@ -83,18 +138,25 @@ function fakeMobileSentrixProductEnrichmentHttp(): void
                 'manufacturer_text' => 'Apple',
                 'model_text' => ['iPhone 14 Pro'],
                 'front_position_text' => 'Front',
+                'warranty_period' => '7645',
                 'warranty_period_text' => 'Lifetime Warranty',
+                'warranty_icon_url' => 'https://cdn.example.test/lifetime-warranty.png',
                 'image_url' => 'https://cdn.example.test/default.jpg',
                 'product_badges' => '7627',
                 'product_badges_text' => 'Premium',
                 'product_badges_bg' => '#1677ff',
+                'product_badges_icon_url' => 'https://cdn.example.test/premium-badge.png',
             ];
 
-            if (isset($query['load'])) {
+            if (str_contains((string) ($query['load'] ?? ''), 'image_gallery')) {
                 $record['image_gallery'] = [
-                    ['url' => 'https://cdn.example.test/gallery-1.jpg', 'label' => 'Front view'],
-                    ['url' => 'https://cdn.example.test/gallery-2.jpg', 'label' => 'Back view'],
+                    ['url' => 'https://cdn.example.test/gallery-1.jpg', 'thumbnail_url' => 'https://cdn.example.test/gallery-1-thumb.jpg', 'label' => 'Front view'],
+                    ['url' => 'https://cdn.example.test/gallery-2.jpg', 'large_image_url' => 'https://cdn.example.test/gallery-2-large.jpg', 'label' => 'Back view'],
+                    ['url' => 'https://cdn.example.test/gallery-1.jpg', 'label' => 'Duplicate front view'],
                 ];
+            }
+
+            if (str_contains((string) ($query['load'] ?? ''), 'related_product')) {
                 $record['related_product'] = ['74'];
             }
 
@@ -113,6 +175,9 @@ function fakeMobileSentrixProductEnrichmentHttp(): void
                 'is_in_stock' => true,
                 'in_stock_qty' => 20,
                 'image_url' => 'https://cdn.example.test/adhesive.jpg',
+                'product_badges' => '990',
+                'product_badges_text' => 'Genuine',
+                'device_color_text' => 'Black',
             ]]);
         }
 
@@ -124,6 +189,14 @@ function fakeMobileSentrixProductEnrichmentHttp(): void
                     'tag' => ['OLED', 'Premium'],
                     'compatibility' => [
                         'Apple' => ['iPhone 14 Pro', 'iPhone 14 Pro Max'],
+                    ],
+                ],
+                [
+                    'sku' => '107082022487',
+                    'new_sku' => null,
+                    'tag' => ['battery', 'ampsentrix basic'],
+                    'compatibility' => [
+                        'Apple' => ['iPhone 14 Pro Max'],
                     ],
                 ],
             ]);
@@ -144,11 +217,17 @@ test('public parts show enriches a MobileSentrix product with detail tags compat
         ->assertSee('$79.99')
         ->assertSee('Install ready')
         ->assertSee('Lifetime Warranty')
+        ->assertSee('Product Description')
+        ->assertSee('Add To Cart')
         ->assertSee('OLED')
         ->assertSee('iPhone 14 Pro Max')
-        ->assertSee('Related Parts')
+        ->assertSee('Related Products')
+        ->assertSee('data-part-gallery-image', false)
+        ->assertSee('https://cdn.example.test/lifetime-warranty.png', false)
+        ->assertSee('https://cdn.example.test/premium-badge.png', false)
         ->assertDontSee('alert("x")', false)
-        ->assertDontSee('onclick', false);
+        ->assertDontSee('onclick', false)
+        ->assertDontSee('src=""', false);
 
     $part = $part->fresh();
 
@@ -156,8 +235,13 @@ test('public parts show enriches a MobileSentrix product with detail tags compat
         ->and($part->raw_payload['entity_id'])->toBe('73')
         ->and($part->tags_raw_payload[0]['sku'])->toBe('MS-73')
         ->and($part->images()->count())->toBe(3)
+        ->and($part->images()->where('image_url', 'https://cdn.example.test/gallery-1.jpg')->count())->toBe(1)
         ->and($part->tags()->pluck('name')->all())->toContain('OLED')
         ->and($part->badges()->pluck('name')->all())->toContain('Premium')
+        ->and($part->badges()->first()->icon_url)->toBe('https://cdn.example.test/premium-badge.png')
+        ->and($part->warranty?->external_warranty_id)->toBe('7645')
+        ->and($part->warranty?->display_label)->toBe('Lifetime Warranty')
+        ->and($part->part_warranty_id)->not->toBeNull()
         ->and($part->compatibilities()->pluck('name')->all())->toContain('Apple: iPhone 14 Pro Max')
         ->and($part->relatedParts()->whereKey(74)->exists())->toBeTrue();
 });
@@ -170,10 +254,58 @@ test('MobileSentrix enrich product command resolves sku and stores enrichment da
         'part_id_or_sku' => 'MS-73',
         '--force' => true,
     ]);
+    $output = Artisan::output();
 
     expect($exitCode)->toBe(0)
-        ->and(Artisan::output())->toContain('MobileSentrix part 73 enriched.')
+        ->and($output)->toContain('MobileSentrix part 73 enriched.')
+        ->and($output)->toContain('Description updated: yes')
+        ->and($output)->toContain('Warranty detected: Lifetime Warranty')
         ->and(Part::query()->findOrFail(73)->tags()->where('name', 'Premium')->exists())->toBeTrue();
+});
+
+test('MobileSentrix enrich product command resolves numeric sku 107082022487 and stores actual gallery warranty and badge data', function () {
+    fakeMobileSentrixProductEnrichmentHttp();
+
+    $exitCode = Artisan::call('mobilesentrix:enrich-product', [
+        'part_id_or_sku' => '107082022487',
+        '--force' => true,
+    ]);
+    $output = Artisan::output();
+
+    $part = Part::query()->where('sku', '107082022487')->firstOrFail();
+
+    expect($exitCode)->toBe(0)
+        ->and($output)->toContain('MobileSentrix part 151485 enriched.')
+        ->and($part->images()->count())->toBe(3)
+        ->and($part->warranty?->display_label)->toBe('1 Year')
+        ->and($part->badges()->first()?->name)->toBe('Basic')
+        ->and($part->badges()->first()?->icon_url)->toBe('https://cdn.example.test/basic-badge.png')
+        ->and($part->relatedParts()->whereKey(74)->exists())->toBeTrue();
+});
+
+test('warranty schema and documented warranty mapping are available', function () {
+    expect(Schema::hasTable('part_warranties'))->toBeTrue()
+        ->and(Schema::hasColumn('parts', 'part_warranty_id'))->toBeTrue()
+        ->and(Schema::hasColumn('part_badges', 'icon_url'))->toBeTrue()
+        ->and(Schema::hasColumn('part_images', 'thumbnail_url'))->toBeTrue()
+        ->and(PartWarranty::WARRANTY_LABELS['7627'])->toBe('No Warranty')
+        ->and(PartWarranty::WARRANTY_LABELS['7630'])->toBe('30 Days')
+        ->and(PartWarranty::WARRANTY_LABELS['7633'])->toBe('60 Days')
+        ->and(PartWarranty::WARRANTY_LABELS['7636'])->toBe('90 Days')
+        ->and(PartWarranty::WARRANTY_LABELS['7642'])->toBe('6 Months')
+        ->and(PartWarranty::WARRANTY_LABELS['7648'])->toBe('1 Year')
+        ->and(PartWarranty::WARRANTY_LABELS['7645'])->toBe('Lifetime Warranty');
+});
+
+test('part image gallery enrichment is idempotent and does not create duplicate image rows', function () {
+    $part = createEnrichmentPart();
+    fakeMobileSentrixProductEnrichmentHttp();
+
+    Artisan::call('mobilesentrix:enrich-product', ['part_id_or_sku' => 'MS-73', '--force' => true]);
+    Artisan::call('mobilesentrix:enrich-product', ['part_id_or_sku' => 'MS-73', '--force' => true]);
+
+    expect($part->fresh()->images()->count())->toBe(3)
+        ->and($part->fresh()->images()->where('image_url', 'https://cdn.example.test/gallery-1.jpg')->count())->toBe(1);
 });
 
 test('public parts show falls back to local data when MobileSentrix enrichment fails', function () {

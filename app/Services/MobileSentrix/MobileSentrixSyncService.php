@@ -662,8 +662,11 @@ class MobileSentrixSyncService
         if (filled($defaultImage)) {
             $images->push([
                 'image_url' => $defaultImage,
+                'thumbnail_url' => $defaultImage,
+                'large_image_url' => $defaultImage,
                 'position' => 0,
-                'label' => 'default',
+                'label' => 'Default',
+                'alt_text' => $this->stringValue($record, 'name'),
                 'is_default' => true,
                 'raw_payload' => ['image_url' => $defaultImage],
             ]);
@@ -671,7 +674,7 @@ class MobileSentrixSyncService
 
         foreach ($this->arrayValue($record['image_gallery'] ?? null) as $index => $image) {
             $imageUrl = is_array($image)
-                ? ($image['url'] ?? $image['image_url'] ?? $image['file'] ?? null)
+                ? ($image['url'] ?? $image['image_url'] ?? $image['file'] ?? $image['large_image_url'] ?? $image['thumbnail_url'] ?? null)
                 : $image;
 
             if (! filled($imageUrl)) {
@@ -680,8 +683,11 @@ class MobileSentrixSyncService
 
             $images->push([
                 'image_url' => (string) $imageUrl,
+                'thumbnail_url' => is_array($image) ? ($image['thumbnail_url'] ?? $image['small_image_url'] ?? $image['thumb_url'] ?? $imageUrl) : (string) $imageUrl,
+                'large_image_url' => is_array($image) ? ($image['large_image_url'] ?? $image['full_image_url'] ?? $imageUrl) : (string) $imageUrl,
                 'position' => $index + 1,
                 'label' => is_array($image) ? ($image['label'] ?? null) : null,
+                'alt_text' => is_array($image) ? ($image['alt_text'] ?? $image['alt'] ?? $image['label'] ?? null) : null,
                 'is_default' => false,
                 'raw_payload' => is_array($image) ? $image : ['image_url' => $imageUrl],
             ]);

@@ -4,212 +4,207 @@
 
 @section('content')
     @php
-        $galleryImages = $part->images->isNotEmpty() ? $part->images : collect();
-        $mainImage = $part->mainImageUrl();
+        $galleryImages = $part->gallery_images->isNotEmpty() ? $part->gallery_images : collect();
+        $mainImage = $part->main_image_url;
         $sku = $part->sku ?: $part->new_sku;
-        $description = $part->displayDescription();
+        $variation = $part->device_color_text ?: $part->color_text ?: $part->color ?: $part->front_position_text;
+        $description = $part->display_description;
         $stockQuantity = max((int) $part->quantity, (int) $part->in_stock_qty);
-        $detailRows = collect([
-            'SKU' => $part->sku,
-            'New SKU' => $part->new_sku,
-            'Brand' => $part->brandName(),
-            'Manufacturer' => $part->manufacturer_text ?: $part->manufacturer,
-            'Model' => $part->modelName(),
-            'Category' => $part->categoryName(),
-            'Color' => $part->device_color_text ?: $part->color_text ?: $part->color,
-            'Carrier' => $part->device_carrier_text,
-            'Grade' => $part->device_grade_text,
-            'Size' => $part->device_size_text,
-            'Warranty' => $part->warranty_period_text ?: $part->warranty_period,
-            'Order Status' => $part->product_order_status_text ?: $part->product_order_status,
-            'Stock' => $stockQuantity > 0 ? number_format($stockQuantity).' available' : $part->stockLabel(),
-            'Weight' => $part->weight ? $part->weight.' lb' : null,
-            'Dimensions' => ($part->length && $part->width && $part->height) ? "{$part->length} x {$part->width} x {$part->height}" : null,
-        ])->filter();
+        $primaryBadge = $part->badges->first();
+        $warrantyIcon = $part->display_warranty_icon_url;
+        $warrantyLabel = $part->display_warranty_label;
+        $reviewCount = (int) ($part->total_reviews_count ?? 0);
+        $ratingRaw = data_get($part->raw_payload, 'rating_summary') ?? data_get($part->raw_payload, 'rating');
+        $ratingValue = is_numeric($ratingRaw) ? (float) $ratingRaw : 0;
+        $ratingOutOfFive = $ratingValue > 5 ? round($ratingValue / 20, 1) : round($ratingValue, 1);
     @endphp
 
-    <section class="part-detail-hero">
-        <div class="container">
-            <nav class="small mb-3" aria-label="breadcrumb">
-                <a class="text-white text-decoration-none" href="{{ route('parts.index') }}">Parts</a>
-                @if ($part->categoryName())
-                    <span class="text-white-50 mx-2">/</span>
-                    <span class="text-white-50">{{ $part->categoryName() }}</span>
-                @endif
-            </nav>
-            <p class="eyebrow mb-2">Parts Price Check</p>
-            <h1 class="display-6 fw-bold mb-3">{{ $part->name }}</h1>
-            <div class="d-flex flex-wrap gap-2">
-                @if ($sku)
-                    <span class="part-hero-pill">SKU {{ $sku }}</span>
-                @endif
-                @if ($part->brandName())
-                    <span class="part-hero-pill">{{ $part->brandName() }}</span>
-                @endif
-                @if ($part->modelName())
-                    <span class="part-hero-pill">{{ $part->modelName() }}</span>
+    <section class="section-pad-sm bg-white">
+        <div class="container ms-product-page">
+            <div class="ms-product-titlebar">
+                <h1>{{ $part->name }}</h1>
+
+                @if ($warrantyLabel)
+                    <div class="ms-warranty-ribbon">
+                        @if ($warrantyIcon)
+                            <img src="{{ $warrantyIcon }}" alt="{{ $warrantyLabel }}">
+                        @endif
+                        <span>{{ $warrantyLabel }}</span>
+                    </div>
                 @endif
             </div>
-        </div>
-    </section>
 
-    <section class="section-pad bg-white">
-        <div class="container">
+            <div class="ms-product-sku-row">
+                @if ($sku)
+                    <span class="ms-sku-label"><i class="bi bi-tag-fill"></i> SKU</span>
+                    <span class="ms-sku-value">{{ $sku }}</span>
+                    <i class="bi bi-clipboard ms-sku-copy" aria-hidden="true"></i>
+                @endif
+
+                @if ($variation)
+                    <span class="ms-variation-pill">{{ $variation }}</span>
+                @endif
+            </div>
+
             <div class="row g-4 align-items-start">
-                <div class="col-lg-7">
-                    <div class="part-gallery surface p-3">
-                        <div class="part-gallery-main">
+                <div class="col-lg-5">
+                    <div class="ms-service-row">
+                        <span><i class="bi bi-truck"></i> Ship</span>
+                        <span><i class="bi bi-tags"></i> Price match promise</span>
+                        <span><i class="bi bi-arrow-return-left"></i> Easy refunds & returns</span>
+                    </div>
+
+                    <div class="ms-gallery-frame">
+                        @if ($primaryBadge)
+                            <div class="ms-image-badge">
+                                @if ($primaryBadge->display_icon_url)
+                                    <img src="{{ $primaryBadge->display_icon_url }}" alt="{{ $primaryBadge->name }}">
+                                @else
+                                    <span>{{ $primaryBadge->name }}</span>
+                                @endif
+                            </div>
+                        @endif
+
+                        <div class="ms-main-image-wrap">
                             <img data-part-main-image src="{{ $mainImage }}" alt="{{ $part->name }}">
                         </div>
 
                         @if ($galleryImages->count() > 1)
-                            <div class="part-gallery-thumbs" aria-label="Product images">
+                            <div class="ms-gallery-strip" aria-label="Product images">
                                 @foreach ($galleryImages as $image)
-                                    <button class="part-gallery-thumb {{ $loop->first ? 'active' : '' }}" type="button" data-part-gallery-image="{{ $image->image_url }}" data-part-gallery-alt="{{ $image->label ?: $part->name }}">
-                                        <img src="{{ $image->image_url }}" alt="{{ $image->label ?: $part->name }}">
+                                    <button class="ms-gallery-thumb {{ $loop->first ? 'active' : '' }}" type="button" data-part-gallery-image="{{ $image->large_image_url ?: $image->image_url }}" data-part-gallery-alt="{{ $image->alt_text ?: $image->label ?: $part->name }}">
+                                        <img src="{{ $image->thumbnail_url ?: $image->image_url }}" alt="{{ $image->alt_text ?: $image->label ?: $part->name }}">
                                     </button>
                                 @endforeach
                             </div>
                         @endif
                     </div>
-                </div>
-
-                <div class="col-lg-5">
-                    <aside class="surface p-4 part-purchase-panel">
-                        <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
-                            <div>
-                                <p class="eyebrow mb-1">{{ $part->categoryName() ?: 'MobileSentrix Part' }}</p>
-                                <strong class="display-6 d-block">${{ number_format($part->displayPrice(), 2) }}</strong>
-                            </div>
-                            <span class="status-pill {{ $part->isAvailableForPartsPurchase() ? 'status-pill-success' : 'status-pill-muted' }}">
-                                {{ $part->stockLabel() }}
-                            </span>
-                        </div>
-
-                        @if ($part->badges->isNotEmpty() || $part->premium || $part->end_of_life)
-                            <div class="d-flex flex-wrap gap-2 mb-4">
-                                @foreach ($part->badges as $badge)
-                                    <span class="part-badge">{{ $badge->name }}</span>
-                                @endforeach
-                                @if ($part->premium)
-                                    <span class="part-badge">Premium</span>
-                                @endif
-                                @if ($part->end_of_life)
-                                    <span class="part-badge part-badge-muted">End of Life</span>
-                                @endif
-                            </div>
-                        @endif
-
-                        <dl class="part-summary-list mb-4">
-                            @foreach ($detailRows->take(8) as $label => $value)
-                                <div>
-                                    <dt>{{ $label }}</dt>
-                                    <dd>{{ $value }}</dd>
-                                </div>
-                            @endforeach
-                        </dl>
-
-                        @if(! auth()->user()?->isAdmin())
-                            <div class="d-flex flex-wrap align-items-end gap-2">
-                                <div>
-                                    <label class="form-label" for="part_quantity">Quantity</label>
-                                    <input class="form-control" id="part_quantity" type="number" value="1" min="1" max="{{ max(1, $stockQuantity) }}" style="width: 112px;">
-                                </div>
-                                <a class="btn btn-primary btn-lg" href="{{ route('contact.create', ['part' => $sku ?: $part->id]) }}">
-                                    <i class="bi bi-chat-dots me-2"></i>Ask About This Part
-                                </a>
-                            </div>
-                        @endif
-
-                        @if ($part->last_enriched_at)
-                            <p class="small muted mt-3 mb-0">Updated {{ $part->last_enriched_at->diffForHumans() }}</p>
-                        @endif
-                    </aside>
-                </div>
-            </div>
-
-            <div class="row g-4 mt-4">
-                <div class="col-lg-7">
-                    <section class="surface p-4 h-100">
-                        <h2 class="h4 fw-bold mb-3">Description</h2>
-                        @if ($description)
-                            <div class="part-description">
-                                {!! $description !!}
-                            </div>
-                        @else
-                            <p class="muted mb-0">Detailed description is not available for this part yet.</p>
-                        @endif
-                    </section>
-                </div>
-                <div class="col-lg-5">
-                    <section class="surface p-4 h-100">
-                        <h2 class="h4 fw-bold mb-3">Product Details</h2>
-                        <dl class="part-details-table mb-0">
-                            @foreach ($detailRows as $label => $value)
-                                <div>
-                                    <dt>{{ $label }}</dt>
-                                    <dd>{{ $value }}</dd>
-                                </div>
-                            @endforeach
-                        </dl>
-                    </section>
-                </div>
-            </div>
-
-            @if ($part->tags->isNotEmpty() || $part->compatibilities->isNotEmpty())
-                <div class="row g-4 mt-4">
-                    @if ($part->tags->isNotEmpty())
-                        <div class="col-lg-5">
-                            <section class="surface p-4 h-100">
-                                <h2 class="h4 fw-bold mb-3">Tags</h2>
-                                <div class="d-flex flex-wrap gap-2">
-                                    @foreach ($part->tags as $tag)
-                                        <span class="part-tag">{{ $tag->name }}</span>
-                                    @endforeach
-                                </div>
-                            </section>
-                        </div>
-                    @endif
 
                     @if ($part->compatibilities->isNotEmpty())
-                        <div class="{{ $part->tags->isNotEmpty() ? 'col-lg-7' : 'col-12' }}">
-                            <section class="surface p-4 h-100">
-                                <h2 class="h4 fw-bold mb-3">Compatibility</h2>
-                                <div class="part-compatibility-grid">
-                                    @foreach ($part->compatibilities as $compatibility)
-                                        <span>{{ $compatibility->name }}</span>
-                                    @endforeach
-                                </div>
-                            </section>
-                        </div>
+                        <section class="ms-token-panel mt-3">
+                            <h2 class="ms-token-heading ms-token-heading-red"><i class="bi bi-link-45deg"></i> Compatible</h2>
+                            <div class="ms-token-body">
+                                @foreach ($part->compatibilities as $compatibility)
+                                    <span>{{ $compatibility->name }}</span>
+                                @endforeach
+                            </div>
+                        </section>
+                    @endif
+
+                    @if ($part->tags->isNotEmpty())
+                        <section class="ms-token-panel mt-3">
+                            <h2 class="ms-token-heading ms-token-heading-blue"><i class="bi bi-tag-fill"></i> Tag</h2>
+                            <div class="ms-token-body">
+                                @foreach ($part->tags as $tag)
+                                    <span>{{ $tag->name }}</span>
+                                @endforeach
+                            </div>
+                        </section>
                     @endif
                 </div>
-            @endif
+
+                <div class="col-lg-7">
+                    <div class="ms-purchase-panel">
+                        <div class="ms-price">CA${{ number_format($part->display_price, 2) }}</div>
+
+                        <div class="ms-review-row">
+                            @if ($reviewCount > 0 && $ratingOutOfFive > 0)
+                                <span class="ms-stars" aria-label="{{ $ratingOutOfFive }} out of 5 rating">
+                                    @for ($i = 1; $i <= 5; $i++)
+                                        <i class="bi {{ $i <= round($ratingOutOfFive) ? 'bi-star-fill' : 'bi-star' }}"></i>
+                                    @endfor
+                                </span>
+                                <span>{{ number_format($ratingOutOfFive, 1) }} Out Of 5 Rating</span>
+                            @else
+                                <span>Be the first to write a review</span>
+                            @endif
+                        </div>
+
+                        @if ($part->badges->isNotEmpty() || $warrantyLabel)
+                            <div class="ms-cred-row">
+                                @foreach ($part->badges as $badge)
+                                    <span>
+                                        @if ($badge->display_icon_url)
+                                            <img src="{{ $badge->display_icon_url }}" alt="{{ $badge->name }}">
+                                        @endif
+                                        {{ $badge->name }}
+                                    </span>
+                                @endforeach
+                                @if ($warrantyLabel)
+                                    <span>
+                                        @if ($warrantyIcon)
+                                            <img src="{{ $warrantyIcon }}" alt="{{ $warrantyLabel }}">
+                                        @endif
+                                        {{ $warrantyLabel }}
+                                    </span>
+                                @endif
+                            </div>
+                        @endif
+
+                        <form class="ms-cart-form" method="GET" action="{{ route('contact.create') }}">
+                            <input type="hidden" name="part" value="{{ $sku ?: $part->id }}">
+                            <div class="ms-quantity-control" data-quantity-control>
+                                <button type="button" data-quantity-minus aria-label="Decrease quantity">-</button>
+                                <input name="quantity" type="number" value="1" min="1" max="{{ max(1, $stockQuantity) }}" aria-label="Quantity">
+                                <button type="button" data-quantity-plus aria-label="Increase quantity">+</button>
+                            </div>
+                            <button class="ms-add-cart" type="submit"><i class="bi bi-cart-fill"></i> Add To Cart</button>
+                        </form>
+
+                        <p class="ms-stock-line">{{ $stockQuantity > 0 ? number_format($stockQuantity).' available' : $part->stockLabel() }}</p>
+                    </div>
+
+                    <section class="ms-description-panel">
+                        <h2>Product Description</h2>
+                        <div class="ms-description-body">
+                            @if ($description)
+                                {!! $description !!}
+                            @else
+                                <p>Detailed description is not available for this part yet.</p>
+                            @endif
+                        </div>
+                    </section>
+                </div>
+            </div>
 
             @if ($part->relatedParts->isNotEmpty())
-                <section class="mt-5">
-                    <div class="d-flex justify-content-between align-items-center gap-3 mb-4">
-                        <h2 class="h3 fw-bold mb-0">Related Parts</h2>
-                        <a class="btn btn-outline-primary" href="{{ route('parts.index') }}">Browse Parts</a>
-                    </div>
-                    <div class="row g-4">
+                <section class="ms-related-section">
+                    <h2><i class="bi bi-list-ul"></i> Related Products</h2>
+                    <div class="ms-related-grid">
                         @foreach ($part->relatedParts->take(4) as $related)
-                            <div class="col-md-6 col-xl-3">
-                                <div class="surface part-card h-100 overflow-hidden">
-                                    <img src="{{ $related->mainImageUrl() }}" alt="{{ $related->name }}">
-                                    <div class="p-4">
-                                        <p class="eyebrow mb-1">{{ $related->categoryName() ?: 'Part' }}</p>
-                                        <h3 class="h6 fw-bold">{{ $related->name }}</h3>
-                                        <p class="small muted mb-3">{{ $related->sku ?: $related->new_sku }}</p>
-                                        <div class="d-flex justify-content-between align-items-center gap-2">
-                                            <strong>${{ number_format($related->displayPrice(), 2) }}</strong>
-                                            <a class="btn btn-outline-primary btn-sm" href="{{ route('parts.show', $related) }}">
-                                                <i class="bi bi-eye"></i><span class="visually-hidden">View</span>
-                                            </a>
-                                        </div>
+                            @php
+                                $relatedBadge = $related->badges->first();
+                                $relatedVariation = $related->device_color_text ?: $related->color_text ?: $related->color ?: $related->front_position_text;
+                                $relatedStock = max((int) $related->quantity, (int) $related->in_stock_qty);
+                            @endphp
+                            <article class="ms-related-card">
+                                @if ($relatedBadge)
+                                    <div class="ms-related-badge">
+                                        @if ($relatedBadge->display_icon_url)
+                                            <img src="{{ $relatedBadge->display_icon_url }}" alt="{{ $relatedBadge->name }}">
+                                        @else
+                                            <span>{{ $relatedBadge->name }}</span>
+                                        @endif
                                     </div>
-                                </div>
-                            </div>
+                                @endif
+                                <a class="ms-related-image" href="{{ route('parts.show', $related) }}">
+                                    <img src="{{ $related->main_image_url }}" alt="{{ $related->name }}">
+                                </a>
+                                @if ($relatedVariation)
+                                    <div class="ms-related-variation">{{ $relatedVariation }}</div>
+                                @endif
+                                <h3><a href="{{ route('parts.show', $related) }}">{{ $related->name }}</a></h3>
+                                <strong>CA${{ number_format($related->display_price, 2) }}</strong>
+                                <form class="ms-related-cart" method="GET" action="{{ route('contact.create') }}">
+                                    <input type="hidden" name="part" value="{{ $related->sku ?: $related->id }}">
+                                    <div class="ms-quantity-control ms-quantity-control-sm" data-quantity-control>
+                                        <button type="button" data-quantity-minus aria-label="Decrease quantity">-</button>
+                                        <input name="quantity" type="number" value="0" min="0" max="{{ max(1, $relatedStock) }}" aria-label="Quantity">
+                                        <button type="button" data-quantity-plus aria-label="Increase quantity">+</button>
+                                    </div>
+                                    <button class="ms-related-add" type="submit">Add to Cart</button>
+                                </form>
+                            </article>
                         @endforeach
                     </div>
                 </section>
@@ -230,6 +225,22 @@
                 mainImage.alt = button.dataset.partGalleryAlt || mainImage.alt;
                 document.querySelectorAll('[data-part-gallery-image]').forEach((item) => item.classList.remove('active'));
                 button.classList.add('active');
+            });
+        });
+
+        document.querySelectorAll('[data-quantity-control]').forEach((control) => {
+            const input = control.querySelector('input');
+            const minus = control.querySelector('[data-quantity-minus]');
+            const plus = control.querySelector('[data-quantity-plus]');
+
+            minus?.addEventListener('click', () => {
+                const min = Number(input.min || 0);
+                input.value = Math.max(min, Number(input.value || 0) - 1);
+            });
+
+            plus?.addEventListener('click', () => {
+                const max = Number(input.max || 9999);
+                input.value = Math.min(max, Number(input.value || 0) + 1);
             });
         });
     </script>

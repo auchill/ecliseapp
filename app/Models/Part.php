@@ -125,6 +125,11 @@ class Part extends Model
         return $this->belongsTo(PartModel::class);
     }
 
+    public function warranty(): BelongsTo
+    {
+        return $this->belongsTo(PartWarranty::class, 'part_warranty_id');
+    }
+
     public function categories(): BelongsToMany
     {
         return $this->belongsToMany(PartCategory::class, 'part_category_part', 'part_id', 'category_id')
@@ -216,6 +221,10 @@ class Part extends Model
             return $this->default_image ?: $this->image_url;
         }
 
+        if (file_exists(public_path('images/parts/part-placeholder.svg'))) {
+            return asset('images/parts/part-placeholder.svg');
+        }
+
         return asset('images/brand/logo.png');
     }
 
@@ -228,9 +237,50 @@ class Part extends Model
         return $image?->image_url ?: $this->imageUrl();
     }
 
+    public function getMainImageUrlAttribute(): string
+    {
+        return $this->mainImageUrl();
+    }
+
+    public function getGalleryImagesAttribute()
+    {
+        return $this->relationLoaded('images')
+            ? $this->images
+            : $this->images()->orderByDesc('is_default')->orderBy('position')->get();
+    }
+
     public function displayDescription(): string
     {
         return ProductDescriptionSanitizer::sanitize($this->description ?: $this->short_description);
+    }
+
+    public function getDisplayDescriptionAttribute(): string
+    {
+        return $this->displayDescription();
+    }
+
+    public function getDisplayPriceAttribute(): float
+    {
+        return $this->displayPrice();
+    }
+
+    public function getDisplayBadgeIconUrlAttribute(): ?string
+    {
+        $badge = $this->relationLoaded('badges')
+            ? $this->badges->first()
+            : $this->badges()->first();
+
+        return $badge?->display_icon_url;
+    }
+
+    public function getDisplayWarrantyIconUrlAttribute(): ?string
+    {
+        return $this->warranty?->display_icon_url;
+    }
+
+    public function getDisplayWarrantyLabelAttribute(): ?string
+    {
+        return $this->warranty?->display_label ?: $this->warranty_period_text ?: $this->warranty_period;
     }
 
     public function isAvailableForPartsPurchase(): bool
@@ -239,6 +289,11 @@ class Part extends Model
             || (bool) $this->is_in_stock
             || (int) $this->quantity > 0
             || (int) $this->in_stock_qty > 0;
+    }
+
+    public function getIsAvailableAttribute(): bool
+    {
+        return $this->isAvailableForPartsPurchase();
     }
 
     public function sourceSkus(): array
