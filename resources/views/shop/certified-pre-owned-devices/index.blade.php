@@ -23,7 +23,9 @@
     </section>
 
     <section class="section-pad bg-white">
-        <div class="container-fluid">
+        {{-- sh:codes --}}
+        {{-- <div class="container-fluid"> --}}
+        <div class="container">
             <form id="cpoFilters" class="surface p-4 mb-4" method="GET" action="{{ route('shop.certified-pre-owned-devices.index') }}">
                 <div class="row g-3 align-items-end">
                     <div class="col-md-5 col-xl-3">
