@@ -13,6 +13,8 @@ class DeviceType extends Model
 
     public const STATUSES = ['active', 'inactive'];
 
+    protected $table = 'repair_device_types';
+
     protected $fillable = ['name', 'slug', 'code', 'source', 'status', 'description', 'sort_order'];
 
     protected function casts(): array

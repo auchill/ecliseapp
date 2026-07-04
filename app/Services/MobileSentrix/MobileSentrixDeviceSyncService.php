@@ -9,7 +9,6 @@ use App\Models\DeviceGrade;
 use App\Models\DeviceManufacturer;
 use App\Models\DeviceModel;
 use App\Models\DeviceSize;
-use App\Models\DeviceType;
 use App\Models\MobileSentrixDevice;
 use App\Models\MobileSentrixSyncLog;
 use Illuminate\Database\Eloquent\Model;
@@ -142,13 +141,12 @@ class MobileSentrixDeviceSyncService
             $device ??= new MobileSentrixDevice;
 
             $manufacturerText = $this->limitString($this->textValue($record, 'manufacturer_text') ?: $this->textValue($record, 'device_manufacturer_text') ?: $this->textValue($record, 'brand_text'));
-            $modelText = $this->limitString($this->textValue($record, 'device_model_text') ?: $this->textValue($record, 'model_text'));
+            $modelText = $this->modelTextFromRecord($record);
             $colorText = $this->limitString($this->textValue($record, 'device_color_text') ?: $this->textValue($record, 'color_text'));
             $conditionText = $this->limitString($this->textValue($record, 'condition_text') ?: $this->textValue($record, 'device_grade_text') ?: $this->textValue($record, 'condition'));
             $carrierText = $this->limitString($this->textValue($record, 'device_carrier_text') ?: $this->textValue($record, 'carrier_text'));
             $sizeText = $this->limitString($this->textValue($record, 'device_size_text') ?: $this->textValue($record, 'size_text'));
             $gradeText = $this->limitString($this->textValue($record, 'device_grade_text'));
-            $typeText = $this->limitString($this->textValue($record, 'attribute_set') ?: $this->textValue($record, 'product_type') ?: 'Certified Pre-Owned Device');
 
             $device->fill([
                 'device_manufacturer_id' => $this->lookup(DeviceManufacturer::class, $manufacturerText)?->id,
@@ -158,7 +156,6 @@ class MobileSentrixDeviceSyncService
                 'device_carrier_id' => $this->lookup(DeviceCarrier::class, $carrierText)?->id,
                 'device_size_id' => $this->lookup(DeviceSize::class, $sizeText)?->id,
                 'device_grade_id' => $this->lookup(DeviceGrade::class, $gradeText)?->id,
-                'device_type_id' => $this->lookup(DeviceType::class, $typeText)?->id,
                 'entity_id' => $entityId,
                 'sku' => $sku,
                 'name' => $this->limitString($this->textValue($record, 'name') ?: $this->textValue($record, 'title'), 512),
@@ -399,10 +396,35 @@ class MobileSentrixDeviceSyncService
     private function safeError(\Throwable $exception, array $record): array
     {
         return [
+            'exception' => $exception::class,
             'message' => Str::limit($exception->getMessage(), 500, '...'),
             'entity_id' => $record['entity_id'] ?? $record['product_id'] ?? $record['id'] ?? null,
-            'sku' => $record['sku'] ?? $record['product_code'] ?? null,
+            'product_id' => $record['product_id'] ?? $record['id'] ?? null,
+            'sku' => $record['sku'] ?? $record['product_code'] ?? $record['new_sku'] ?? null,
+            'name' => Str::limit((string) ($record['name'] ?? $record['title'] ?? ''), 160, ''),
         ];
+    }
+
+    private function modelTextFromRecord(array $record): ?string
+    {
+        foreach ([
+            'device_model_text',
+            'model_text',
+            'device_name_text',
+            'device_model',
+            'model',
+            'model_name',
+            'product_model',
+            'product_model_text',
+        ] as $key) {
+            $value = $this->limitString($this->textValue($record, $key));
+
+            if (filled($value)) {
+                return $value;
+            }
+        }
+
+        return null;
     }
 
     private function textValue(array $record, string $key): ?string

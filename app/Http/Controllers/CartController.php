@@ -6,6 +6,7 @@ use App\Models\Cart;
 use App\Models\CartItem;
 use App\Models\MobileSentrixDevice;
 use App\Models\Product;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class CartController extends Controller
@@ -25,27 +26,25 @@ class CartController extends Controller
     public function store(Request $request, Product $product)
     {
         abort_if($request->user()?->isAdmin(), 403);
+
+        if (! $request->user()?->isCustomer()) {
+            return $this->authRequired($request);
+        }
+
         abort_unless($product->status === 'Active' && $product->quantity > 0, 404);
 
         $data = $request->validate([
             'quantity' => ['required', 'integer', 'min:1', 'max:'.$product->quantity],
         ]);
 
-        if ($request->user()) {
-            $cart = $this->activeCart($request);
-            $item = $cart->items()->firstOrNew([
-                'product_id' => $this->ecliseProductId($product),
-                'item_source' => CartItem::SOURCE_ECLISE,
-            ]);
-            $item->unit_price = $product->currentPrice();
-            $item->quantity = min($product->quantity, ($item->exists ? $item->quantity : 0) + $data['quantity']);
-            $item->save();
-        } else {
-            $cart = $this->normalizedSessionCart($request);
-            $key = $this->cartKey(CartItem::SOURCE_ECLISE, $this->ecliseProductId($product));
-            $cart[$key] = min($product->quantity, ($cart[$key] ?? 0) + $data['quantity']);
-            $request->session()->put('cart.items', $cart);
-        }
+        $cart = $this->activeCart($request);
+        $item = $cart->items()->firstOrNew([
+            'product_id' => $this->ecliseProductId($product),
+            'item_source' => CartItem::SOURCE_ECLISE,
+        ]);
+        $item->unit_price = $product->currentPrice();
+        $item->quantity = min($product->quantity, ($item->exists ? $item->quantity : 0) + $data['quantity']);
+        $item->save();
 
         return back()->with('status', 'Product added to cart.');
     }
@@ -53,29 +52,75 @@ class CartController extends Controller
     public function storeDevice(Request $request, MobileSentrixDevice $device)
     {
         abort_if($request->user()?->isAdmin(), 403);
+
+        if (! $request->user()?->isCustomer()) {
+            return $this->authRequired($request);
+        }
+
         abort_unless($device->availableQuantity() > 0, 404);
 
         $data = $request->validate([
             'quantity' => ['required', 'integer', 'min:1', 'max:'.$device->availableQuantity()],
         ]);
 
-        if ($request->user()) {
-            $cart = $this->activeCart($request);
+        $cart = $this->activeCart($request);
+        $item = $cart->items()->firstOrNew([
+            'product_id' => $device->cartProductId(),
+            'item_source' => CartItem::SOURCE_MOBILESENTRIX,
+        ]);
+        $item->unit_price = $device->displayPrice() ?? 0;
+        $item->quantity = min($device->availableQuantity(), ($item->exists ? $item->quantity : 0) + $data['quantity']);
+        $item->save();
+
+        return back()->with('status', 'Certified pre-owned device added to cart.');
+    }
+
+    public function storeDevices(Request $request): RedirectResponse
+    {
+        abort_if($request->user()?->isAdmin(), 403);
+
+        if (! $request->user()?->isCustomer()) {
+            return $this->authRequired($request);
+        }
+
+        $data = $request->validate([
+            'devices' => ['required', 'array'],
+            'devices.*' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        $selected = collect($data['devices'])
+            ->map(fn ($quantity): int => (int) $quantity)
+            ->filter(fn (int $quantity): bool => $quantity > 0);
+
+        if ($selected->isEmpty()) {
+            return back()->withErrors(['devices' => 'Select at least one device quantity before adding to cart.']);
+        }
+
+        $cart = $this->activeCart($request);
+        $added = 0;
+
+        foreach ($selected as $deviceId => $quantity) {
+            $device = MobileSentrixDevice::query()->find($deviceId);
+
+            if (! $device || $device->availableQuantity() <= 0) {
+                continue;
+            }
+
             $item = $cart->items()->firstOrNew([
                 'product_id' => $device->cartProductId(),
                 'item_source' => CartItem::SOURCE_MOBILESENTRIX,
             ]);
             $item->unit_price = $device->displayPrice() ?? 0;
-            $item->quantity = min($device->availableQuantity(), ($item->exists ? $item->quantity : 0) + $data['quantity']);
+            $item->quantity = min($device->availableQuantity(), ($item->exists ? $item->quantity : 0) + $quantity);
             $item->save();
-        } else {
-            $cart = $this->normalizedSessionCart($request);
-            $key = $this->cartKey(CartItem::SOURCE_MOBILESENTRIX, $device->cartProductId());
-            $cart[$key] = min($device->availableQuantity(), ($cart[$key] ?? 0) + $data['quantity']);
-            $request->session()->put('cart.items', $cart);
+            $added++;
         }
 
-        return back()->with('status', 'Certified pre-owned device added to cart.');
+        if ($added === 0) {
+            return back()->withErrors(['devices' => 'Selected devices are no longer available.']);
+        }
+
+        return back()->with('status', $added.' certified pre-owned device '.($added === 1 ? 'item was' : 'items were').' added to cart.');
     }
 
     public function update(Request $request, Product $product)
@@ -181,6 +226,13 @@ class CartController extends Controller
             'user_id' => $request->user()->id,
             'status' => 'active',
         ]);
+    }
+
+    private function authRequired(Request $request): RedirectResponse
+    {
+        return back()
+            ->with('auth_required', true)
+            ->with('auth_required_url', $request->headers->get('referer') ?: url()->previous() ?: route('shop.index'));
     }
 
     private function cartItems(Request $request)

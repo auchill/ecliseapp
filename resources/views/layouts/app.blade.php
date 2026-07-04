@@ -49,17 +49,17 @@
                             <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle {{ request()->routeIs('repairs.*') || request()->routeIs('quotes.*') ? 'active' : '' }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Repair</a>
                                 <ul class="dropdown-menu">
-                                    <li><a class="dropdown-item" href="{{ route('quotes.create') }}">Get a Quote</a></li>
-                                    <li><a class="dropdown-item" href="{{ route('repairs.create') }}">Book Repair</a></li>
-                                    <li><a class="dropdown-item" href="{{ route('repairs.track') }}">Track Repair</a></li>
+                                    <li><a class="dropdown-item" href="{{ route('quotes.create') }}" @unless($publicNavUser) data-auth-required data-intended-url="{{ route('quotes.create') }}" @endunless>Get a Quote</a></li>
+                                    <li><a class="dropdown-item" href="{{ route('repairs.create') }}" @unless($publicNavUser) data-auth-required data-intended-url="{{ route('repairs.create') }}" @endunless>Book Repair</a></li>
+                                    <li><a class="dropdown-item" href="{{ route('repairs.track') }}" @unless($publicNavUser) data-auth-required data-intended-url="{{ route('repairs.track') }}" @endunless>Track Repair</a></li>
                                 </ul>
                             </li>
                             <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle {{ request()->routeIs('shop.*') || request()->routeIs('products.*') || request()->routeIs('orders.track*') ? 'active' : '' }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Shop</a>
                                 <ul class="dropdown-menu">
-                                    <li><a class="dropdown-item" href="{{ route('shop.index') }}">New & Retail Products</a></li>
-                                    <li><a class="dropdown-item" href="{{ route('shop.certified-pre-owned-devices.index') }}">Certified Pre-Owned Devices</a></li>
-                                    <li><a class="dropdown-item" href="{{ route('orders.track') }}">Track Order</a></li>
+                                    <li><a class="dropdown-item" href="{{ route('shop.index') }}" @unless($publicNavUser) data-auth-required data-intended-url="{{ route('shop.index') }}" @endunless>New & Retail Products</a></li>
+                                    <li><a class="dropdown-item" href="{{ route('shop.certified-pre-owned-devices.index') }}" @unless($publicNavUser) data-auth-required data-intended-url="{{ route('shop.certified-pre-owned-devices.index') }}" @endunless>Certified Pre-Owned Devices</a></li>
+                                    <li><a class="dropdown-item" href="{{ route('orders.track') }}" @unless($publicNavUser) data-auth-required data-intended-url="{{ route('orders.track') }}" @endunless>Track Order</a></li>
                                 </ul>
                             </li>
                             <li class="nav-item"><a class="nav-link {{ request()->routeIs('parts.*') ? 'active' : '' }}" href="{{ route('parts.index') }}">Parts</a></li>
@@ -104,11 +104,11 @@
                         <div class="col-sm-6 col-lg-4">
                             <h2 class="h6">Quick Links</h2>
                             <div class="d-flex flex-wrap gap-2">
-                                <a class="btn btn-outline-light btn-sm" href="{{ route('quotes.create') }}">Get a Quote</a>
-                                <a class="btn btn-outline-light btn-sm" href="{{ route('repairs.create') }}">Book Repair</a>
-                                <a class="btn btn-outline-light btn-sm" href="{{ route('repairs.track') }}">Track Repair</a>
-                                <a class="btn btn-outline-light btn-sm" href="{{ route('orders.track') }}">Track Order</a>
-                                <a class="btn btn-outline-light btn-sm" href="{{ route('shop.index') }}">Shop</a>
+                                <a class="btn btn-outline-light btn-sm" href="{{ route('quotes.create') }}" @unless($publicNavUser) data-auth-required data-intended-url="{{ route('quotes.create') }}" @endunless>Get a Quote</a>
+                                <a class="btn btn-outline-light btn-sm" href="{{ route('repairs.create') }}" @unless($publicNavUser) data-auth-required data-intended-url="{{ route('repairs.create') }}" @endunless>Book Repair</a>
+                                <a class="btn btn-outline-light btn-sm" href="{{ route('repairs.track') }}" @unless($publicNavUser) data-auth-required data-intended-url="{{ route('repairs.track') }}" @endunless>Track Repair</a>
+                                <a class="btn btn-outline-light btn-sm" href="{{ route('orders.track') }}" @unless($publicNavUser) data-auth-required data-intended-url="{{ route('orders.track') }}" @endunless>Track Order</a>
+                                <a class="btn btn-outline-light btn-sm" href="{{ route('shop.index') }}" @unless($publicNavUser) data-auth-required data-intended-url="{{ route('shop.index') }}" @endunless>Shop</a>
                                 <a class="btn btn-outline-light btn-sm" href="{{ route('parts.index') }}">Parts</a>
                             </div>
                         </div>
@@ -116,7 +116,67 @@
                 </div>
             </footer>
         </div>
+        @guest
+            <div class="modal fade" id="authRequiredModal" tabindex="-1" aria-labelledby="authRequiredModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2 class="modal-title h5" id="authRequiredModalLabel">Customer access required</h2>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            Login or register to continue.
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <a class="btn btn-outline-primary" id="authRequiredRegisterLink" href="{{ route('register') }}">Register</a>
+                            <a class="btn btn-primary" id="authRequiredLoginLink" href="{{ route('login') }}">Login</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endguest
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+        @guest
+            <script>
+                (() => {
+                    const modalElement = document.getElementById('authRequiredModal');
+                    if (!modalElement || !window.bootstrap) return;
+
+                    const modal = new bootstrap.Modal(modalElement);
+                    const loginLink = document.getElementById('authRequiredLoginLink');
+                    const registerLink = document.getElementById('authRequiredRegisterLink');
+                    const loginUrl = @json(route('login'));
+                    const registerUrl = @json(route('register'));
+
+                    const withIntended = (base, intended) => {
+                        const url = new URL(base, window.location.origin);
+                        if (intended) url.searchParams.set('intended', intended);
+                        return url.toString();
+                    };
+
+                    const showModal = (intended) => {
+                        loginLink.href = withIntended(loginUrl, intended);
+                        registerLink.href = withIntended(registerUrl, intended);
+                        modal.show();
+                    };
+
+                    document.addEventListener('click', (event) => {
+                        const trigger = event.target.closest('[data-auth-required]');
+                        if (!trigger) return;
+
+                        event.preventDefault();
+                        showModal(trigger.dataset.intendedUrl || trigger.href || window.location.href);
+                    });
+
+                    @if(session('auth_required'))
+                        showModal(@json(session('auth_required_url') ?: url()->current()));
+                    @endif
+
+                    document.dispatchEvent(new Event('auth-modal-ready'));
+                })();
+            </script>
+        @endguest
         @stack('scripts')
     </body>
 </html>

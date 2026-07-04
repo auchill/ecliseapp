@@ -31,7 +31,6 @@ return new class extends Migration
                 $table->foreignId('device_carrier_id')->nullable()->constrained('device_carriers')->nullOnDelete();
                 $table->foreignId('device_size_id')->nullable()->constrained('device_sizes')->nullOnDelete();
                 $table->foreignId('device_grade_id')->nullable()->constrained('device_grades')->nullOnDelete();
-                $table->foreignId('device_type_id')->nullable()->constrained('device_types')->nullOnDelete();
                 $table->unsignedBigInteger('entity_id')->nullable()->unique();
                 $table->string('sku')->nullable()->index();
                 $table->string('name', 512)->nullable();
@@ -124,7 +123,6 @@ return new class extends Migration
                 'device_carrier_id' => 'device_carriers',
                 'device_size_id' => 'device_sizes',
                 'device_grade_id' => 'device_grades',
-                'device_type_id' => 'device_types',
             ] as $column => $foreignTable) {
                 if (! Schema::hasColumn('mobilesentrix_devices', $column)) {
                     $table->foreignId($column)->nullable()->constrained($foreignTable)->nullOnDelete();

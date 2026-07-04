@@ -407,6 +407,37 @@ test('mobile sentrix parts sync maps products into parts without exposing suppli
         ->assertDontSee('MobileSentrix');
 });
 
+test('mobile sentrix parts sync keeps missing category ids raw without creating placeholders', function () {
+    Http::fake([
+        'https://preprod.mobilesentrix.ca/api/rest/products*' => Http::response([
+            [
+                'entity_id' => '9051',
+                'sku' => 'MS-MISSING-CATEGORY',
+                'status' => 1,
+                'name' => 'Part With Missing Category',
+                'price' => '12.00',
+                'category_ids' => ['999999'],
+                'is_in_stock' => true,
+                'in_stock_qty' => 2,
+            ],
+        ]),
+    ]);
+
+    $this->artisan('mobilesentrix:sync-parts', ['--limit' => 1])->assertSuccessful();
+
+    $part = Part::query()->where('sku', 'MS-MISSING-CATEGORY')->firstOrFail();
+    $log = MobileSentrixSyncLog::query()->where('sync_type', 'parts_full')->latest()->firstOrFail();
+
+    expect($part->raw_payload['category_ids'])->toBe(['999999'])
+        ->and($part->categories()->count())->toBe(0)
+        ->and($log->skipped_count)->toBeGreaterThanOrEqual(1)
+        ->and(json_encode($log->error_details))->toContain('missing category 999999');
+
+    $this->assertDatabaseMissing('part_categories', [
+        'name' => 'MobileSentrix Category 999999',
+    ]);
+});
+
 test('mobile sentrix full parts sync paginates products and logs parts full', function () {
     Http::fake(function ($request) {
         parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);

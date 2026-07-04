@@ -2,10 +2,7 @@
 
 namespace App\Support;
 
-use App\Models\Cart;
-use App\Models\CartItem;
 use App\Models\MobileSentrixDevice;
-use App\Models\Product;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -133,47 +130,6 @@ class MobileSentrixDeviceFilters
         $perPage = (int) $request->query('per_page', 10);
 
         return in_array($perPage, [10, 25, 50, 100], true) ? $perPage : 10;
-    }
-
-    public function cartSummary(Request $request): array
-    {
-        if ($request->user()?->isCustomer()) {
-            $cart = Cart::query()
-                ->where('user_id', $request->user()->id)
-                ->where('status', 'active')
-                ->with('items')
-                ->first();
-
-            return [
-                'count' => (int) ($cart?->items->sum('quantity') ?? 0),
-                'total' => (float) ($cart?->subtotal() ?? 0),
-            ];
-        }
-
-        $items = collect($request->session()->get('cart.items', []))
-            ->filter(fn ($quantity): bool => (int) $quantity > 0);
-
-        $total = $items->sum(function ($quantity, $key): float {
-            [$source, $productId] = str_contains((string) $key, ':')
-                ? explode(':', (string) $key, 2)
-                : [CartItem::SOURCE_ECLISE, 'ecl'.$key];
-
-            if ($source === CartItem::SOURCE_MOBILESENTRIX) {
-                $device = MobileSentrixDevice::query()
-                    ->where('entity_id', $productId)
-                    ->orWhere('sku', $productId)
-                    ->first();
-
-                return (float) ($device?->displayPrice() ?? 0) * (int) $quantity;
-            }
-
-            $id = preg_replace('/^ecl/i', '', $productId);
-            $product = is_numeric($id) ? Product::query()->find((int) $id) : null;
-
-            return (float) ($product?->currentPrice() ?? 0) * (int) $quantity;
-        });
-
-        return ['count' => (int) $items->sum(), 'total' => (float) $total];
     }
 
     public function csvRows(Builder $query): Collection

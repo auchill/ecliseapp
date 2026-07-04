@@ -17,7 +17,7 @@ class StoreQuoteRequest extends FormRequest
             'customer_name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255'],
             'phone_number' => ['required', 'string', 'max:40'],
-            'device_type_id' => ['required', 'exists:device_types,id'],
+            'device_type_id' => ['required', 'exists:repair_device_types,id'],
             'device_brand_id' => ['required', 'exists:device_brands,id'],
             'device_model_id' => ['nullable', 'exists:device_models,id'],
             'device_model' => ['nullable', 'string', 'max:255'],

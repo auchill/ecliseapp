@@ -10,7 +10,8 @@
         .cpo-filter-menu { min-width: 260px; max-height: 360px; overflow-y: auto; }
         .cpo-chip { border: 1px solid #dbe4f0; border-radius: 999px; padding: .35rem .65rem; background: #f8fafc; font-size: .8rem; }
         .cpo-qty { width: 110px; }
-        .cpo-cart-box { border: 2px solid #071d3a; border-radius: 8px; padding: 1rem; background: #fff; }
+        .cpo-action-bar { border: 2px solid #071d3a; border-radius: 8px; padding: 1rem; background: #fff; }
+        .cpo-total { color: #071d3a; font-size: 1.1rem; }
     </style>
 
     <section class="page-header">
@@ -71,106 +72,12 @@
                 @endforeach
             </form>
 
-            <div class="row g-4 align-items-start">
-                <div class="col-xl-10">
-                    @if ($selectedChips)
-                        <div class="d-flex flex-wrap gap-2 mb-3">
-                            @foreach ($selectedChips as $chip)
-                                <span class="cpo-chip">{{ $chip['label'] }}: {{ $chip['value'] }}</span>
-                            @endforeach
-                        </div>
-                    @endif
+            <div data-cpo-selected-chips>
+                @include('shop.certified-pre-owned-devices.partials.chips', ['selectedChips' => $selectedChips])
+            </div>
 
-                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                        <p class="mb-0 text-primary fw-bold">{{ number_format($devices->total()) }} result{{ $devices->total() === 1 ? '' : 's' }}</p>
-                        <p class="mb-0 muted">Showing {{ number_format($devices->firstItem() ?? 0) }}-{{ number_format($devices->lastItem() ?? 0) }}</p>
-                    </div>
-
-                    <div class="surface p-0 overflow-hidden">
-                        <div class="table-responsive">
-                            <table class="table table-sm table-bordered table-hover cpo-table mb-0">
-                                <thead>
-                                    <tr>
-                                        @foreach (['manufacturer_text' => 'Make', 'device_model_text' => 'Model', 'device_size_text' => 'Size', 'device_color_text' => 'Color', 'condition_text' => 'Condition', 'device_carrier_text' => 'Carrier'] as $field => $label)
-                                            <th>
-                                                <div class="dropdown">
-                                                    <button class="btn btn-sm text-white dropdown-toggle p-0 fw-bold text-uppercase" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">{{ $label }}</button>
-                                                    <div class="dropdown-menu p-3 cpo-filter-menu">
-                                                        <input class="form-control form-control-sm mb-2" placeholder="Search {{ strtolower($label) }}" data-cpo-filter-search>
-                                                        @foreach (($filterOptions[$field]['values'] ?? []) as $item)
-                                                            <label class="dropdown-item d-flex justify-content-between gap-3">
-                                                                <span>
-                                                                    <input class="form-check-input me-2" type="checkbox" value="{{ $item['value'] }}" data-cpo-filter-field="{{ $field }}" @checked(in_array($item['value'], (array) request($field, []), true))>
-                                                                    <span data-cpo-filter-label>{{ $item['value'] }}</span>
-                                                                </span>
-                                                                <span class="muted small">{{ $item['count'] }}</span>
-                                                            </label>
-                                                        @endforeach
-                                                    </div>
-                                                </div>
-                                            </th>
-                                        @endforeach
-                                        <th>Available</th>
-                                        <th>Price</th>
-                                        <th>Quantity</th>
-                                        <th></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @forelse ($devices as $device)
-                                        <tr>
-                                            <td>{{ $device->manufacturer_text ?: '—' }}</td>
-                                            <td>{{ $device->device_model_text ?: '—' }}</td>
-                                            <td>{{ $device->device_size_text ?: '—' }}</td>
-                                            <td>{{ $device->device_color_text ?: '—' }}</td>
-                                            <td>{{ $device->condition_text ?: '—' }}</td>
-                                            <td>{{ $device->device_carrier_text ?: '—' }}</td>
-                                            <td>{{ number_format($device->availableQuantity()) }} pcs</td>
-                                            <td class="cpo-price">{{ $device->displayPrice() !== null ? 'CA$'.number_format($device->displayPrice(), 2) : '—' }}</td>
-                                            <td>
-                                                <div class="input-group input-group-sm cpo-qty" data-cpo-quantity>
-                                                    <button class="btn btn-outline-secondary" type="button" data-cpo-minus>-</button>
-                                                    <input class="form-control text-center" form="addDevice{{ $device->id }}" name="quantity" value="1" min="1" max="{{ $device->availableQuantity() }}" type="number">
-                                                    <button class="btn btn-outline-secondary" type="button" data-cpo-plus>+</button>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                @unless(auth()->user()?->isAdmin())
-                                                    <form id="addDevice{{ $device->id }}" method="POST" action="{{ route('cart.devices.store', $device) }}">
-                                                        @csrf
-                                                        <button class="btn btn-danger btn-sm text-nowrap" type="submit"><i class="bi bi-bag-plus me-1"></i>Add To Cart</button>
-                                                    </form>
-                                                @endunless
-                                            </td>
-                                        </tr>
-                                    @empty
-                                        <tr><td class="text-center py-5 muted" colspan="10">No available certified pre-owned devices match the selected filters.</td></tr>
-                                    @endforelse
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <div class="mt-4">{{ $devices->links() }}</div>
-                </div>
-
-                <div class="col-xl-2">
-                    <div class="cpo-cart-box sticky-xl-top" style="top: 92px;">
-                        <p class="eyebrow mb-2">Cart Total</p>
-                        <p class="h4 fw-bold mb-1">CA${{ number_format($cartSummary['total'], 2) }}</p>
-                        <p class="muted small">{{ number_format($cartSummary['count']) }} item{{ $cartSummary['count'] === 1 ? '' : 's' }}</p>
-                        <div class="d-grid gap-2">
-                            <a class="btn btn-dark" href="{{ route('cart.index') }}"><i class="bi bi-cart me-2"></i>View Cart</a>
-                            @auth
-                                @if(auth()->user()->isCustomer())
-                                    <a class="btn btn-primary" href="{{ route('checkout.show') }}"><i class="bi bi-credit-card me-2"></i>Checkout</a>
-                                @endif
-                            @else
-                                <a class="btn btn-primary" href="{{ route('login') }}"><i class="bi bi-box-arrow-in-right me-2"></i>Checkout</a>
-                            @endauth
-                        </div>
-                    </div>
-                </div>
+            <div data-cpo-results>
+                @include('shop.certified-pre-owned-devices.partials.table', ['devices' => $devices, 'filterOptions' => $filterOptions])
             </div>
         </div>
     </section>
@@ -181,42 +88,144 @@
         (() => {
             const form = document.getElementById('cpoFilters');
             if (!form) return;
+            const results = document.querySelector('[data-cpo-results]');
+            const selectedChips = document.querySelector('[data-cpo-selected-chips]');
+            const currency = new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' });
+            let searchController;
 
-            document.querySelectorAll('[data-cpo-filter-search]').forEach((input) => {
-                input.addEventListener('input', () => {
-                    const term = input.value.toLowerCase();
-                    input.closest('.dropdown-menu')?.querySelectorAll('.dropdown-item').forEach((item) => {
-                        const label = item.querySelector('[data-cpo-filter-label]')?.textContent.toLowerCase() || '';
-                        item.classList.toggle('d-none', !label.includes(term));
+            const formParams = () => new URLSearchParams(new FormData(form));
+            const targetUrl = (url = null) => {
+                if (url) {
+                    const parsed = new URL(url, window.location.origin);
+                    const target = new URL(form.action, window.location.origin);
+                    target.search = parsed.search;
+                    return target;
+                }
+
+                const target = new URL(form.action, window.location.origin);
+                target.search = formParams().toString();
+                return target;
+            };
+
+            const bindFilterMenus = () => {
+                document.querySelectorAll('[data-cpo-filter-menu]').forEach((menu) => {
+                    menu.addEventListener('click', (event) => event.stopPropagation());
+                });
+
+                document.querySelectorAll('[data-cpo-filter-search]').forEach((input) => {
+                    input.addEventListener('input', () => {
+                        const term = input.value.toLowerCase();
+                        input.closest('.dropdown-menu')?.querySelectorAll('.dropdown-item').forEach((item) => {
+                            const label = item.querySelector('[data-cpo-filter-label]')?.textContent.toLowerCase() || '';
+                            item.classList.toggle('d-none', !label.includes(term));
+                        });
                     });
                 });
-            });
 
-            document.querySelectorAll('[data-cpo-filter-field]').forEach((checkbox) => {
-                checkbox.addEventListener('change', () => {
-                    const field = checkbox.dataset.cpoFilterField;
-                    form.querySelectorAll(`[data-cpo-hidden-filter="${field}"]`).forEach((node) => node.remove());
-                    document.querySelectorAll(`[data-cpo-filter-field="${field}"]:checked`).forEach((checked) => {
-                        const hidden = document.createElement('input');
-                        hidden.type = 'hidden';
-                        hidden.name = `${field}[]`;
-                        hidden.value = checked.value;
-                        hidden.dataset.cpoHiddenFilter = field;
-                        form.appendChild(hidden);
+                document.querySelectorAll('[data-cpo-filter-field]').forEach((checkbox) => {
+                    checkbox.addEventListener('change', () => {
+                        const field = checkbox.dataset.cpoFilterField;
+                        form.querySelectorAll(`[data-cpo-hidden-filter="${field}"]`).forEach((node) => node.remove());
+                        document.querySelectorAll(`[data-cpo-filter-field="${field}"]:checked`).forEach((checked) => {
+                            const hidden = document.createElement('input');
+                            hidden.type = 'hidden';
+                            hidden.name = `${field}[]`;
+                            hidden.value = checked.value;
+                            hidden.dataset.cpoHiddenFilter = field;
+                            form.appendChild(hidden);
+                        });
+                        runSearch();
                     });
-                    form.submit();
                 });
+            };
+
+            const updateSelectedTotal = () => {
+                let total = 0;
+                document.querySelectorAll('[data-cpo-row]').forEach((row) => {
+                    const input = row.querySelector('[data-cpo-qty-input]');
+                    total += Number(row.dataset.cpoPrice || 0) * Number(input?.value || 0);
+                });
+                document.querySelector('[data-cpo-selected-total]').textContent = currency.format(total).replace('$', 'CA$');
+            };
+
+            const bindQuantities = () => {
+                document.querySelectorAll('[data-cpo-quantity]').forEach((group) => {
+                    const input = group.querySelector('[data-cpo-qty-input]');
+                    const normalize = () => {
+                        input.value = Math.min(Number(input.max || 0), Math.max(Number(input.min || 0), Number(input.value || 0)));
+                        updateSelectedTotal();
+                    };
+                    group.querySelector('[data-cpo-minus]')?.addEventListener('click', () => {
+                        input.value = Math.max(Number(input.min || 0), Number(input.value || 0) - 1);
+                        updateSelectedTotal();
+                    });
+                    group.querySelector('[data-cpo-plus]')?.addEventListener('click', () => {
+                        input.value = Math.min(Number(input.max || 0), Number(input.value || 0) + 1);
+                        updateSelectedTotal();
+                    });
+                    input?.addEventListener('input', normalize);
+                    input?.addEventListener('change', normalize);
+                });
+                updateSelectedTotal();
+            };
+
+            const bindPagination = () => {
+                document.querySelector('[data-cpo-pagination]')?.addEventListener('click', (event) => {
+                    const link = event.target.closest('a');
+                    if (!link) return;
+                    event.preventDefault();
+                    runSearch(link.href);
+                });
+            };
+
+            const bindResults = () => {
+                bindFilterMenus();
+                bindQuantities();
+                bindPagination();
+            };
+
+            const runSearch = (url = null) => {
+                searchController?.abort();
+                searchController = new AbortController();
+                const target = targetUrl(url);
+
+                fetch(target, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    signal: searchController.signal,
+                })
+                    .then((response) => response.ok ? response.json() : Promise.reject())
+                    .then((payload) => {
+                        results.innerHTML = payload.html;
+                        if (selectedChips) selectedChips.innerHTML = payload.chips_html || '';
+                        window.history.replaceState({}, '', target);
+                        bindResults();
+                    })
+                    .catch((error) => {
+                        if (error.name !== 'AbortError') {
+                            results.innerHTML = '<div class="surface p-4">Device search failed. Please try again.</div>';
+                        }
+                    });
+            };
+
+            form.addEventListener('submit', (event) => {
+                event.preventDefault();
+                runSearch();
             });
 
-            document.querySelectorAll('[data-cpo-quantity]').forEach((group) => {
-                const input = group.querySelector('input');
-                group.querySelector('[data-cpo-minus]')?.addEventListener('click', () => {
-                    input.value = Math.max(Number(input.min || 1), Number(input.value || 1) - 1);
-                });
-                group.querySelector('[data-cpo-plus]')?.addEventListener('click', () => {
-                    input.value = Math.min(Number(input.max || 1), Number(input.value || 1) + 1);
-                });
+            form.querySelectorAll('input, select').forEach((field) => {
+                field.addEventListener('change', () => runSearch());
+                if (field.tagName === 'INPUT') {
+                    let timer;
+                    field.addEventListener('input', () => {
+                        window.clearTimeout(timer);
+                        timer = window.setTimeout(() => runSearch(), 300);
+                    });
+                }
             });
+
+            bindResults();
+
+            document.addEventListener('auth-modal-ready', bindResults);
         })();
     </script>
 @endpush

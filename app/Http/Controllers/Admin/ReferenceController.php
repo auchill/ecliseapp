@@ -42,7 +42,7 @@ class ReferenceController extends Controller
             'title' => 'Device Types',
             'singular' => 'Device Type',
             'route' => 'admin.device-types',
-            'table' => 'device_types',
+            'table' => 'repair_device_types',
         ],
         'device-brands' => [
             'model' => DeviceBrand::class,

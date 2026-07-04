@@ -4,7 +4,6 @@
             <div class="surface part-card h-100 overflow-hidden">
                 <img src="{{ $part->imageUrl() }}" alt="{{ $part->name }}">
                 <div class="p-4">
-                    <p class="eyebrow mb-1">{{ $part->categoryName() }}</p>
                     <h2 class="h5 fw-bold">{{ $part->name }}</h2>
                     <p class="muted small mb-2">{{ $part->brandName() }} &middot; {{ $part->modelName() }}</p>
                     <div class="small muted mb-3">

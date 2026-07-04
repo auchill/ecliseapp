@@ -66,6 +66,7 @@ Route::middleware('no_admin_cart')->group(function (): void {
     Route::post('/repairs/book', [RepairBookingController::class, 'store'])->name('repairs.store');
     Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
     Route::post('/cart/products/{product}', [CartController::class, 'store'])->name('cart.store');
+    Route::post('/cart/mobilesentrix-devices', [CartController::class, 'storeDevices'])->name('cart.devices.bulk');
     Route::post('/cart/mobilesentrix-devices/{device}', [CartController::class, 'storeDevice'])->name('cart.devices.store');
     Route::patch('/cart/products/{product}', [CartController::class, 'update'])->name('cart.update');
     Route::delete('/cart/products/{product}', [CartController::class, 'destroy'])->name('cart.destroy');

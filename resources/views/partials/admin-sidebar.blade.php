@@ -15,7 +15,6 @@
             ['label' => 'Device Carriers', 'route' => 'admin.device-carriers.index', 'icon' => 'bi-broadcast-pin', 'active' => 'admin.device-carriers.*'],
             ['label' => 'Device Sizes', 'route' => 'admin.device-sizes.index', 'icon' => 'bi-aspect-ratio', 'active' => 'admin.device-sizes.*'],
             ['label' => 'Device Grades', 'route' => 'admin.device-grades.index', 'icon' => 'bi-stars', 'active' => 'admin.device-grades.*'],
-            ['label' => 'Device Types', 'route' => 'admin.device-types.index', 'icon' => 'bi-hdd-stack', 'active' => 'admin.device-types.*'],
         ],
         'Repairs' => [
             ['label' => 'Device Types', 'route' => 'admin.device-types.index', 'icon' => 'bi-hdd-stack', 'active' => 'admin.device-types.*'],

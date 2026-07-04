@@ -84,7 +84,7 @@ class QuoteController extends Controller
         abort_if($quote->status === 'rejected', 422, 'Rejected quotes cannot be converted.');
 
         $data = $request->validate([
-            'device_type_id' => ['required', 'exists:device_types,id'],
+            'device_type_id' => ['required', 'exists:repair_device_types,id'],
             'device_brand_id' => ['nullable', 'exists:device_brands,id'],
             'device_model_id' => ['nullable', 'exists:device_models,id'],
             'device_model' => ['nullable', 'string', 'max:255'],

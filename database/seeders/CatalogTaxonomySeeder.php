@@ -20,7 +20,19 @@ class CatalogTaxonomySeeder extends Seeder
             );
         }
 
-        foreach (['Phones', 'Laptops', 'Accessories', 'Tablets', 'Chargers'] as $index => $name) {
+        foreach ([
+            'Phone',
+            'Laptop',
+            'Tablet',
+            'Desktop',
+            'Game Console',
+            'Smart Watch',
+            'Accessories',
+            'Parts',
+            'Phones',
+            'Laptops',
+            'Chargers',
+        ] as $index => $name) {
             ProductCategory::query()->updateOrCreate(
                 ['slug' => Str::slug($name)],
                 ['name' => $name, 'is_active' => true, 'sort_order' => ($index + 1) * 10],

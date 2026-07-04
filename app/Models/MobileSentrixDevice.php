@@ -21,7 +21,6 @@ class MobileSentrixDevice extends Model
         'device_carrier_id',
         'device_size_id',
         'device_grade_id',
-        'device_type_id',
         'entity_id',
         'sku',
         'name',
@@ -94,11 +93,6 @@ class MobileSentrixDevice extends Model
     public function grade(): BelongsTo
     {
         return $this->belongsTo(DeviceGrade::class, 'device_grade_id');
-    }
-
-    public function type(): BelongsTo
-    {
-        return $this->belongsTo(DeviceType::class, 'device_type_id');
     }
 
     public function scopeAvailable(Builder $query): Builder

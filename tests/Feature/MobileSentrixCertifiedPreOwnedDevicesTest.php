@@ -47,7 +47,7 @@ test('mobile sentrix device sync stores raw payload and lookup data without dupl
         'sku' => 'CPO-IPHONE-14-128',
         'name' => 'Apple iPhone 14 128GB Blue Certified Pre-Owned',
         'manufacturer_text' => 'Apple',
-        'device_model_text' => 'iPhone 14',
+        'model_text' => 'iPhone 14',
         'device_color_text' => 'Blue',
         'condition_text' => 'Excellent',
         'device_carrier_text' => 'Unlocked',
@@ -74,6 +74,7 @@ test('mobile sentrix device sync stores raw payload and lookup data without dupl
     expect(MobileSentrixDevice::query()->count())->toBe(1)
         ->and($device->entity_id)->toBe(73001)
         ->and($device->sku)->toBe('CPO-IPHONE-14-128')
+        ->and($device->device_model_text)->toBe('iPhone 14')
         ->and($device->raw_payload == $rawDevice)->toBeTrue()
         ->and(DeviceManufacturer::query()->where('slug', 'apple')->exists())->toBeTrue();
 
@@ -117,6 +118,8 @@ test('customer device listing only shows available devices and admin listing has
         ->assertOk()
         ->assertSee($available->device_model_text)
         ->assertSee('Add To Cart')
+        ->assertSee('TOTAL: <span data-cpo-selected-total>CA$0.00</span>', false)
+        ->assertSee('data-auth-required', false)
         ->assertDontSee('Galaxy S24');
 
     $this->actingAs(cpoTestUser('cpo-admin@example.com', 'admin'))
@@ -149,7 +152,7 @@ test('cart stores eclise and mobile sentrix items with distinct source identifie
     ]);
 
     $this->actingAs($customer)->post(route('cart.store', $product), ['quantity' => 1])->assertRedirect();
-    $this->actingAs($customer)->post(route('cart.devices.store', $device), ['quantity' => 2])->assertRedirect();
+    $this->actingAs($customer)->post(route('cart.devices.bulk'), ['devices' => [$device->id => 2]])->assertRedirect();
 
     $cart = Cart::query()->where('user_id', $customer->id)->where('status', 'active')->firstOrFail();
 

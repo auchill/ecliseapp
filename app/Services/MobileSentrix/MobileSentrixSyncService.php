@@ -220,7 +220,7 @@ class MobileSentrixSyncService
             $brand = $this->brandFromProduct($record);
             $models = $this->modelsFromProduct($record, $brand);
             $model = $models->first();
-            $categories = $this->categoriesFromProduct($record);
+            $categories = $this->categoriesFromProduct($record, $summary);
             $primaryCategory = $categories->first();
             $brandName = $brand?->name
                 ?: $this->stringValue($record, 'brand_text')
@@ -616,24 +616,24 @@ class MobileSentrixSyncService
         return $models->unique('id')->values();
     }
 
-    private function categoriesFromProduct(array $record): Collection
+    private function categoriesFromProduct(array $record, array &$summary): Collection
     {
         return collect($this->arrayValue($record['category_ids'] ?? []))
-            ->map(function ($categoryId) {
+            ->map(function ($categoryId) use ($record, &$summary) {
                 $categoryId = (int) $categoryId;
+                $category = PartCategory::query()->find($categoryId);
 
-                // Product pages often arrive before category sync has visited every category.
-                // Keep the relationship by creating a placeholder and let category sync fill details later.
-                return PartCategory::query()->firstOrCreate(
-                    ['id' => $categoryId],
-                    [
-                        'name' => 'MobileSentrix Category '.$categoryId,
-                        'slug' => Str::slug('MobileSentrix Category '.$categoryId),
-                        'status' => 'active',
-                        'is_active' => true,
-                        'synced_at' => now(),
-                    ],
-                );
+                if (! $category) {
+                    $summary['skipped_count']++;
+                    $this->addError($summary, [
+                        'message' => "MobileSentrix part references missing category {$categoryId}; keeping raw category_ids without creating a placeholder category.",
+                        'entity_id' => $record['entity_id'] ?? $record['product_id'] ?? null,
+                        'sku' => $record['sku'] ?? $record['new_sku'] ?? $record['product_code'] ?? null,
+                        'missing_category_id' => $categoryId,
+                    ]);
+                }
+
+                return $category;
             })
             ->filter()
             ->values();
@@ -966,9 +966,12 @@ class MobileSentrixSyncService
     private function safeError(\Throwable $exception, array $record): array
     {
         return [
+            'exception' => $exception::class,
             'message' => Str::limit($exception->getMessage(), 500, '...'),
             'entity_id' => $record['entity_id'] ?? $record['product_id'] ?? $record['category_id'] ?? null,
-            'sku' => $record['sku'] ?? $record['product_code'] ?? null,
+            'product_id' => $record['product_id'] ?? null,
+            'sku' => $record['sku'] ?? $record['new_sku'] ?? $record['product_code'] ?? null,
+            'name' => Str::limit((string) ($record['name'] ?? $record['title'] ?? ''), 160, ''),
         ];
     }
 

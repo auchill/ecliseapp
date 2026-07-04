@@ -14,8 +14,10 @@ use Illuminate\Validation\Rules\Password;
 
 class AuthController extends Controller
 {
-    public function showLogin()
+    public function showLogin(Request $request)
     {
+        $this->storeIntendedUrl($request);
+
         return view('auth.login');
     }
 
@@ -94,8 +96,10 @@ class AuthController extends Controller
         return redirect()->intended(route('admin.dashboard'));
     }
 
-    public function showRegister()
+    public function showRegister(Request $request)
     {
+        $this->storeIntendedUrl($request);
+
         return view('auth.register');
     }
 
@@ -119,7 +123,7 @@ class AuthController extends Controller
         Auth::login($user);
         $this->mergeSessionCart($request);
 
-        return redirect()->route('dashboard');
+        return redirect()->intended(route('dashboard'));
     }
 
     public function logout(Request $request)
@@ -197,6 +201,32 @@ class AuthController extends Controller
         });
 
         $request->session()->forget('cart.items');
+    }
+
+    private function storeIntendedUrl(Request $request): void
+    {
+        $intended = (string) $request->query('intended', '');
+
+        if ($intended === '') {
+            return;
+        }
+
+        if (str_starts_with($intended, '/') && ! str_starts_with($intended, '//')) {
+            $intended = url($intended);
+        }
+
+        $appHost = parse_url(url('/'), PHP_URL_HOST);
+        $intendedHost = parse_url($intended, PHP_URL_HOST);
+
+        if (! $intendedHost || $intendedHost !== $appHost) {
+            return;
+        }
+
+        if (str_starts_with((string) parse_url($intended, PHP_URL_PATH), '/admin')) {
+            return;
+        }
+
+        $request->session()->put('url.intended', $intended);
     }
 
     private function parseCartKey(string $key): array
