@@ -3,6 +3,20 @@
         'Overview' => [
             ['label' => 'Dashboard', 'route' => 'admin.dashboard', 'icon' => 'bi-speedometer2', 'active' => 'admin.dashboard'],
         ],
+        'MobileSentrix API' => [
+            ['label' => 'API Dashboard', 'route' => 'admin.parts.mobilesentrix.index', 'icon' => 'bi-cloud-arrow-down', 'active' => 'admin.parts.mobilesentrix.*'],
+        ],
+        'MobileSentrix Devices' => [
+            ['label' => 'Pre-Owned Devices', 'route' => 'admin.devices.index', 'icon' => 'bi-phone', 'active' => 'admin.devices.*'],
+            ['label' => 'Device Manufacturers', 'route' => 'admin.device-manufacturers.index', 'icon' => 'bi-building', 'active' => 'admin.device-manufacturers.*'],
+            ['label' => 'Device Models', 'route' => 'admin.device-models.index', 'icon' => 'bi-phone-landscape', 'active' => 'admin.device-models.*'],
+            ['label' => 'Device Colors', 'route' => 'admin.device-colors.index', 'icon' => 'bi-palette', 'active' => 'admin.device-colors.*'],
+            ['label' => 'Device Conditions', 'route' => 'admin.device-conditions.index', 'icon' => 'bi-check2-square', 'active' => 'admin.device-conditions.*'],
+            ['label' => 'Device Carriers', 'route' => 'admin.device-carriers.index', 'icon' => 'bi-broadcast-pin', 'active' => 'admin.device-carriers.*'],
+            ['label' => 'Device Sizes', 'route' => 'admin.device-sizes.index', 'icon' => 'bi-aspect-ratio', 'active' => 'admin.device-sizes.*'],
+            ['label' => 'Device Grades', 'route' => 'admin.device-grades.index', 'icon' => 'bi-stars', 'active' => 'admin.device-grades.*'],
+            ['label' => 'Device Types', 'route' => 'admin.device-types.index', 'icon' => 'bi-hdd-stack', 'active' => 'admin.device-types.*'],
+        ],
         'Repairs' => [
             ['label' => 'Device Types', 'route' => 'admin.device-types.index', 'icon' => 'bi-hdd-stack', 'active' => 'admin.device-types.*'],
             ['label' => 'Device Brands', 'route' => 'admin.device-brands.index', 'icon' => 'bi-bookmark', 'active' => 'admin.device-brands.*'],
@@ -19,7 +33,6 @@
             ['label' => 'Payments', 'route' => 'admin.shop-payments.index', 'icon' => 'bi-credit-card', 'active' => 'admin.shop-payments.*'],
         ],
         'Parts' => [
-            ['label' => 'MobileSentrix API', 'route' => 'admin.parts.mobilesentrix.index', 'icon' => 'bi-cloud-arrow-down', 'active' => 'admin.parts.mobilesentrix.*'],
             ['label' => 'Parts', 'route' => 'admin.parts.index', 'icon' => 'bi-box-seam', 'active' => 'admin.parts.index'],
             ['label' => 'Parts Brands', 'route' => 'admin.part-brands.index', 'icon' => 'bi-tags', 'active' => 'admin.part-brands.*'],
             ['label' => 'Parts Categories', 'route' => 'admin.part-categories.index', 'icon' => 'bi-grid', 'active' => 'admin.part-categories.*'],

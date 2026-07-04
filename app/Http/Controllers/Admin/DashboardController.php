@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ContactMessage;
+use App\Models\MobileSentrixDevice;
 use App\Models\Order;
 use App\Models\Part;
 use App\Models\Payment;
@@ -29,6 +30,7 @@ class DashboardController extends Controller
                 'Customers' => ['value' => User::query()->customers()->count(), 'route' => route('admin.customers.index'), 'icon' => 'bi-people'],
                 'Messages' => ['value' => ContactMessage::query()->whereNull('read_at')->count(), 'route' => route('admin.contact-messages.index'), 'icon' => 'bi-envelope'],
                 'Products' => ['value' => Product::query()->count(), 'route' => route('admin.products.index'), 'icon' => 'bi-phone'],
+                'Pre-owned devices' => ['value' => MobileSentrixDevice::query()->count(), 'route' => route('admin.devices.index'), 'icon' => 'bi-phone-fill'],
                 'Listed parts' => ['value' => Part::query()->count(), 'route' => route('admin.parts.index'), 'icon' => 'bi-cpu'],
             ],
             'repairs' => RepairBooking::query()->latest()->take(5)->get(),

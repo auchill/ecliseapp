@@ -7,7 +7,7 @@
         <div class="container">
             <p class="eyebrow mb-2">Shop</p>
             <h1 class="display-5 fw-bold mb-3">Phones, computers, and accessories.</h1>
-            <p class="fs-5 mb-0">Browse used, new, and refurbished technology available through Eclise.</p>
+            <p class="fs-5 mb-0">Browse used, new, and refurbished devices.</p>
         </div>
     </section>
 

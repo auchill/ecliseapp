@@ -13,7 +13,7 @@ class DeviceType extends Model
 
     public const STATUSES = ['active', 'inactive'];
 
-    protected $fillable = ['name', 'slug', 'status', 'description', 'sort_order'];
+    protected $fillable = ['name', 'slug', 'code', 'source', 'status', 'description', 'sort_order'];
 
     protected function casts(): array
     {

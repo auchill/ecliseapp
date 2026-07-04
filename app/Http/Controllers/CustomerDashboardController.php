@@ -13,7 +13,7 @@ class CustomerDashboardController extends Controller
         return view('customer.dashboard', [
             'repairs' => $user->repairBookings()->with('deviceBrand', 'deviceModel', 'issueCategory')->latest()->take(5)->get(),
             'orders' => $user->orders()->latest()->take(5)->get(),
-            'cart' => $user->carts()->where('status', 'active')->with('items.product')->first(),
+            'cart' => $user->carts()->where('status', 'active')->with('items')->first(),
         ]);
     }
 

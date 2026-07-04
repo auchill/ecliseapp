@@ -4,7 +4,13 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\DeviceBrand;
+use App\Models\DeviceCarrier;
+use App\Models\DeviceColor;
+use App\Models\DeviceCondition;
+use App\Models\DeviceGrade;
+use App\Models\DeviceManufacturer;
 use App\Models\DeviceModel;
+use App\Models\DeviceSize;
 use App\Models\DeviceType;
 use App\Models\IssueCategory;
 use App\Models\PartModel;
@@ -51,6 +57,48 @@ class ReferenceController extends Controller
             'singular' => 'Device Model',
             'route' => 'admin.device-models',
             'table' => 'device_models',
+        ],
+        'device-manufacturers' => [
+            'model' => DeviceManufacturer::class,
+            'title' => 'Device Manufacturers',
+            'singular' => 'Device Manufacturer',
+            'route' => 'admin.device-manufacturers',
+            'table' => 'device_manufacturers',
+        ],
+        'device-colors' => [
+            'model' => DeviceColor::class,
+            'title' => 'Device Colors',
+            'singular' => 'Device Color',
+            'route' => 'admin.device-colors',
+            'table' => 'device_colors',
+        ],
+        'device-conditions' => [
+            'model' => DeviceCondition::class,
+            'title' => 'Device Conditions',
+            'singular' => 'Device Condition',
+            'route' => 'admin.device-conditions',
+            'table' => 'device_conditions',
+        ],
+        'device-carriers' => [
+            'model' => DeviceCarrier::class,
+            'title' => 'Device Carriers',
+            'singular' => 'Device Carrier',
+            'route' => 'admin.device-carriers',
+            'table' => 'device_carriers',
+        ],
+        'device-sizes' => [
+            'model' => DeviceSize::class,
+            'title' => 'Device Sizes',
+            'singular' => 'Device Size',
+            'route' => 'admin.device-sizes',
+            'table' => 'device_sizes',
+        ],
+        'device-grades' => [
+            'model' => DeviceGrade::class,
+            'title' => 'Device Grades',
+            'singular' => 'Device Grade',
+            'route' => 'admin.device-grades',
+            'table' => 'device_grades',
         ],
         'issue-categories' => [
             'model' => IssueCategory::class,

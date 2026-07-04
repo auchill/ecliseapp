@@ -4,7 +4,7 @@
 
 @section('content')
     @php
-        $subtotal = $cart->subtotal();
+        $subtotal = $cartItems->sum('line_total');
         $tax = round($subtotal * 0.13, 2);
         $selectedFulfillment = $shippingMethods->isEmpty() ? 'pickup' : old('fulfillment_method', 'pickup');
         $selectedShippingMethodId = (string) old('shipping_method_id', array_key_first($shippingQuotes) ?? '');
@@ -176,13 +176,13 @@
                 <div class="col-lg-5">
                     <div class="surface p-4">
                         <h2 class="h4 fw-bold mb-3">Order Summary</h2>
-                        @foreach ($cart->items as $item)
+                        @foreach ($cartItems as $item)
                             <div class="d-flex justify-content-between gap-3 py-3 border-bottom">
                                 <div>
-                                    <strong>{{ $item->product->name }}</strong>
-                                    <div class="small muted">Qty {{ $item->quantity }}</div>
+                                    <strong>{{ $item['name'] }}</strong>
+                                    <div class="small muted">{{ $item['item_source'] }} &middot; Qty {{ $item['quantity'] }}</div>
                                 </div>
-                                <strong>${{ number_format($item->lineTotal(), 2) }}</strong>
+                                <strong>${{ number_format($item['line_total'], 2) }}</strong>
                             </div>
                         @endforeach
                         <div class="d-flex justify-content-between pt-3">

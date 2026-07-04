@@ -18,6 +18,7 @@ class MobileSentrixSyncLog extends Model
         'parts_full',
         'parts_category',
         'single_part',
+        'devices',
         'search',
     ];
 

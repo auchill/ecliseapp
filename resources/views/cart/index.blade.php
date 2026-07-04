@@ -33,27 +33,29 @@
                                     <tr>
                                         <td>
                                             <div class="d-flex align-items-center gap-3">
-                                                <img src="{{ $item['product']->imageUrl() }}" alt="{{ $item['product']->name }}" width="72" height="72" style="object-fit: contain;">
+                                                <img src="{{ $item['image_url'] }}" alt="{{ $item['name'] }}" width="72" height="72" style="object-fit: contain;">
                                                 <div>
-                                                    <strong>{{ $item['product']->name }}</strong>
-                                                    <div class="small muted">{{ $item['product']->sku }}</div>
+                                                    <strong>{{ $item['name'] }}</strong>
+                                                    <div class="small muted">{{ $item['source'] }} &middot; {{ $item['sku'] ?: 'No SKU' }}</div>
                                                 </div>
                                             </div>
                                         </td>
                                         <td>${{ number_format($item['unit_price'], 2) }}</td>
                                         <td>
-                                            <form class="d-flex gap-2" method="POST" action="{{ route('cart.update', $item['product']) }}">
+                                            <form class="d-flex gap-2" method="POST" action="{{ route('cart.items.update') }}">
                                                 @csrf
                                                 @method('PATCH')
-                                                <input class="form-control" name="quantity" type="number" min="1" max="{{ $item['product']->quantity }}" value="{{ $item['quantity'] }}" style="width: 96px;">
+                                                <input type="hidden" name="item_key" value="{{ $item['cart_key'] }}">
+                                                <input class="form-control" name="quantity" type="number" min="1" max="{{ $item['max_quantity'] }}" value="{{ $item['quantity'] }}" style="width: 96px;">
                                                 <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-arrow-repeat"></i><span class="visually-hidden">Update</span></button>
                                             </form>
                                         </td>
                                         <td>${{ number_format($item['line_total'], 2) }}</td>
                                         <td class="text-end">
-                                            <form method="POST" action="{{ route('cart.destroy', $item['product']) }}">
+                                            <form method="POST" action="{{ route('cart.items.destroy') }}">
                                                 @csrf
                                                 @method('DELETE')
+                                                <input type="hidden" name="item_key" value="{{ $item['cart_key'] }}">
                                                 <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-trash"></i><span class="visually-hidden">Remove</span></button>
                                             </form>
                                         </td>
@@ -63,7 +65,10 @@
                         </table>
                     </div>
                     <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 pt-3">
-                        <a class="btn btn-outline-primary" href="{{ route('shop.index') }}"><i class="bi bi-arrow-left me-2"></i>Continue Shopping</a>
+                        <div class="d-flex flex-wrap gap-2">
+                            <a class="btn btn-outline-primary" href="{{ route('shop.index') }}"><i class="bi bi-arrow-left me-2"></i>New & Retail Products</a>
+                            <a class="btn btn-outline-primary" href="{{ route('shop.certified-pre-owned-devices.index') }}"><i class="bi bi-phone me-2"></i>Certified Pre-Owned Devices</a>
+                        </div>
                         <div class="text-end">
                             <p class="h4 fw-bold mb-2">Subtotal: ${{ number_format($subtotal, 2) }}</p>
                             @auth

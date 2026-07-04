@@ -388,7 +388,7 @@ test('guest cart items merge into customer cart on login', function () {
 
     $cart = Cart::query()->where('user_id', $user->id)->where('status', 'active')->firstOrFail();
 
-    expect($cart->items()->where('product_id', $product->id)->value('quantity'))->toBe(2)
+    expect($cart->items()->where('product_id', 'ecl'.$product->id)->where('item_source', 'Eclise')->value('quantity'))->toBe(2)
         ->and(session('cart.items'))->toBeNull();
 });
 

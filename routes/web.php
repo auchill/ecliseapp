@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\ContactMessageController as AdminContactMessageController;
 use App\Http\Controllers\Admin\CustomerController as AdminCustomerController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Admin\DeviceController as AdminDeviceController;
 use App\Http\Controllers\Admin\MobileSentrixController as AdminMobileSentrixController;
 use App\Http\Controllers\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Admin\PartBrandController as AdminPartBrandController;
@@ -21,6 +22,7 @@ use App\Http\Controllers\Admin\ShippingMethodController as AdminShippingMethodCo
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CartController;
+use App\Http\Controllers\CertifiedPreOwnedDeviceController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\CustomerDashboardController;
@@ -45,6 +47,8 @@ Route::get('/repairs/track', [RepairBookingController::class, 'trackForm'])->nam
 Route::post('/repairs/track', [RepairBookingController::class, 'track'])->name('repairs.track.submit');
 
 Route::get('/shop', [ShopController::class, 'index'])->name('shop.index');
+Route::get('/shop/certified-pre-owned-devices', [CertifiedPreOwnedDeviceController::class, 'index'])->name('shop.certified-pre-owned-devices.index');
+Route::get('/shop/certified-pre-owned-devices/export', [CertifiedPreOwnedDeviceController::class, 'export'])->name('shop.certified-pre-owned-devices.export');
 Route::get('/products/{product}', [ShopController::class, 'show'])->name('products.show');
 Route::get('/orders/track', [OrderTrackingController::class, 'form'])->name('orders.track');
 Route::post('/orders/track/result', [OrderTrackingController::class, 'result'])->name('orders.track.result');
@@ -62,8 +66,11 @@ Route::middleware('no_admin_cart')->group(function (): void {
     Route::post('/repairs/book', [RepairBookingController::class, 'store'])->name('repairs.store');
     Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
     Route::post('/cart/products/{product}', [CartController::class, 'store'])->name('cart.store');
+    Route::post('/cart/mobilesentrix-devices/{device}', [CartController::class, 'storeDevice'])->name('cart.devices.store');
     Route::patch('/cart/products/{product}', [CartController::class, 'update'])->name('cart.update');
     Route::delete('/cart/products/{product}', [CartController::class, 'destroy'])->name('cart.destroy');
+    Route::patch('/cart/items', [CartController::class, 'updateItem'])->name('cart.items.update');
+    Route::delete('/cart/items', [CartController::class, 'destroyItem'])->name('cart.items.destroy');
     Route::get('/payments/{payment}', [PaymentController::class, 'show'])->name('payments.show');
     Route::get('/payments/{payment}/stripe/success', [PaymentController::class, 'stripeSuccess'])->name('payments.stripe.success');
     Route::get('/payments/{payment}/paypal/return', [PaymentController::class, 'paypalReturn'])->name('payments.paypal.return');
@@ -116,6 +123,12 @@ Route::middleware('admin')->prefix('admin')->name('admin.')->group(function (): 
         'repairs/issues' => 'issue-categories',
         'shop/product-models' => 'product-models',
         'parts/part-models' => 'part-models',
+        'mobilesentrix/device-manufacturers' => 'device-manufacturers',
+        'mobilesentrix/device-colors' => 'device-colors',
+        'mobilesentrix/device-conditions' => 'device-conditions',
+        'mobilesentrix/device-carriers' => 'device-carriers',
+        'mobilesentrix/device-sizes' => 'device-sizes',
+        'mobilesentrix/device-grades' => 'device-grades',
     ] as $path => $reference) {
         Route::get($path, [AdminReferenceController::class, 'index'])->defaults('reference', $reference)->name($reference.'.index');
         Route::get($path.'/create', [AdminReferenceController::class, 'create'])->defaults('reference', $reference)->name($reference.'.create');
@@ -148,6 +161,9 @@ Route::middleware('admin')->prefix('admin')->name('admin.')->group(function (): 
     Route::post('/parts/mobilesentrix/sync-categories', [AdminMobileSentrixController::class, 'syncCategories'])->name('parts.mobilesentrix.sync-categories');
     Route::post('/parts/mobilesentrix/sync-parts', [AdminMobileSentrixController::class, 'syncParts'])->name('parts.mobilesentrix.sync-parts');
     Route::post('/parts/mobilesentrix/refresh', [AdminMobileSentrixController::class, 'refreshPart'])->name('parts.mobilesentrix.refresh');
+    Route::get('/devices', [AdminDeviceController::class, 'index'])->name('devices.index');
+    Route::get('/devices/export', [AdminDeviceController::class, 'export'])->name('devices.export');
+    Route::post('/devices/sync', [AdminDeviceController::class, 'sync'])->name('devices.sync');
     Route::post('/parts/sync', [AdminPartController::class, 'sync'])->name('parts.sync');
     Route::get('/parts/search', [AdminPartController::class, 'search'])->name('parts.search');
     Route::get('/parts/suggestions', [AdminPartController::class, 'suggestions'])->name('parts.suggestions');

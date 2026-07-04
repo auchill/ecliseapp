@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Mail\AdminPaymentReceivedMail;
 use App\Mail\PaymentReceiptMail;
+use App\Models\CartItem;
 use App\Models\Order;
 use App\Models\Payment;
 use App\Models\RepairBooking;
@@ -81,7 +82,11 @@ class PaymentFinalizer
     {
         if (! $order->inventory_committed_at) {
             foreach ($order->items as $item) {
-                $product = $item->product;
+                if (($item->item_source ?: CartItem::SOURCE_ECLISE) !== CartItem::SOURCE_ECLISE) {
+                    continue;
+                }
+
+                $product = $item->ecliseProduct();
 
                 if ($product) {
                     $product->decrement('quantity', min($product->quantity, $item->quantity));

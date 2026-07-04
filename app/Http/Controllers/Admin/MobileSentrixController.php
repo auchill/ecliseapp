@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Jobs\MobileSentrix\SyncMobileSentrixCategoriesJob;
 use App\Jobs\MobileSentrix\SyncMobileSentrixPartsJob;
+use App\Models\MobileSentrixDevice;
 use App\Models\MobileSentrixSyncLog;
 use App\Models\Part;
 use App\Models\PartCategory;
@@ -32,7 +33,9 @@ class MobileSentrixController extends Controller
             'missingCredentials' => $client->missingCredentialNames(),
             'latestLogs' => MobileSentrixSyncLog::query()->latest()->limit(12)->get(),
             'lastCategoryLog' => MobileSentrixSyncLog::query()->where('sync_type', 'categories')->latest()->first(),
+            'lastDeviceLog' => MobileSentrixSyncLog::query()->where('sync_type', 'devices')->latest()->first(),
             'lastPartLog' => MobileSentrixSyncLog::query()->whereIn('sync_type', ['parts_full', 'parts_category', 'parts', 'single_part'])->latest()->first(),
+            'devicesCount' => MobileSentrixDevice::query()->count(),
             'partsCount' => Part::query()->where('is_api_item', true)->count(),
             'categoriesCount' => PartCategory::query()->whereNotNull('raw_payload')->count(),
             'queueConfigured' => $this->queueConfigured(),

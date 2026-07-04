@@ -7,10 +7,13 @@
         <div class="container">
             <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
                 <div>
-                    <p class="eyebrow">Parts</p>
+                    <p class="eyebrow">MobileSentrix</p>
                     <h1 class="display-6 fw-bold mb-0">MobileSentrix API</h1>
                 </div>
-                <a class="btn btn-outline-primary" href="{{ route('admin.parts.index') }}"><i class="bi bi-box-seam me-2"></i>Parts</a>
+                <div class="d-flex flex-wrap gap-2">
+                    <a class="btn btn-outline-primary" href="{{ route('admin.devices.index') }}"><i class="bi bi-phone me-2"></i>Pre-Owned Devices</a>
+                    <a class="btn btn-outline-primary" href="{{ route('admin.parts.index') }}"><i class="bi bi-box-seam me-2"></i>Parts</a>
+                </div>
             </div>
 
             <div class="row g-4 mb-4">
@@ -79,9 +82,13 @@
                             <span>Synced categories</span>
                             <strong>{{ number_format($categoriesCount) }}</strong>
                         </div>
-                        <div class="d-flex justify-content-between align-items-center py-2">
+                        <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
                             <span>API parts</span>
                             <strong>{{ number_format($partsCount) }}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center py-2">
+                            <span>Certified pre-owned devices</span>
+                            <strong>{{ number_format($devicesCount) }}</strong>
                         </div>
                     </div>
                 </div>
@@ -119,6 +126,7 @@
                 </div>
             </div>
 
+            @if (session('mobilesentrix_connection_status') === 'Failed')
             <div class="surface p-4 mb-4">
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
                     <div>
@@ -131,6 +139,7 @@
                 </div>
                 <textarea class="form-control font-monospace small" id="mobileSentrixSupportMessage" rows="10" readonly>{{ $safeSupportMessage }}</textarea>
             </div>
+            @endif
 
             <div class="row g-4 mb-4">
                 <div class="col-lg-3">
@@ -175,6 +184,21 @@
                     </form>
                 </div>
                 <div class="col-lg-3">
+                    <form class="surface p-4 h-100" method="POST" action="{{ route('admin.devices.sync') }}">
+                        @csrf
+                        <p class="eyebrow mb-2">Pre-Owned Devices</p>
+                        @unless ($queueConfigured)
+                            <div class="alert alert-warning small">Queue is not configured. Use the Artisan device sync command for large runs.</div>
+                        @endunless
+                        <label class="form-label" for="devices_limit">Limit</label>
+                        <input class="form-control mb-3" id="devices_limit" name="limit" min="1" max="500" value="30" type="number">
+                        <label class="form-label" for="devices_page">Start page</label>
+                        <input class="form-control mb-3" id="devices_page" name="page" min="1" value="1" type="number">
+                        <button class="btn btn-primary w-100" type="submit"><i class="bi bi-phone me-2"></i>Sync Devices</button>
+                        <a class="btn btn-outline-primary w-100 mt-2" href="{{ route('admin.devices.index') }}"><i class="bi bi-table me-2"></i>View Devices</a>
+                    </form>
+                </div>
+                <div class="col-lg-3">
                     <form class="surface p-4 h-100" method="POST" action="{{ route('admin.parts.mobilesentrix.refresh') }}">
                         @csrf
                         <p class="eyebrow mb-2">Single Part</p>
@@ -193,7 +217,8 @@
                     </div>
                     <div class="small muted">
                         Last category sync: {{ $lastCategoryLog?->finished_at?->diffForHumans() ?? 'Never' }}<br>
-                        Last parts sync: {{ $lastPartLog?->finished_at?->diffForHumans() ?? 'Never' }}
+                        Last parts sync: {{ $lastPartLog?->finished_at?->diffForHumans() ?? 'Never' }}<br>
+                        Last device sync: {{ $lastDeviceLog?->finished_at?->diffForHumans() ?? 'Never' }}
                     </div>
                 </div>
                 <div class="table-responsive">

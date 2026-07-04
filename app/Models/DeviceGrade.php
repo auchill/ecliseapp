@@ -7,11 +7,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class DeviceModel extends Model
+class DeviceGrade extends Model
 {
     use HasFactory;
-
-    public const STATUSES = ['active', 'inactive'];
 
     protected $fillable = ['name', 'slug', 'code', 'source', 'status', 'description', 'sort_order'];
 
@@ -20,14 +18,9 @@ class DeviceModel extends Model
         return ['sort_order' => 'integer'];
     }
 
-    public function quotes(): HasMany
+    public function mobileSentrixDevices(): HasMany
     {
-        return $this->hasMany(Quote::class);
-    }
-
-    public function repairBookings(): HasMany
-    {
-        return $this->hasMany(RepairBooking::class);
+        return $this->hasMany(MobileSentrixDevice::class);
     }
 
     public function scopeActive(Builder $query): Builder

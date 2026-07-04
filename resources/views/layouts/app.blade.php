@@ -57,7 +57,8 @@
                             <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle {{ request()->routeIs('shop.*') || request()->routeIs('products.*') || request()->routeIs('orders.track*') ? 'active' : '' }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Shop</a>
                                 <ul class="dropdown-menu">
-                                    <li><a class="dropdown-item" href="{{ route('shop.index') }}">Shop Online</a></li>
+                                    <li><a class="dropdown-item" href="{{ route('shop.index') }}">New & Retail Products</a></li>
+                                    <li><a class="dropdown-item" href="{{ route('shop.certified-pre-owned-devices.index') }}">Certified Pre-Owned Devices</a></li>
                                     <li><a class="dropdown-item" href="{{ route('orders.track') }}">Track Order</a></li>
                                 </ul>
                             </li>

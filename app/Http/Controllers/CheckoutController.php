@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\CheckoutRequest;
 use App\Models\Cart;
+use App\Models\CartItem;
 use App\Models\Order;
 use App\Services\PaymentGatewayService;
 use App\Services\ShippingCostService;
@@ -17,13 +18,14 @@ class CheckoutController extends Controller
     {
         abort_if($request->user()?->isAdmin(), 403);
 
-        $cart = $this->activeCart($request)->load('items.product');
+        $cart = $this->activeCart($request)->load('items');
+        $cartItems = $this->cartItems($cart);
 
-        if ($cart->items->isEmpty()) {
+        if ($cartItems->isEmpty()) {
             return redirect()->route('shop.index')->with('status', 'Add an item before checkout.');
         }
 
-        $subtotal = $cart->subtotal();
+        $subtotal = (float) $cartItems->sum('line_total');
         $shippingMethods = $shippingCosts->getAvailableShippingMethods();
         $shippingQuotes = $shippingMethods
             ->mapWithKeys(fn ($method) => [
@@ -33,6 +35,7 @@ class CheckoutController extends Controller
 
         return view('checkout.show', [
             'cart' => $cart,
+            'cartItems' => $cartItems,
             'pickupQuote' => $shippingCosts->calculateForFulfillment('pickup', $subtotal, null),
             'shippingMethods' => $shippingMethods,
             'shippingQuotes' => $shippingQuotes,
@@ -43,9 +46,10 @@ class CheckoutController extends Controller
     {
         abort_if($request->user()?->isAdmin(), 403);
 
-        $cart = $this->activeCart($request)->load('items.product');
+        $cart = $this->activeCart($request)->load('items');
+        $cartItems = $this->cartItems($cart);
 
-        if ($cart->items->isEmpty()) {
+        if ($cartItems->isEmpty()) {
             return redirect()->route('shop.index')->with('status', 'Add an item before checkout.');
         }
 
@@ -54,7 +58,7 @@ class CheckoutController extends Controller
         try {
             $shippingQuote = $shippingCosts->calculateForFulfillment(
                 $data['fulfillment_method'],
-                $cart->subtotal(),
+                (float) $cartItems->sum('line_total'),
                 isset($data['shipping_method_id']) ? (int) $data['shipping_method_id'] : null,
             );
         } catch (InvalidArgumentException $exception) {
@@ -65,8 +69,8 @@ class CheckoutController extends Controller
 
         $data = $this->normalizeFulfillmentData($data, $shippingQuote);
 
-        $order = DB::transaction(function () use ($cart, $data, $request): Order {
-            $subtotal = $cart->subtotal();
+        $order = DB::transaction(function () use ($cart, $cartItems, $data, $request): Order {
+            $subtotal = (float) $cartItems->sum('line_total');
             $tax = round($subtotal * 0.13, 2);
             $total = $subtotal + $tax + $data['shipping_cost'];
 
@@ -122,14 +126,15 @@ class CheckoutController extends Controller
                 'created_by' => $request->user()->id,
             ]);
 
-            foreach ($cart->items as $item) {
+            foreach ($cartItems as $item) {
                 $order->items()->create([
-                    'product_id' => $item->product_id,
-                    'product_name' => $item->product->name,
-                    'sku' => $item->product->sku,
-                    'quantity' => $item->quantity,
-                    'unit_price' => $item->unit_price,
-                    'line_total' => $item->lineTotal(),
+                    'product_id' => $item['product_id'],
+                    'item_source' => $item['item_source'],
+                    'product_name' => $item['name'],
+                    'sku' => $item['sku'] ?: $item['product_id'],
+                    'quantity' => $item['quantity'],
+                    'unit_price' => $item['unit_price'],
+                    'line_total' => $item['line_total'],
                 ]);
 
             }
@@ -220,5 +225,32 @@ class CheckoutController extends Controller
         } while (Order::query()->where('order_number', $orderNumber)->exists());
 
         return $orderNumber;
+    }
+
+    private function cartItems(Cart $cart)
+    {
+        return $cart->items
+            ->map(function (CartItem $item): ?array {
+                $purchasable = $item->purchasable();
+
+                if (! $purchasable) {
+                    return null;
+                }
+
+                $quantity = min($item->quantity, $item->maxQuantity());
+                $unitPrice = (float) $item->unit_price;
+
+                return [
+                    'product_id' => (string) $item->product_id,
+                    'item_source' => $item->item_source ?: CartItem::SOURCE_ECLISE,
+                    'name' => $item->displayName(),
+                    'sku' => $item->displaySku(),
+                    'quantity' => $quantity,
+                    'unit_price' => $unitPrice,
+                    'line_total' => $unitPrice * $quantity,
+                ];
+            })
+            ->filter()
+            ->values();
     }
 }

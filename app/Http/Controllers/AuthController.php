@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Cart;
+use App\Models\CartItem;
+use App\Models\MobileSentrixDevice;
 use App\Models\Permission;
 use App\Models\Product;
 use App\Models\User;
@@ -154,24 +156,57 @@ class AuthController extends Controller
             'status' => 'active',
         ]);
 
-        $products = Product::query()
-            ->whereIn('id', $sessionItems->keys())
-            ->get()
-            ->keyBy('id');
+        $sessionItems->each(function ($quantity, $key) use ($cart): void {
+            [$source, $productId] = $this->parseCartKey((string) $key);
 
-        $sessionItems->each(function ($quantity, $productId) use ($cart, $products): void {
-            $product = $products->get((int) $productId);
+            if ($source === CartItem::SOURCE_MOBILESENTRIX) {
+                $device = MobileSentrixDevice::query()
+                    ->where('entity_id', $productId)
+                    ->orWhere('sku', $productId)
+                    ->first();
+
+                if (! $device || $device->availableQuantity() <= 0) {
+                    return;
+                }
+
+                $item = $cart->items()->firstOrNew([
+                    'product_id' => $device->cartProductId(),
+                    'item_source' => CartItem::SOURCE_MOBILESENTRIX,
+                ]);
+                $item->unit_price = $device->displayPrice() ?? 0;
+                $item->quantity = min($device->availableQuantity(), ($item->exists ? $item->quantity : 0) + (int) $quantity);
+                $item->save();
+
+                return;
+            }
+
+            $id = preg_replace('/^ecl/i', '', $productId);
+            $product = is_numeric($id) ? Product::query()->find((int) $id) : null;
 
             if (! $product || $product->status !== 'Active' || $product->quantity <= 0) {
                 return;
             }
 
-            $item = $cart->items()->firstOrNew(['product_id' => $product->id]);
+            $item = $cart->items()->firstOrNew([
+                'product_id' => 'ecl'.$product->id,
+                'item_source' => CartItem::SOURCE_ECLISE,
+            ]);
             $item->unit_price = $product->currentPrice();
             $item->quantity = min($product->quantity, ($item->exists ? $item->quantity : 0) + (int) $quantity);
             $item->save();
         });
 
         $request->session()->forget('cart.items');
+    }
+
+    private function parseCartKey(string $key): array
+    {
+        if (! str_contains($key, ':')) {
+            return [CartItem::SOURCE_ECLISE, str_starts_with($key, 'ecl') ? $key : 'ecl'.$key];
+        }
+
+        [$source, $productId] = explode(':', $key, 2);
+
+        return [$source ?: CartItem::SOURCE_ECLISE, $productId];
     }
 }
