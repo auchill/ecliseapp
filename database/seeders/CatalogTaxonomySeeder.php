@@ -29,9 +29,9 @@ class CatalogTaxonomySeeder extends Seeder
             'Smart Watch',
             'Accessories',
             'Parts',
-            'Phones',
-            'Laptops',
-            'Chargers',
+            // 'Phones',
+            // 'Laptops',
+            // 'Chargers',
         ] as $index => $name) {
             ProductCategory::query()->updateOrCreate(
                 ['slug' => Str::slug($name)],
