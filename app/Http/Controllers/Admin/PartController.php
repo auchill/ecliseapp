@@ -6,9 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePartRequest;
 use App\Jobs\MobileSentrix\SyncMobileSentrixPartsJob;
 use App\Models\Part;
-use App\Models\PartBrand;
 use App\Models\PartCategory;
-use App\Models\PartModel;
 use App\Services\Parts\PartSearchService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,9 +18,8 @@ class PartController extends Controller
     {
         return view('admin.parts.index', [
             'parts' => $partSearch->adminResults($request),
-            'partBrands' => PartBrand::query()->active()->orderBy('name')->get(),
-            'partCategories' => PartCategory::query()->active()->orderBy('name')->get(),
-            'partModels' => PartModel::query()->active()->orderBy('name')->get(),
+            'partBrands' => $this->brandOptions(),
+            'partModels' => $this->modelOptions(),
         ]);
     }
 
@@ -47,9 +44,7 @@ class PartController extends Controller
     {
         return view('admin.parts.form', [
             'part' => new Part,
-            'partBrands' => PartBrand::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
             'partCategories' => PartCategory::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
-            'partModels' => PartModel::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
             'markupTypes' => Part::MARKUP_TYPES,
         ]);
     }
@@ -66,9 +61,7 @@ class PartController extends Controller
     {
         return view('admin.parts.form', [
             'part' => $part,
-            'partBrands' => PartBrand::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
             'partCategories' => PartCategory::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
-            'partModels' => PartModel::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
             'markupTypes' => Part::MARKUP_TYPES,
         ]);
     }
@@ -110,13 +103,9 @@ class PartController extends Controller
             $data['local_image_path'] = $data['image_path'];
         }
 
-        $partBrand = PartBrand::query()->find($data['part_brand_id']);
         $partCategory = PartCategory::query()->find($data['part_category_id']);
-        $partModel = ! empty($data['part_model_id']) ? PartModel::query()->find($data['part_model_id']) : null;
 
-        $data['brand'] = $partBrand?->name ?? $data['brand'] ?? null;
         $data['part_category'] = $partCategory?->name ?? $data['part_category'] ?? null;
-        $data['model_compatibility'] = $partModel?->name ?? $data['model_compatibility'] ?? null;
         $data['slug'] = ($data['slug'] ?? null) ?: Str::slug($data['name'].' '.($data['sku'] ?? $data['internal_sku'] ?? uniqid()));
         $data['selling_price'] = $data['selling_price'] ?? $data['price'];
         $data['markup_type'] = $data['markup_type'] ?? 'none';
@@ -163,5 +152,25 @@ class PartController extends Controller
         if ($part->part_category_id) {
             $part->partCategories()->syncWithoutDetaching([$part->part_category_id]);
         }
+    }
+
+    private function brandOptions()
+    {
+        return Part::query()
+            ->whereNotNull('brand')
+            ->whereRaw("TRIM(brand) != ''")
+            ->distinct()
+            ->orderBy('brand')
+            ->pluck('brand');
+    }
+
+    private function modelOptions()
+    {
+        return Part::query()
+            ->whereNotNull('model_compatibility')
+            ->whereRaw("TRIM(model_compatibility) != ''")
+            ->distinct()
+            ->orderBy('model_compatibility')
+            ->pluck('model_compatibility');
     }
 }

@@ -392,12 +392,14 @@ test('mobile sentrix parts sync maps products into parts without exposing suppli
         ->and((float) $part->cost_price)->toBe(50.0)
         ->and((float) $part->selling_price)->toBe(60.0)
         ->and($part->categories()->whereKey($category->id)->exists())->toBeTrue()
-        ->and($part->models()->where('name', 'iPhone 14')->exists())->toBeTrue()
-        ->and($part->images()->where('image_url', 'https://cdn.example.test/part.jpg')->exists())->toBeTrue();
-    expect(Schema::hasColumn('parts', 'mobilesentrix_product_id'))->toBeFalse();
-
-    $this->assertDatabaseHas('part_brands', ['name' => 'Apple', 'status' => 'active']);
-    $this->assertDatabaseHas('part_models', ['name' => 'iPhone 14']);
+        ->and($part->gallery_images->pluck('image_url'))->toContain('https://cdn.example.test/part.jpg')
+        ->and(Schema::hasColumn('parts', 'mobilesentrix_product_id'))->toBeFalse()
+        ->and(Schema::hasColumn('parts', 'part_brand_id'))->toBeFalse()
+        ->and(Schema::hasColumn('parts', 'part_model_id'))->toBeFalse()
+        ->and(Schema::hasTable('part_brands'))->toBeFalse()
+        ->and(Schema::hasTable('part_models'))->toBeFalse()
+        ->and(Schema::hasTable('part_categories'))->toBeTrue()
+        ->and(Schema::hasTable('part_category_part'))->toBeTrue();
 
     $this->get(route('parts.index'))
         ->assertOk()
@@ -515,7 +517,8 @@ test('mobile sentrix full parts sync paginates products and logs parts full', fu
     $this->assertDatabaseHas('parts', ['id' => 9103, 'sku' => 'MS-9103']);
     $this->assertDatabaseHas('parts', ['id' => 9104, 'sku' => 'MS-9104', 'brand' => 'MobileSentrix', 'model' => '111,222,333']);
     expect(strlen((string) Part::query()->where('sku', 'MS-9104')->value('url')))->toBeLessThanOrEqual(255);
-    expect(Part::query()->findOrFail(9104)->models()->count())->toBe(3);
+    expect(Part::query()->findOrFail(9104)->modelName())->toBe('Tablet')
+        ->and(Part::query()->findOrFail(9104)->raw_payload['model'])->toBe('111,222,333');
     $this->assertDatabaseHas('mobilesentrix_sync_logs', [
         'sync_type' => 'parts_full',
         'status' => 'success',

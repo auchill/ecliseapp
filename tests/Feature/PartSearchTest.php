@@ -1,48 +1,31 @@
 <?php
 
 use App\Models\Part;
-use App\Models\PartBrand;
 use App\Models\PartCategory;
-use App\Models\PartModel;
 use App\Models\Permission;
 use App\Models\User;
 
 function createSearchPart(array $overrides = []): Part
 {
-    $brand = $overrides['partBrand'] ?? PartBrand::query()->create([
-        'name' => 'Apple',
-        'slug' => 'apple',
-        'is_active' => true,
-        'status' => 'active',
-    ]);
-    $category = $overrides['partCategory'] ?? PartCategory::query()->create([
-        'name' => 'Screens',
-        'slug' => 'screens',
-        'is_active' => true,
-        'status' => 'active',
-    ]);
-    $model = $overrides['partModel'] ?? PartModel::query()->create([
-        'name' => 'iPhone 15',
-        'slug' => 'iphone-15',
-        'status' => 'active',
-    ]);
+    $category = $overrides['partCategory'] ?? PartCategory::query()->firstOrCreate(
+        ['slug' => 'screens'],
+        ['name' => 'Screens', 'is_active' => true, 'status' => 'active'],
+    );
 
-    unset($overrides['partBrand'], $overrides['partCategory'], $overrides['partModel']);
+    unset($overrides['partCategory']);
 
     $part = Part::query()->create(array_merge([
         'id' => 1001,
-        'part_brand_id' => $brand->id,
         'part_category_id' => $category->id,
-        'part_model_id' => $model->id,
         'name' => 'iPhone 15 OLED Screen',
         'slug' => 'iphone-15-oled-screen',
         'sku' => 'MS-1001',
         'new_sku' => 'NEW-1001',
         'device_type' => 'Front',
-        'brand' => $brand->name,
-        'manufacturer_text' => $brand->name,
-        'model_compatibility' => $model->name,
-        'model_text' => [$model->name],
+        'brand' => 'Apple',
+        'manufacturer_text' => 'Apple',
+        'model_compatibility' => 'iPhone 15',
+        'model_text' => ['iPhone 15'],
         'part_category' => $category->name,
         'description' => 'Premium OLED display replacement.',
         'price' => 50,
@@ -104,7 +87,7 @@ test('public parts search returns dynamic results without exposing supplier cost
         ->and($html)->not->toContain('MSP-1001');
 });
 
-test('public parts autocomplete suggests parts skus brands models and categories', function () {
+test('public parts autocomplete suggests parts skus brands and direct models', function () {
     createSearchPart();
 
     $response = $this->getJson(route('parts.suggestions', ['q' => 'iPhone']));
@@ -115,6 +98,26 @@ test('public parts autocomplete suggests parts skus brands models and categories
 
     expect($labels)->toContain('iPhone 15 OLED Screen')
         ->and($labels)->toContain('iPhone 15');
+});
+
+test('parts brand filter uses direct distinct part values and category filter is absent', function () {
+    createSearchPart();
+    createSearchPart([
+        'id' => 1002,
+        'sku' => 'MS-1002',
+        'new_sku' => 'NEW-1002',
+        'name' => 'Samsung Screen',
+        'slug' => 'samsung-screen',
+        'brand' => 'Samsung',
+        'manufacturer_text' => 'Samsung',
+    ]);
+
+    $response = $this->get(route('parts.index', ['brand' => 'Apple']));
+
+    $response->assertOk()
+        ->assertSee('iPhone 15 OLED Screen')
+        ->assertDontSee('Samsung Screen')
+        ->assertDontSee('name="part_category"', false);
 });
 
 test('admin parts search can find mobilesentrix ids and show admin-only cost', function () {

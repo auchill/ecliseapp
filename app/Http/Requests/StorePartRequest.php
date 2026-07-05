@@ -15,9 +15,7 @@ class StorePartRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'part_brand_id' => ['required', 'exists:part_brands,id'],
             'part_category_id' => ['required', 'exists:part_categories,id'],
-            'part_model_id' => ['nullable', 'exists:part_models,id'],
             'name' => ['required', 'string', 'max:255'],
             'slug' => ['nullable', 'string', 'max:255'],
             'sku' => ['nullable', 'string', 'max:120'],
@@ -30,7 +28,7 @@ class StorePartRequest extends FormRequest
             'short_description' => ['nullable', 'string'],
             'cost_price' => ['nullable', 'numeric', 'min:0'],
             'device_type' => ['required', 'string', 'max:120'],
-            'brand' => ['nullable', 'string', 'max:120'],
+            'brand' => ['required', 'string', 'max:120'],
             'model_compatibility' => ['nullable', 'string', 'max:255'],
             'compatibility' => ['nullable', 'json'],
             'specifications' => ['nullable', 'json'],

@@ -33,7 +33,7 @@ class SyncMobileSentrixPartsCommand extends Command
 
         $this->info($result['message'] ?? 'MobileSentrix parts sync finished.');
         if ($this->option('dry-run')) {
-            $this->warn('Dry run only. No parts, brands, models, or categories were saved.');
+            $this->warn('Dry run only. No parts or category assignments were saved.');
         }
         $this->line(sprintf(
             'Processed: %d, Created: %d, Updated: %d, Skipped: %d, Failed: %d, Price changes: %d, Stock changes: %d',

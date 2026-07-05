@@ -28,13 +28,8 @@
                         <input class="form-control" id="device_type" name="device_type" value="{{ old('device_type', $part->device_type) }}" required>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label" for="part_brand_id">Parts Brand</label>
-                        <select class="form-select" id="part_brand_id" name="part_brand_id" required>
-                            <option value="">Choose brand</option>
-                            @foreach ($partBrands as $brand)
-                                <option value="{{ $brand->id }}" @selected((int) old('part_brand_id', $part->part_brand_id) === $brand->id)>{{ $brand->name }}</option>
-                            @endforeach
-                        </select>
+                        <label class="form-label" for="brand">Brand</label>
+                        <input class="form-control" id="brand" name="brand" value="{{ old('brand', $part->brand) }}" required>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label" for="part_category_id">Parts Category</label>
@@ -46,16 +41,7 @@
                         </select>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label" for="part_model_id">Parts Model</label>
-                        <select class="form-select" id="part_model_id" name="part_model_id">
-                            <option value="">Choose model if listed</option>
-                            @foreach ($partModels as $model)
-                                <option value="{{ $model->id }}" @selected((int) old('part_model_id', $part->part_model_id) === $model->id)>{{ $model->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label" for="model_compatibility">Custom compatibility</label>
+                        <label class="form-label" for="model_compatibility">Model compatibility</label>
                         <input class="form-control" id="model_compatibility" name="model_compatibility" value="{{ old('model_compatibility', $part->model_compatibility) }}">
                     </div>
                     <div class="col-md-4">

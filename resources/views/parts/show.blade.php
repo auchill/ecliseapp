@@ -10,7 +10,8 @@
         $variation = $part->device_color_text ?: $part->color_text ?: $part->color ?: $part->front_position_text;
         $description = $part->display_description;
         $stockQuantity = max((int) $part->quantity, (int) $part->in_stock_qty);
-        $primaryBadge = $part->badges->first();
+        $badgeName = $part->display_badge_name;
+        $badgeIcon = $part->display_badge_icon_url;
         $warrantyIcon = $part->display_warranty_icon_url;
         $warrantyLabel = $part->display_warranty_label;
         $reviewCount = (int) ($part->total_reviews_count ?? 0);
@@ -55,12 +56,12 @@
                     </div>
 
                     <div class="ms-gallery-frame">
-                        @if ($primaryBadge)
+                        @if ($badgeName)
                             <div class="ms-image-badge">
-                                @if ($primaryBadge->display_icon_url)
-                                    <img src="{{ $primaryBadge->display_icon_url }}" alt="{{ $primaryBadge->name }}">
+                                @if ($badgeIcon)
+                                    <img src="{{ $badgeIcon }}" alt="{{ $badgeName }}">
                                 @else
-                                    <span>{{ $primaryBadge->name }}</span>
+                                    <span>{{ $badgeName }}</span>
                                 @endif
                             </div>
                         @endif
@@ -80,23 +81,23 @@
                         @endif
                     </div>
 
-                    @if ($part->compatibilities->isNotEmpty())
+                    @if ($part->compatibility_labels->isNotEmpty())
                         <section class="ms-token-panel mt-3">
                             <h2 class="ms-token-heading ms-token-heading-red"><i class="bi bi-link-45deg"></i> Compatible</h2>
                             <div class="ms-token-body">
-                                @foreach ($part->compatibilities as $compatibility)
-                                    <span>{{ $compatibility->name }}</span>
+                                @foreach ($part->compatibility_labels as $compatibility)
+                                    <span>{{ $compatibility }}</span>
                                 @endforeach
                             </div>
                         </section>
                     @endif
 
-                    @if ($part->tags->isNotEmpty())
+                    @if ($part->tag_labels->isNotEmpty())
                         <section class="ms-token-panel mt-3">
                             <h2 class="ms-token-heading ms-token-heading-blue"><i class="bi bi-tag-fill"></i> Tag</h2>
                             <div class="ms-token-body">
-                                @foreach ($part->tags as $tag)
-                                    <span>{{ $tag->name }}</span>
+                                @foreach ($part->tag_labels as $tag)
+                                    <span>{{ $tag }}</span>
                                 @endforeach
                             </div>
                         </section>
@@ -120,16 +121,16 @@
                             @endif
                         </div>
 
-                        @if ($part->badges->isNotEmpty() || $warrantyLabel)
+                        @if ($badgeName || $warrantyLabel)
                             <div class="ms-cred-row">
-                                @foreach ($part->badges as $badge)
+                                @if ($badgeName)
                                     <span>
-                                        @if ($badge->display_icon_url)
-                                            <img src="{{ $badge->display_icon_url }}" alt="{{ $badge->name }}">
+                                        @if ($badgeIcon)
+                                            <img src="{{ $badgeIcon }}" alt="{{ $badgeName }}">
                                         @endif
-                                        {{ $badge->name }}
+                                        {{ $badgeName }}
                                     </span>
-                                @endforeach
+                                @endif
                                 @if ($warrantyLabel)
                                     <span>
                                         @if ($warrantyIcon)
@@ -167,23 +168,24 @@
                 </div>
             </div>
 
-            @if ($part->relatedParts->isNotEmpty())
+            @if ($part->related_product_parts->isNotEmpty())
                 <section class="ms-related-section">
                     <h2><i class="bi bi-list-ul"></i> Related Products</h2>
                     <div class="ms-related-grid">
-                        @foreach ($part->relatedParts->take(4) as $related)
+                        @foreach ($part->related_product_parts->take(4) as $related)
                             @php
-                                $relatedBadge = $related->badges->first();
+                                $relatedBadgeName = $related->display_badge_name;
+                                $relatedBadgeIcon = $related->display_badge_icon_url;
                                 $relatedVariation = $related->device_color_text ?: $related->color_text ?: $related->color ?: $related->front_position_text;
                                 $relatedStock = max((int) $related->quantity, (int) $related->in_stock_qty);
                             @endphp
                             <article class="ms-related-card">
-                                @if ($relatedBadge)
+                                @if ($relatedBadgeName)
                                     <div class="ms-related-badge">
-                                        @if ($relatedBadge->display_icon_url)
-                                            <img src="{{ $relatedBadge->display_icon_url }}" alt="{{ $relatedBadge->name }}">
+                                        @if ($relatedBadgeIcon)
+                                            <img src="{{ $relatedBadgeIcon }}" alt="{{ $relatedBadgeName }}">
                                         @else
-                                            <span>{{ $relatedBadge->name }}</span>
+                                            <span>{{ $relatedBadgeName }}</span>
                                         @endif
                                     </div>
                                 @endif

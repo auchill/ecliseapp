@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\DeviceType;
 use App\Models\IssueCategory;
-use App\Models\PartModel;
 use App\Models\ProductBrand;
 use App\Models\ProductCarrier;
 use App\Models\ProductColor;
@@ -76,13 +75,6 @@ class ReferenceController extends Controller
             'route' => 'admin.product-carriers',
             'table' => 'product_carriers',
             'code_source' => true,
-        ],
-        'part-models' => [
-            'model' => PartModel::class,
-            'title' => 'Parts Models',
-            'singular' => 'Parts Model',
-            'route' => 'admin.part-models',
-            'table' => 'part_models',
         ],
         'device-types' => [
             'model' => DeviceType::class,

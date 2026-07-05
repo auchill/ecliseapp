@@ -10,7 +10,7 @@ class EnrichMissingMobileSentrixProductsCommand extends Command
 {
     protected $signature = 'mobilesentrix:enrich-missing-products {--limit=50 : Maximum number of products to enrich} {--force : Enrich even when cache is fresh}';
 
-    protected $description = 'Enrich MobileSentrix parts missing descriptions, gallery images, tags, compatibility, badges, warranty, or related products.';
+    protected $description = 'Enrich MobileSentrix parts with incomplete direct product data.';
 
     public function handle(MobileSentrixProductEnrichmentService $enrichmentService): int
     {
@@ -27,12 +27,12 @@ class EnrichMissingMobileSentrixProductsCommand extends Command
             ->where(function ($query): void {
                 $query->whereNull('description')
                     ->orWhere('description', '')
-                    ->orWhereNull('part_warranty_id')
-                    ->orWhereDoesntHave('images')
-                    ->orWhereDoesntHave('tags')
-                    ->orWhereDoesntHave('compatibilities')
-                    ->orWhereDoesntHave('badges')
-                    ->orWhereDoesntHave('relatedParts');
+                    ->orWhereNull('image_gallery')
+                    ->orWhereNull('tags_raw_payload')
+                    ->orWhereNull('compatibility')
+                    ->orWhereNull('product_badges_text')
+                    ->orWhereNull('warranty_period_text')
+                    ->orWhereNull('related_product');
             })
             ->orderByDesc('updated_at')
             ->limit($limit)

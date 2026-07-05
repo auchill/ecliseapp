@@ -3,8 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Part;
-use App\Models\PartBrand;
-use App\Models\PartCategory;
 use App\Services\MobileSentrix\MobileSentrixProductEnrichmentService;
 use App\Services\Parts\PartSearchService;
 use Illuminate\Http\JsonResponse;
@@ -18,9 +16,15 @@ class PartController extends Controller
     {
         return view('parts.index', [
             'parts' => $partSearch->publicResults($request),
-            'brands' => PartBrand::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
+            'brands' => Part::query()
+                ->where('is_active', true)
+                ->where('status', 'active')
+                ->whereNotNull('brand')
+                ->whereRaw("TRIM(brand) != ''")
+                ->distinct()
+                ->orderBy('brand')
+                ->pluck('brand'),
             'deviceTypes' => Part::query()->where('is_active', true)->where('status', 'active')->distinct()->orderBy('device_type')->pluck('device_type'),
-            'categories' => PartCategory::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
         ]);
     }
 
@@ -57,21 +61,7 @@ class PartController extends Controller
 
         abort_unless($part->is_active && $part->status === 'active', 404);
 
-        $part->load([
-            'brand',
-            'partCategory',
-            'partModel',
-            'categories',
-            'models',
-            'warranty',
-            'tags',
-            'badges',
-            'compatibilities',
-            'images' => fn ($query) => $query->orderByDesc('is_default')->orderBy('position'),
-            'relatedParts.images' => fn ($query) => $query->orderByDesc('is_default')->orderBy('position'),
-            'relatedParts.badges',
-            'relatedParts.warranty',
-        ]);
+        $part->load(['partCategory', 'categories']);
 
         return view('parts.show', ['part' => $part]);
     }

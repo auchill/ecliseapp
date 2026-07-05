@@ -29,9 +29,7 @@
         ],
         'Parts' => [
             ['label' => 'Parts', 'route' => 'admin.parts.index', 'icon' => 'bi-box-seam', 'active' => 'admin.parts.index'],
-            ['label' => 'Parts Brands', 'route' => 'admin.part-brands.index', 'icon' => 'bi-tags', 'active' => 'admin.part-brands.*'],
             ['label' => 'Parts Categories', 'route' => 'admin.part-categories.index', 'icon' => 'bi-grid', 'active' => 'admin.part-categories.*'],
-            ['label' => 'Parts Models', 'route' => 'admin.part-models.index', 'icon' => 'bi-cpu-fill', 'active' => 'admin.part-models.*'],
         ],
         'Others' => [
             ['label' => 'Shipping Methods', 'route' => 'admin.shipping-methods.index', 'icon' => 'bi-truck', 'active' => 'admin.shipping-methods.*'],

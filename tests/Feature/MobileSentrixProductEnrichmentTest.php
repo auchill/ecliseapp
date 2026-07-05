@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Part;
+use App\Models\PartBadge;
 use App\Models\PartCategory;
 use App\Models\PartWarranty;
 use Illuminate\Support\Facades\Artisan;
@@ -223,8 +224,8 @@ test('public parts show enriches a MobileSentrix product with detail tags compat
         ->assertSee('iPhone 14 Pro Max')
         ->assertSee('Related Products')
         ->assertSee('data-part-gallery-image', false)
-        ->assertSee('https://cdn.example.test/lifetime-warranty.png', false)
-        ->assertSee('https://cdn.example.test/premium-badge.png', false)
+        ->assertSee('/images/parts/warranties/warranty-lifetime.svg', false)
+        ->assertSee('/images/parts/badges/badge-default.svg', false)
         ->assertDontSee('alert("x")', false)
         ->assertDontSee('onclick', false)
         ->assertDontSee('src=""', false);
@@ -234,16 +235,16 @@ test('public parts show enriches a MobileSentrix product with detail tags compat
     expect($part->last_enriched_at)->not->toBeNull()
         ->and($part->raw_payload['entity_id'])->toBe('73')
         ->and($part->tags_raw_payload[0]['sku'])->toBe('MS-73')
-        ->and($part->images()->count())->toBe(3)
-        ->and($part->images()->where('image_url', 'https://cdn.example.test/gallery-1.jpg')->count())->toBe(1)
-        ->and($part->tags()->pluck('name')->all())->toContain('OLED')
-        ->and($part->badges()->pluck('name')->all())->toContain('Premium')
-        ->and($part->badges()->first()->icon_url)->toBe('https://cdn.example.test/premium-badge.png')
-        ->and($part->warranty?->external_warranty_id)->toBe('7645')
-        ->and($part->warranty?->display_label)->toBe('Lifetime Warranty')
-        ->and($part->part_warranty_id)->not->toBeNull()
-        ->and($part->compatibilities()->pluck('name')->all())->toContain('Apple: iPhone 14 Pro Max')
-        ->and($part->relatedParts()->whereKey(74)->exists())->toBeTrue();
+        ->and($part->gallery_images)->toHaveCount(3)
+        ->and($part->gallery_images->where('image_url', 'https://cdn.example.test/gallery-1.jpg'))->toHaveCount(1)
+        ->and($part->tag_labels)->toContain('OLED')
+        ->and($part->display_badge_name)->toBe('Premium')
+        ->and($part->display_badge_icon_url)->toContain('/images/parts/badges/badge-default.svg')
+        ->and($part->warranty_period)->toBe('7645')
+        ->and($part->display_warranty_label)->toBe('Lifetime Warranty')
+        ->and($part->display_warranty_icon_url)->toContain('/images/parts/warranties/warranty-lifetime.svg')
+        ->and($part->compatibility_labels)->toContain('Apple: iPhone 14 Pro Max')
+        ->and($part->related_product_parts->pluck('id'))->toContain(74);
 });
 
 test('MobileSentrix enrich product command resolves sku and stores enrichment data', function () {
@@ -260,7 +261,7 @@ test('MobileSentrix enrich product command resolves sku and stores enrichment da
         ->and($output)->toContain('MobileSentrix part 73 enriched.')
         ->and($output)->toContain('Description updated: yes')
         ->and($output)->toContain('Warranty detected: Lifetime Warranty')
-        ->and(Part::query()->findOrFail(73)->tags()->where('name', 'Premium')->exists())->toBeTrue();
+        ->and(Part::query()->findOrFail(73)->tag_labels)->toContain('Premium');
 });
 
 test('MobileSentrix enrich product command resolves numeric sku 107082022487 and stores actual gallery warranty and badge data', function () {
@@ -276,36 +277,44 @@ test('MobileSentrix enrich product command resolves numeric sku 107082022487 and
 
     expect($exitCode)->toBe(0)
         ->and($output)->toContain('MobileSentrix part 151485 enriched.')
-        ->and($part->images()->count())->toBe(3)
-        ->and($part->warranty?->display_label)->toBe('1 Year')
-        ->and($part->badges()->first()?->name)->toBe('Basic')
-        ->and($part->badges()->first()?->icon_url)->toBe('https://cdn.example.test/basic-badge.png')
-        ->and($part->relatedParts()->whereKey(74)->exists())->toBeTrue();
+        ->and($part->gallery_images)->toHaveCount(3)
+        ->and($part->display_warranty_label)->toBe('1 Year')
+        ->and($part->display_warranty_icon_url)->toContain('/images/parts/warranties/warranty-1-year.svg')
+        ->and($part->display_badge_name)->toBe('Basic')
+        ->and($part->display_badge_icon_url)->toContain('/images/parts/badges/badge-basic.svg')
+        ->and($part->related_product_parts->pluck('id'))->toContain(74);
 });
 
-test('warranty schema and documented warranty mapping are available', function () {
-    expect(Schema::hasTable('part_warranties'))->toBeTrue()
-        ->and(Schema::hasColumn('parts', 'part_warranty_id'))->toBeTrue()
-        ->and(Schema::hasColumn('part_badges', 'icon_url'))->toBeTrue()
-        ->and(Schema::hasColumn('part_images', 'thumbnail_url'))->toBeTrue()
+test('obsolete lookup schema is removed while display resolvers and category schema remain', function () {
+    expect(Schema::hasTable('part_warranties'))->toBeFalse()
+        ->and(Schema::hasTable('part_badges'))->toBeFalse()
+        ->and(Schema::hasTable('part_images'))->toBeFalse()
+        ->and(Schema::hasTable('part_tags'))->toBeFalse()
+        ->and(Schema::hasTable('part_compatibilities'))->toBeFalse()
+        ->and(Schema::hasColumn('parts', 'part_warranty_id'))->toBeFalse()
+        ->and(Schema::hasColumn('parts', 'part_category_id'))->toBeTrue()
+        ->and(Schema::hasTable('part_categories'))->toBeTrue()
+        ->and(Schema::hasTable('part_category_part'))->toBeTrue()
         ->and(PartWarranty::WARRANTY_LABELS['7627'])->toBe('No Warranty')
         ->and(PartWarranty::WARRANTY_LABELS['7630'])->toBe('30 Days')
         ->and(PartWarranty::WARRANTY_LABELS['7633'])->toBe('60 Days')
         ->and(PartWarranty::WARRANTY_LABELS['7636'])->toBe('90 Days')
         ->and(PartWarranty::WARRANTY_LABELS['7642'])->toBe('6 Months')
         ->and(PartWarranty::WARRANTY_LABELS['7648'])->toBe('1 Year')
-        ->and(PartWarranty::WARRANTY_LABELS['7645'])->toBe('Lifetime Warranty');
+        ->and(PartWarranty::WARRANTY_LABELS['7645'])->toBe('Lifetime Warranty')
+        ->and(PartWarranty::displayIconUrl('7645'))->toContain('/images/parts/warranties/warranty-lifetime.svg')
+        ->and(PartBadge::displayIconUrl('Genuine'))->toContain('/images/parts/badges/badge-genuine.svg');
 });
 
-test('part image gallery enrichment is idempotent and does not create duplicate image rows', function () {
+test('part image gallery enrichment is idempotent in direct part data', function () {
     $part = createEnrichmentPart();
     fakeMobileSentrixProductEnrichmentHttp();
 
     Artisan::call('mobilesentrix:enrich-product', ['part_id_or_sku' => 'MS-73', '--force' => true]);
     Artisan::call('mobilesentrix:enrich-product', ['part_id_or_sku' => 'MS-73', '--force' => true]);
 
-    expect($part->fresh()->images()->count())->toBe(3)
-        ->and($part->fresh()->images()->where('image_url', 'https://cdn.example.test/gallery-1.jpg')->count())->toBe(1);
+    expect($part->fresh()->gallery_images)->toHaveCount(3)
+        ->and($part->fresh()->gallery_images->where('image_url', 'https://cdn.example.test/gallery-1.jpg'))->toHaveCount(1);
 });
 
 test('public parts show falls back to local data when MobileSentrix enrichment fails', function () {

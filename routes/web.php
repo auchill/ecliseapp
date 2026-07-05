@@ -6,7 +6,6 @@ use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\DeviceController as AdminDeviceController;
 use App\Http\Controllers\Admin\MobileSentrixController as AdminMobileSentrixController;
 use App\Http\Controllers\Admin\OrderController as AdminOrderController;
-use App\Http\Controllers\Admin\PartBrandController as AdminPartBrandController;
 use App\Http\Controllers\Admin\PartCategoryController as AdminPartCategoryController;
 use App\Http\Controllers\Admin\PartController as AdminPartController;
 use App\Http\Controllers\Admin\PaymentController as AdminPaymentController;
@@ -126,7 +125,6 @@ Route::middleware('admin')->prefix('admin')->name('admin.')->group(function (): 
         'shop/product-conditions' => 'product-conditions',
         'shop/product-colors' => 'product-colors',
         'shop/product-carriers' => 'product-carriers',
-        'parts/part-models' => 'part-models',
     ] as $path => $reference) {
         Route::get($path, [AdminReferenceController::class, 'index'])->defaults('reference', $reference)->name($reference.'.index');
         Route::get($path.'/create', [AdminReferenceController::class, 'create'])->defaults('reference', $reference)->name($reference.'.create');
@@ -165,7 +163,6 @@ Route::middleware('admin')->prefix('admin')->name('admin.')->group(function (): 
     Route::get('/parts/search', [AdminPartController::class, 'search'])->name('parts.search');
     Route::get('/parts/suggestions', [AdminPartController::class, 'suggestions'])->name('parts.suggestions');
     Route::resource('parts', AdminPartController::class)->except(['show']);
-    Route::resource('parts/part-brands', AdminPartBrandController::class)->names('part-brands')->except(['show']);
     Route::resource('parts/part-categories', AdminPartCategoryController::class)->names('part-categories')->except(['show']);
     Route::get('/payments', [AdminPaymentController::class, 'index'])->name('payments.index');
     Route::get('/payments/{payment}', [AdminPaymentController::class, 'show'])->name('payments.show');

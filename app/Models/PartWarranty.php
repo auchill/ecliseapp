@@ -2,11 +2,9 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
-class PartWarranty extends Model
+final class PartWarranty
 {
     public const WARRANTY_LABELS = [
         '7627' => 'No Warranty',
@@ -19,39 +17,18 @@ class PartWarranty extends Model
         '5941' => '1 Year',
     ];
 
-    protected $guarded = [];
-
-    protected function casts(): array
+    public static function displayLabel(mixed $externalId, mixed $label = null): ?string
     {
-        return [
-            'raw_payload' => 'array',
-        ];
-    }
-
-    public function parts(): HasMany
-    {
-        return $this->hasMany(Part::class);
-    }
-
-    public function getDisplayIconUrlAttribute(): ?string
-    {
-        if ($this->icon_url ?: $this->photo_url ?: $this->image_url) {
-            return $this->icon_url ?: $this->photo_url ?: $this->image_url;
+        if (filled($label)) {
+            return trim((string) $label);
         }
 
-        return $this->localDefaultIconUrl();
+        return self::WARRANTY_LABELS[(string) $externalId] ?? (filled($externalId) ? trim((string) $externalId) : null);
     }
 
-    public function getDisplayLabelAttribute(): ?string
+    public static function displayIconUrl(mixed $externalId, mixed $label = null, ?string $apiUrl = null): ?string
     {
-        return $this->duration_label
-            ?: $this->name
-            ?: (self::WARRANTY_LABELS[(string) $this->external_warranty_id] ?? null);
-    }
-
-    private function localDefaultIconUrl(): ?string
-    {
-        $label = Str::lower((string) $this->display_label);
+        $label = Str::lower((string) self::displayLabel($externalId, $label));
         $filename = match (true) {
             str_contains($label, 'lifetime') => 'warranty-lifetime.svg',
             str_contains($label, '1 year') => 'warranty-1-year.svg',
@@ -65,6 +42,10 @@ class PartWarranty extends Model
 
         $path = 'images/parts/warranties/'.$filename;
 
-        return file_exists(public_path($path)) ? asset($path) : null;
+        if (file_exists(public_path($path))) {
+            return asset($path);
+        }
+
+        return filled($apiUrl) ? $apiUrl : null;
     }
 }

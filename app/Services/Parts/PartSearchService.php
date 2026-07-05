@@ -3,9 +3,6 @@
 namespace App\Services\Parts;
 
 use App\Models\Part;
-use App\Models\PartBrand;
-use App\Models\PartCategory;
-use App\Models\PartModel;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -31,36 +28,23 @@ class PartSearchService
     public function publicQuery(Request $request): Builder
     {
         return Part::query()
-            ->with('brand', 'partCategory', 'partModel', 'categories', 'models')
+            ->with('partCategory', 'categories')
             ->where('is_active', true)
             ->where('status', 'active')
             ->when($request->filled('q'), fn (Builder $query) => $this->applyKeyword($query, $request->string('q')->toString()))
             ->when($request->filled('brand'), function (Builder $query) use ($request): void {
                 $brand = $request->string('brand')->toString();
-                $query->where(function (Builder $query) use ($brand): void {
-                    $query->whereHas('partBrand', fn (Builder $query) => $query->where('slug', $brand))
-                        ->orWhere('brand', $brand)
-                        ->orWhere('manufacturer_text', $brand);
-                });
+                $query->where('brand', $brand);
             })
             ->when($request->filled('model'), function (Builder $query) use ($request): void {
                 $model = $request->string('model')->toString();
                 $query->where(function (Builder $query) use ($model): void {
-                    $query->whereHas('models', fn (Builder $query) => $query->where('name', 'like', "%{$model}%"))
-                        ->orWhereHas('partModel', fn (Builder $query) => $query->where('name', 'like', "%{$model}%"))
-                        ->orWhere('model_compatibility', 'like', "%{$model}%")
+                    $query->where('model_compatibility', 'like', "%{$model}%")
+                        ->orWhere('device_model_text', 'like', "%{$model}%")
                         ->orWhere('model_text', 'like', "%{$model}%");
                 });
             })
             ->when($request->filled('device_type'), fn (Builder $query) => $query->where('device_type', $request->string('device_type')->toString()))
-            ->when($request->filled('part_category'), function (Builder $query) use ($request): void {
-                $category = $request->string('part_category')->toString();
-                $query->where(function (Builder $query) use ($category): void {
-                    $query->whereHas('partCategory', fn (Builder $query) => $query->where('slug', $category))
-                        ->orWhereHas('categories', fn (Builder $query) => $query->where('slug', $category))
-                        ->orWhere('part_category', $category);
-                });
-            })
             ->when($request->filled('stock'), fn (Builder $query) => $this->applyStock($query, $request->string('stock')->toString()))
             ->when($request->filled('min_price'), fn (Builder $query) => $query->whereRaw('CAST(COALESCE(selling_price, final_price, price) AS DECIMAL(10,2)) >= ?', [(float) $request->input('min_price')]))
             ->when($request->filled('max_price'), fn (Builder $query) => $query->whereRaw('CAST(COALESCE(selling_price, final_price, price) AS DECIMAL(10,2)) <= ?', [(float) $request->input('max_price')]));
@@ -69,21 +53,15 @@ class PartSearchService
     public function adminQuery(Request $request): Builder
     {
         return Part::query()
-            ->with('brand', 'partCategory', 'partModel', 'categories', 'models')
+            ->with('partCategory', 'categories')
             ->when($request->filled('q'), fn (Builder $query) => $this->applyKeyword($query, $request->string('q')->toString(), true))
-            ->when($request->filled('brand'), fn (Builder $query) => $query->where('part_brand_id', $request->integer('brand')))
-            ->when($request->filled('category'), function (Builder $query) use ($request): void {
-                $categoryId = $request->integer('category');
-                $query->where(function (Builder $query) use ($categoryId): void {
-                    $query->whereHas('categories', fn (Builder $query) => $query->whereKey($categoryId))
-                        ->orWhere('part_category_id', $categoryId);
-                });
-            })
+            ->when($request->filled('brand'), fn (Builder $query) => $query->where('brand', $request->string('brand')->toString()))
             ->when($request->filled('model'), function (Builder $query) use ($request): void {
-                $modelId = $request->integer('model');
-                $query->where(function (Builder $query) use ($modelId): void {
-                    $query->whereHas('models', fn (Builder $query) => $query->whereKey($modelId))
-                        ->orWhere('part_model_id', $modelId);
+                $model = $request->string('model')->toString();
+                $query->where(function (Builder $query) use ($model): void {
+                    $query->where('model_compatibility', 'like', "%{$model}%")
+                        ->orWhere('device_model_text', 'like', "%{$model}%")
+                        ->orWhere('model_text', 'like', "%{$model}%");
                 });
             })
             ->when($request->filled('stock'), fn (Builder $query) => $this->applyStock($query, $request->string('stock')->toString()))
@@ -103,7 +81,6 @@ class PartSearchService
             $this->partSuggestions($term, $limit, false),
             $this->brandSuggestions($term, $limit, false),
             $this->modelSuggestions($term, $limit, false),
-            $this->categorySuggestions($term, $limit, false),
         )));
     }
 
@@ -119,7 +96,6 @@ class PartSearchService
             $this->partSuggestions($term, $limit, true),
             $this->brandSuggestions($term, $limit, true),
             $this->modelSuggestions($term, $limit, true),
-            $this->categorySuggestions($term, $limit, true),
         )));
     }
 
@@ -136,11 +112,8 @@ class PartSearchService
                 ->orWhere('part_category', 'like', "%{$search}%")
                 ->orWhere('front_position_text', 'like', "%{$search}%")
                 ->orWhere('description', 'like', "%{$search}%")
-                ->orWhereHas('partBrand', fn (Builder $query) => $query->where('name', 'like', "%{$search}%"))
-                ->orWhereHas('partModel', fn (Builder $query) => $query->where('name', 'like', "%{$search}%"))
                 ->orWhereHas('partCategory', fn (Builder $query) => $query->where('name', 'like', "%{$search}%"))
-                ->orWhereHas('categories', fn (Builder $query) => $query->where('name', 'like', "%{$search}%"))
-                ->orWhereHas('models', fn (Builder $query) => $query->where('name', 'like', "%{$search}%"));
+                ->orWhereHas('categories', fn (Builder $query) => $query->where('name', 'like', "%{$search}%"));
 
             if ($admin) {
                 $query->orWhere('id', 'like', "%{$search}%");
@@ -198,15 +171,20 @@ class PartSearchService
 
     private function brandSuggestions(string $term, int $limit, bool $admin): array
     {
-        return PartBrand::query()
-            ->when(! $admin, fn (Builder $query) => $query->active())
-            ->where('name', 'like', "%{$term}%")
+        return Part::query()
+            ->when(! $admin, fn (Builder $query) => $query->where('is_active', true)->where('status', 'active'))
+            ->whereNotNull('brand')
+            ->whereRaw("TRIM(brand) != ''")
+            ->where('brand', 'like', "%{$term}%")
+            ->select('brand')
+            ->distinct()
+            ->orderBy('brand')
             ->limit($limit)
-            ->get(['id', 'name', 'slug'])
-            ->map(fn (PartBrand $brand): array => [
+            ->pluck('brand')
+            ->map(fn (string $brand): array => [
                 'type' => 'brand',
-                'label' => $brand->name,
-                'value' => $admin ? (string) $brand->id : $brand->slug,
+                'label' => $brand,
+                'value' => $brand,
                 'field' => 'brand',
             ])
             ->all();
@@ -214,32 +192,21 @@ class PartSearchService
 
     private function modelSuggestions(string $term, int $limit, bool $admin): array
     {
-        return PartModel::query()
-            ->when(! $admin, fn (Builder $query) => $query->active())
-            ->where('name', 'like', "%{$term}%")
+        return Part::query()
+            ->when(! $admin, fn (Builder $query) => $query->where('is_active', true)->where('status', 'active'))
+            ->whereNotNull('model_compatibility')
+            ->whereRaw("TRIM(model_compatibility) != ''")
+            ->where('model_compatibility', 'like', "%{$term}%")
+            ->select('model_compatibility')
+            ->distinct()
+            ->orderBy('model_compatibility')
             ->limit($limit)
-            ->get(['id', 'name'])
-            ->map(fn (PartModel $model): array => [
+            ->pluck('model_compatibility')
+            ->map(fn (string $model): array => [
                 'type' => 'model',
-                'label' => $model->name,
-                'value' => $admin ? (string) $model->id : $model->name,
+                'label' => $model,
+                'value' => $model,
                 'field' => 'model',
-            ])
-            ->all();
-    }
-
-    private function categorySuggestions(string $term, int $limit, bool $admin): array
-    {
-        return PartCategory::query()
-            ->when(! $admin, fn (Builder $query) => $query->active())
-            ->where('name', 'like', "%{$term}%")
-            ->limit($limit)
-            ->get(['id', 'name', 'slug'])
-            ->map(fn (PartCategory $category): array => [
-                'type' => 'category',
-                'label' => $category->name,
-                'value' => $admin ? (string) $category->id : $category->slug,
-                'field' => $admin ? 'category' : 'part_category',
             ])
             ->all();
     }

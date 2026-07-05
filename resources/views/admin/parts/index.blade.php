@@ -28,16 +28,7 @@
                         <select class="form-select" id="brand" name="brand">
                             <option value="">All</option>
                             @foreach ($partBrands as $brand)
-                                <option value="{{ $brand->id }}" @selected((int) request('brand') === $brand->id)>{{ $brand->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="col-sm-6 col-lg-2">
-                        <label class="form-label" for="category">Category</label>
-                        <select class="form-select" id="category" name="category">
-                            <option value="">All</option>
-                            @foreach ($partCategories as $category)
-                                <option value="{{ $category->id }}" @selected((int) request('category') === $category->id)>{{ $category->name }}</option>
+                                <option value="{{ $brand }}" @selected(request('brand') === $brand)>{{ $brand }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -46,7 +37,7 @@
                         <select class="form-select" id="model" name="model">
                             <option value="">All</option>
                             @foreach ($partModels as $model)
-                                <option value="{{ $model->id }}" @selected((int) request('model') === $model->id)>{{ $model->name }}</option>
+                                <option value="{{ $model }}" @selected(request('model') === $model)>{{ $model }}</option>
                             @endforeach
                         </select>
                     </div>

@@ -25,7 +25,7 @@
                         <select class="form-select" id="brand" name="brand">
                             <option value="">All</option>
                             @foreach ($brands as $brand)
-                                <option value="{{ $brand->slug }}" @selected(request('brand') === $brand->slug)>{{ $brand->name }}</option>
+                                <option value="{{ $brand }}" @selected(request('brand') === $brand)>{{ $brand }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -39,15 +39,6 @@
                             <option value="">All</option>
                             @foreach ($deviceTypes as $deviceType)
                                 <option value="{{ $deviceType }}" @selected(request('device_type') === $deviceType)>{{ $deviceType }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="col-sm-6 col-lg-2">
-                        <label class="form-label" for="part_category">Category</label>
-                        <select class="form-select" id="part_category" name="part_category">
-                            <option value="">All</option>
-                            @foreach ($categories as $category)
-                                <option value="{{ $category->slug }}" @selected(request('part_category') === $category->slug)>{{ $category->name }}</option>
                             @endforeach
                         </select>
                     </div>

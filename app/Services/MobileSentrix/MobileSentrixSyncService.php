@@ -4,10 +4,7 @@ namespace App\Services\MobileSentrix;
 
 use App\Models\MobileSentrixSyncLog;
 use App\Models\Part;
-use App\Models\PartBrand;
 use App\Models\PartCategory;
-use App\Models\PartImage;
-use App\Models\PartModel;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -217,18 +214,16 @@ class MobileSentrixSyncService
             $oldQuantity = $part->quantity;
             $oldStock = $part->is_in_stock;
 
-            $brand = $this->brandFromProduct($record);
-            $models = $this->modelsFromProduct($record, $brand);
-            $model = $models->first();
             $categories = $this->categoriesFromProduct($record, $summary);
             $primaryCategory = $categories->first();
-            $brandName = $brand?->name
-                ?: $this->stringValue($record, 'brand_text')
+            $brandName = $this->stringValue($record, 'brand_text')
                 ?: $this->stringValue($record, 'manufacturer_text')
                 ?: $this->stringValue($record, 'manufacture_text')
                 ?: $this->stringValue($record, 'device_manufacturer_text')
                 ?: $this->stringValue($record, 'brand')
                 ?: 'MobileSentrix';
+            $modelNames = $this->arrayValue($record['model_text'] ?? $record['device_model_text'] ?? null);
+            $modelName = collect($modelNames)->first(fn ($value): bool => filled($value));
             $name = $this->limitString($this->stringValue($record, 'name') ?: $this->stringValue($record, 'title') ?: 'MobileSentrix Part '.$productId);
             $urlKey = $this->limitString($this->stringValue($record, 'url_key'));
             $mobilesentrixUrl = $this->limitString($this->stringValue($record, 'url') ?: $this->stringValue($record, 'link') ?: $urlKey);
@@ -264,12 +259,10 @@ class MobileSentrixSyncService
                 'url' => $mobilesentrixUrl,
                 'default_image' => $imageUrl,
                 'image_url' => $imageUrl,
-                'part_brand_id' => $brand?->id,
                 'part_category_id' => $primaryCategory?->id,
-                'part_model_id' => $model?->id,
                 'brand' => $this->limitString($brandName),
                 'part_category' => $this->limitString($primaryCategory?->name ?: $this->stringValue($record, 'front_position_text') ?: 'MobileSentrix'),
-                'model_compatibility' => $this->limitString($model?->name),
+                'model_compatibility' => $this->limitString($modelName),
                 'device_type' => $this->limitString($this->stringValue($record, 'front_position_text') ?: $this->stringValue($record, 'attribute_set') ?: 'Part'),
                 'price' => $costPrice,
                 'cost_price' => $costPrice,
@@ -359,9 +352,6 @@ class MobileSentrixSyncService
 
             $part->save();
             $this->syncPartCategories($part, $categories);
-            $this->syncPartModels($part, $models);
-            $this->syncPartImages($part, $record, $imageUrl);
-            $this->syncRelatedParts($part, $record);
 
             $summary['processed_count']++;
             $summary[$exists ? 'updated_count' : 'created_count']++;
@@ -537,85 +527,6 @@ class MobileSentrixSyncService
         return $category;
     }
 
-    private function brandFromProduct(array $record): ?PartBrand
-    {
-        $sourceField = null;
-        $name = null;
-
-        foreach (['brand_text', 'manufacturer_text', 'manufacture_text', 'device_manufacturer_text', 'brand', 'manufacturer', 'device_manufacturer'] as $field) {
-            $value = $this->stringValue($record, $field);
-
-            if (! filled($value)) {
-                continue;
-            }
-
-            $sourceField = $field;
-            $name = $value;
-            break;
-        }
-
-        if (! $name) {
-            return null;
-        }
-
-        return PartBrand::query()->updateOrCreate(
-            ['slug' => Str::slug($name)],
-            [
-                'external_brand_id' => $this->stringValue($record, 'brand') ?: $this->stringValue($record, 'manufacturer') ?: $this->stringValue($record, 'device_manufacturer'),
-                'name' => $name,
-                'source_field' => $sourceField,
-                'raw_value' => $sourceField ? $this->stringValue($record, $sourceField) : null,
-                'is_active' => true,
-                'status' => 'active',
-                'raw_payload' => [
-                    'brand' => $record['brand'] ?? null,
-                    'brand_text' => $record['brand_text'] ?? null,
-                    'manufacturer' => $record['manufacturer'] ?? null,
-                    'manufacturer_text' => $record['manufacturer_text'] ?? null,
-                    'manufacture_text' => $record['manufacture_text'] ?? null,
-                    'device_manufacturer' => $record['device_manufacturer'] ?? null,
-                    'device_manufacturer_text' => $record['device_manufacturer_text'] ?? null,
-                ],
-                'synced_at' => now(),
-            ],
-        );
-    }
-
-    private function modelsFromProduct(array $record, ?PartBrand $brand): Collection
-    {
-        $modelIds = $this->arrayValue($record['model'] ?? $record['device_model'] ?? null);
-        $modelTexts = $this->arrayValue($record['model_text'] ?? $record['device_model_text'] ?? null);
-        $models = collect();
-        $max = max(count($modelIds), count($modelTexts));
-
-        for ($index = 0; $index < $max; $index++) {
-            $modelId = $modelIds[$index] ?? $modelIds[0] ?? null;
-            $modelName = $modelTexts[$index] ?? $modelId;
-
-            if (! filled($modelName)) {
-                continue;
-            }
-
-            $model = PartModel::query()->updateOrCreate(
-                ['slug' => Str::slug((string) $modelName)],
-                [
-                    'external_model_id' => $modelId ? (string) $modelId : null,
-                    'part_brand_id' => $brand?->id,
-                    'name' => (string) $modelName,
-                    'source_field' => isset($modelTexts[$index]) ? 'model_text' : 'model',
-                    'raw_value' => $modelId ? (string) $modelId : (string) $modelName,
-                    'status' => 'active',
-                    'raw_payload' => ['model' => $record['model'] ?? null, 'model_text' => $record['model_text'] ?? null],
-                    'synced_at' => now(),
-                ],
-            );
-
-            $models->push($model);
-        }
-
-        return $models->unique('id')->values();
-    }
-
     private function categoriesFromProduct(array $record, array &$summary): Collection
     {
         return collect($this->arrayValue($record['category_ids'] ?? []))
@@ -646,78 +557,6 @@ class MobileSentrixSyncService
         ])->all();
 
         $part->categories()->sync($sync);
-    }
-
-    private function syncPartModels(Part $part, Collection $models): void
-    {
-        $part->models()->sync($models->pluck('id')->all());
-    }
-
-    private function syncPartImages(Part $part, array $record, ?string $defaultImage): void
-    {
-        PartImage::query()->where('part_id', $part->id)->delete();
-
-        $images = collect();
-
-        if (filled($defaultImage)) {
-            $images->push([
-                'image_url' => $defaultImage,
-                'thumbnail_url' => $defaultImage,
-                'large_image_url' => $defaultImage,
-                'position' => 0,
-                'label' => 'Default',
-                'alt_text' => $this->stringValue($record, 'name'),
-                'is_default' => true,
-                'raw_payload' => ['image_url' => $defaultImage],
-            ]);
-        }
-
-        foreach ($this->arrayValue($record['image_gallery'] ?? null) as $index => $image) {
-            $imageUrl = is_array($image)
-                ? ($image['url'] ?? $image['image_url'] ?? $image['file'] ?? $image['large_image_url'] ?? $image['thumbnail_url'] ?? null)
-                : $image;
-
-            if (! filled($imageUrl)) {
-                continue;
-            }
-
-            $images->push([
-                'image_url' => (string) $imageUrl,
-                'thumbnail_url' => is_array($image) ? ($image['thumbnail_url'] ?? $image['small_image_url'] ?? $image['thumb_url'] ?? $imageUrl) : (string) $imageUrl,
-                'large_image_url' => is_array($image) ? ($image['large_image_url'] ?? $image['full_image_url'] ?? $imageUrl) : (string) $imageUrl,
-                'position' => $index + 1,
-                'label' => is_array($image) ? ($image['label'] ?? null) : null,
-                'alt_text' => is_array($image) ? ($image['alt_text'] ?? $image['alt'] ?? $image['label'] ?? null) : null,
-                'is_default' => false,
-                'raw_payload' => is_array($image) ? $image : ['image_url' => $imageUrl],
-            ]);
-        }
-
-        $images
-            ->unique('image_url')
-            ->each(fn (array $image): PartImage => $part->images()->create($image));
-    }
-
-    private function syncRelatedParts(Part $part, array $record): void
-    {
-        $relatedIds = collect($this->arrayValue($record['related_product'] ?? null))
-            ->filter(fn ($value): bool => is_numeric($value))
-            ->map(fn ($value): int => (int) $value)
-            ->filter(fn (int $id): bool => $id !== (int) $part->id)
-            ->values();
-
-        if ($relatedIds->isEmpty()) {
-            $part->relatedParts()->sync([]);
-
-            return;
-        }
-
-        $existingIds = Part::query()
-            ->whereKey($relatedIds->all())
-            ->pluck('id')
-            ->all();
-
-        $part->relatedParts()->sync($existingIds);
     }
 
     private function partIdentifiers(array $record): array

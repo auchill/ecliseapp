@@ -10,7 +10,7 @@ class EnrichMobileSentrixProductCommand extends Command
 {
     protected $signature = 'mobilesentrix:enrich-product {part_id_or_sku : Local MobileSentrix product ID, SKU, or new SKU} {--force : Enrich even when the local cache is fresh}';
 
-    protected $description = 'Fetch MobileSentrix product details, tags, compatibility, images, badges, and related products for one part.';
+    protected $description = 'Fetch and store MobileSentrix product details in the direct part fields.';
 
     public function handle(MobileSentrixProductEnrichmentService $enrichmentService): int
     {
@@ -33,18 +33,17 @@ class EnrichMobileSentrixProductCommand extends Command
         }
 
         $part = $enrichmentService->enrichPart($part, (bool) $this->option('force'));
-        $part->load('warranty')->loadCount(['images', 'tags', 'badges', 'compatibilities', 'relatedParts']);
 
         $this->info("MobileSentrix part {$part->id} enriched.");
         $this->line('SKU: '.($part->sku ?: 'N/A'));
         $this->line('Name: '.$part->name);
         $this->line('Description updated: '.(filled($part->description) ? 'yes' : 'no'));
-        $this->line('Images: '.$part->images_count);
-        $this->line('Tags: '.$part->tags_count);
-        $this->line('Compatibility rows: '.$part->compatibilities_count);
-        $this->line('Badges: '.$part->badges_count);
-        $this->line('Warranty detected: '.($part->warranty ? ($part->warranty->display_label ?: 'yes') : 'no'));
-        $this->line('Related parts: '.$part->related_parts_count);
+        $this->line('Images: '.$part->gallery_images->count());
+        $this->line('Tags: '.$part->tag_labels->count());
+        $this->line('Compatibility rows: '.$part->compatibility_labels->count());
+        $this->line('Badge detected: '.($part->display_badge_name ?: 'no'));
+        $this->line('Warranty detected: '.($part->display_warranty_label ?: 'no'));
+        $this->line('Related parts: '.$part->related_product_parts->count());
 
         return self::SUCCESS;
     }

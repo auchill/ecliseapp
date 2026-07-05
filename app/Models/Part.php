@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Part extends Model
 {
@@ -105,29 +104,9 @@ class Part extends Model
         ];
     }
 
-    public function brand(): BelongsTo
-    {
-        return $this->belongsTo(PartBrand::class, 'part_brand_id');
-    }
-
-    public function partBrand(): BelongsTo
-    {
-        return $this->brand();
-    }
-
     public function partCategory(): BelongsTo
     {
         return $this->belongsTo(PartCategory::class);
-    }
-
-    public function partModel(): BelongsTo
-    {
-        return $this->belongsTo(PartModel::class);
-    }
-
-    public function warranty(): BelongsTo
-    {
-        return $this->belongsTo(PartWarranty::class, 'part_warranty_id');
     }
 
     public function categories(): BelongsToMany
@@ -141,43 +120,9 @@ class Part extends Model
         return $this->categories();
     }
 
-    public function models(): BelongsToMany
-    {
-        return $this->belongsToMany(PartModel::class, 'part_model_part')
-            ->withTimestamps();
-    }
-
-    public function tags(): BelongsToMany
-    {
-        return $this->belongsToMany(PartTag::class, 'part_part_tag')
-            ->withTimestamps();
-    }
-
-    public function badges(): BelongsToMany
-    {
-        return $this->belongsToMany(PartBadge::class, 'part_part_badge')
-            ->withTimestamps();
-    }
-
-    public function images(): HasMany
-    {
-        return $this->hasMany(PartImage::class);
-    }
-
-    public function compatibilities(): HasMany
-    {
-        return $this->hasMany(PartCompatibility::class);
-    }
-
-    public function relatedParts(): BelongsToMany
-    {
-        return $this->belongsToMany(self::class, 'part_related_parts', 'part_id', 'related_part_id')
-            ->withTimestamps();
-    }
-
     public function brandName(): ?string
     {
-        return $this->brand?->name ?? $this->manufacturer_text ?? $this->brand_text ?? $this->brand;
+        return $this->brand ?: $this->brand_text ?: $this->manufacturer_text ?: $this->device_manufacturer_text;
     }
 
     public function categoryName(): ?string
@@ -187,23 +132,17 @@ class Part extends Model
 
     public function modelName(): ?string
     {
-        if ($this->partModel?->name) {
-            return $this->partModel->name;
-        }
-
-        $model = $this->models->first()?->name;
-
-        if ($model) {
-            return $model;
-        }
-
         $modelText = $this->model_text;
 
         if (is_array($modelText)) {
-            return implode(', ', array_filter($modelText));
+            $value = collect($modelText)->filter(fn ($model): bool => filled($model))->implode(', ');
+
+            if ($value !== '') {
+                return $value;
+            }
         }
 
-        return $this->model_compatibility;
+        return $this->device_model_text ?: $this->model_compatibility ?: (is_string($this->model) ? $this->model : null);
     }
 
     public function displayPrice(): float
@@ -230,11 +169,7 @@ class Part extends Model
 
     public function mainImageUrl(): string
     {
-        $image = $this->relationLoaded('images')
-            ? $this->images->sortByDesc('is_default')->sortBy('position')->first()
-            : $this->images()->orderByDesc('is_default')->orderBy('position')->first();
-
-        return $image?->image_url ?: $this->imageUrl();
+        return $this->gallery_images->first()?->large_image_url ?: $this->imageUrl();
     }
 
     public function getMainImageUrlAttribute(): string
@@ -244,9 +179,41 @@ class Part extends Model
 
     public function getGalleryImagesAttribute()
     {
-        return $this->relationLoaded('images')
-            ? $this->images
-            : $this->images()->orderByDesc('is_default')->orderBy('position')->get();
+        $images = collect();
+
+        if (filled($this->default_image ?: $this->image_url)) {
+            $url = $this->default_image ?: $this->image_url;
+            $images->push((object) [
+                'image_url' => $url,
+                'thumbnail_url' => $url,
+                'large_image_url' => $url,
+                'label' => 'Default',
+                'alt_text' => $this->name,
+            ]);
+        }
+
+        foreach ((array) $this->image_gallery as $image) {
+            $row = is_array($image) ? $image : ['image_url' => $image];
+            $url = data_get($row, 'url')
+                ?: data_get($row, 'image_url')
+                ?: data_get($row, 'file')
+                ?: data_get($row, 'large_image_url')
+                ?: data_get($row, 'thumbnail_url');
+
+            if (! filled($url)) {
+                continue;
+            }
+
+            $images->push((object) [
+                'image_url' => $url,
+                'thumbnail_url' => data_get($row, 'thumbnail_url') ?: data_get($row, 'small_image_url') ?: data_get($row, 'thumb_url') ?: $url,
+                'large_image_url' => data_get($row, 'large_image_url') ?: data_get($row, 'full_image_url') ?: $url,
+                'label' => data_get($row, 'label'),
+                'alt_text' => data_get($row, 'alt_text') ?: data_get($row, 'alt') ?: data_get($row, 'label') ?: $this->name,
+            ]);
+        }
+
+        return $images->unique('image_url')->values();
     }
 
     public function displayDescription(): string
@@ -266,21 +233,95 @@ class Part extends Model
 
     public function getDisplayBadgeIconUrlAttribute(): ?string
     {
-        $badge = $this->relationLoaded('badges')
-            ? $this->badges->first()
-            : $this->badges()->first();
+        return PartBadge::displayIconUrl(
+            $this->display_badge_name,
+            $this->firstRawPayloadValue([
+                'product_badges_icon_url',
+                'product_badge_icon_url',
+                'badge_icon_url',
+                'badge_image_url',
+            ]),
+        );
+    }
 
-        return $badge?->display_icon_url;
+    public function getDisplayBadgeNameAttribute(): ?string
+    {
+        return PartBadge::displayName($this->product_badges_text ?: $this->firstScalarValue($this->product_badges));
     }
 
     public function getDisplayWarrantyIconUrlAttribute(): ?string
     {
-        return $this->warranty?->display_icon_url;
+        return PartWarranty::displayIconUrl(
+            $this->warranty_period,
+            $this->warranty_period_text,
+            $this->firstRawPayloadValue([
+                'warranty_icon_url',
+                'warranty_image_url',
+                'warranty_photo_url',
+            ]),
+        );
     }
 
     public function getDisplayWarrantyLabelAttribute(): ?string
     {
-        return $this->warranty?->display_label ?: $this->warranty_period_text ?: $this->warranty_period;
+        return PartWarranty::displayLabel($this->warranty_period, $this->warranty_period_text);
+    }
+
+    public function getCompatibilityLabelsAttribute()
+    {
+        return $this->labelsFromPayload($this->compatibility, ['name', 'label', 'title', 'value', 'compatibility']);
+    }
+
+    public function getTagLabelsAttribute()
+    {
+        $labels = collect();
+
+        $walk = function (mixed $value) use (&$walk, $labels): void {
+            if (! is_array($value)) {
+                return;
+            }
+
+            foreach ($value as $key => $child) {
+                if (in_array($key, ['tag', 'tags'], true)) {
+                    if (is_array($child)) {
+                        $labels->push(...$this->labelsFromPayload($child, ['name', 'label', 'title', 'value'])->all());
+                    } elseif (is_scalar($child) && trim((string) $child) !== '') {
+                        $labels->push(trim((string) $child));
+                    }
+
+                    continue;
+                }
+
+                if (is_array($child)) {
+                    $walk($child);
+                }
+            }
+        };
+
+        $walk($this->tags_raw_payload);
+
+        return $labels->unique()->values();
+    }
+
+    public function getRelatedProductPartsAttribute()
+    {
+        $ids = collect((array) $this->related_product)
+            ->map(function ($related) {
+                if (is_numeric($related)) {
+                    return (int) $related;
+                }
+
+                return is_array($related)
+                    ? (int) ($related['entity_id'] ?? $related['product_id'] ?? $related['id'] ?? 0)
+                    : 0;
+            })
+            ->filter(fn (int $id): bool => $id > 0 && $id !== (int) $this->getKey())
+            ->unique()
+            ->values();
+
+        return $ids->isEmpty()
+            ? collect()
+            : static::query()->whereKey($ids->all())->get()->sortBy(fn (Part $part) => $ids->search((int) $part->getKey()))->values();
     }
 
     public function isAvailableForPartsPurchase(): bool
@@ -312,5 +353,85 @@ class Part extends Model
         }
 
         return $this->availability_status ?: $this->stock_status ?: 'Check availability';
+    }
+
+    private function firstRawPayloadValue(array $keys): ?string
+    {
+        $payload = (array) $this->raw_payload;
+
+        foreach ($keys as $key) {
+            $value = data_get($payload, $key);
+
+            if (is_string($value) && trim($value) !== '') {
+                return $value;
+            }
+        }
+
+        return null;
+    }
+
+    private function firstScalarValue(mixed $value): ?string
+    {
+        if (is_scalar($value) && trim((string) $value) !== '') {
+            return trim((string) $value);
+        }
+
+        if (! is_array($value)) {
+            return null;
+        }
+
+        foreach ($value as $item) {
+            $result = $this->firstScalarValue($item);
+
+            if ($result) {
+                return $result;
+            }
+        }
+
+        return null;
+    }
+
+    private function labelsFromPayload(mixed $payload, array $preferredKeys)
+    {
+        $labels = collect();
+
+        $walk = function (mixed $value) use (&$walk, $preferredKeys, $labels): void {
+            if (! is_array($value)) {
+                return;
+            }
+
+            if (array_is_list($value)) {
+                foreach ($value as $item) {
+                    if (is_scalar($item) && trim((string) $item) !== '') {
+                        $labels->push(trim((string) $item));
+                    } elseif (is_array($item)) {
+                        $walk($item);
+                    }
+                }
+
+                return;
+            }
+
+            foreach ($preferredKeys as $key) {
+                $label = $value[$key] ?? null;
+
+                if (is_scalar($label) && trim((string) $label) !== '') {
+                    $labels->push(trim((string) $label));
+                    break;
+                }
+            }
+
+            foreach ($value as $child) {
+                if (is_array($child)) {
+                    $walk($child);
+                }
+            }
+        };
+
+        if (is_array($payload)) {
+            $walk($payload);
+        }
+
+        return $labels->unique()->values();
     }
 }
