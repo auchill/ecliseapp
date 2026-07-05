@@ -134,6 +134,112 @@ test('customer device listing only shows available devices and admin listing has
         ->assertDontSee('Add To Cart');
 });
 
+test('active device filter chips render accessible individual remove buttons', function () {
+    MobileSentrixDevice::query()->create([
+        'entity_id' => 88010,
+        'sku' => 'FILTER-CHIP-CPO',
+        'name' => 'Filter Chip Device',
+        'manufacturer_text' => 'Apple',
+        'device_model_text' => 'iPhone 6',
+        'device_size_text' => '16GB',
+        'device_color_text' => 'Black',
+        'condition_text' => 'Good',
+        'device_carrier_text' => 'Unlocked',
+        'available_qty' => 2,
+        'price' => 200,
+        'status' => 'active',
+    ]);
+
+    $response = $this->get(route('shop.certified-pre-owned-devices.index', [
+        'device_model_text' => ['iPhone 6'],
+        'device_size_text' => ['16GB'],
+        'device_color_text' => ['Gold', 'Black', 'Green'],
+        'device_carrier_text' => ['GSM', 'USA Regional', 'WiFi Version'],
+        'price_min' => 100,
+        'price_max' => 300,
+    ]));
+
+    $response->assertOk()
+        ->assertSee('data-cpo-remove-filter', false)
+        ->assertSee('data-cpo-active-filter-group="device_color_text"', false)
+        ->assertSee('data-cpo-active-filter-group="device_carrier_text"', false)
+        ->assertSee('data-filter-type="column"', false)
+        ->assertSee('data-filter-type="price_min"', false)
+        ->assertSee('data-filter-type="price_max"', false)
+        ->assertSee('aria-label="Remove Model iPhone 6 filter"', false)
+        ->assertSee('aria-label="Remove Size 16GB filter"', false)
+        ->assertSee('aria-label="Remove Color Gold filter"', false)
+        ->assertSee('aria-label="Remove Color Black filter"', false)
+        ->assertSee('aria-label="Remove Color Green filter"', false);
+
+    expect(substr_count($response->getContent(), 'class="cpo-active-filter-title">Color :'))->toBe(1)
+        ->and(substr_count($response->getContent(), 'class="cpo-active-filter-title">Carrier :'))->toBe(1);
+});
+
+test('individual device filter removal states preserve sibling and price filters', function () {
+    foreach ([
+        [88101, 'Black', '16GB', 150],
+        [88102, 'Gray', '16GB', 250],
+        [88103, 'Gray', '16GB', 350],
+    ] as [$entityId, $color, $size, $price]) {
+        MobileSentrixDevice::query()->create([
+            'entity_id' => $entityId,
+            'sku' => 'FILTER-'.$entityId,
+            'name' => $color.' Filter Device',
+            'manufacturer_text' => 'Apple',
+            'device_model_text' => 'iPhone 6',
+            'device_size_text' => $size,
+            'device_color_text' => $color,
+            'condition_text' => 'Good',
+            'device_carrier_text' => 'Unlocked',
+            'available_qty' => 2,
+            'price' => $price,
+            'status' => 'active',
+        ]);
+    }
+
+    $headers = ['X-Requested-With' => 'XMLHttpRequest', 'Accept' => 'application/json'];
+
+    $afterBlackRemoval = $this->get(route('shop.certified-pre-owned-devices.index', [
+        'device_color_text' => ['Gray'],
+        'device_size_text' => ['16GB'],
+        'price_min' => 100,
+        'price_max' => 300,
+    ]), $headers);
+
+    $afterBlackRemoval->assertOk()->assertJsonPath('total', 1);
+    expect($afterBlackRemoval->json('chips_html'))
+        ->toContain('Gray')
+        ->toContain('Size :')
+        ->toContain('Min price :')
+        ->toContain('Max price :')
+        ->not->toContain('data-filter-value="Black"');
+
+    $afterMinRemoval = $this->get(route('shop.certified-pre-owned-devices.index', [
+        'device_color_text' => ['Gray'],
+        'price_max' => 300,
+    ]), $headers);
+
+    $afterMinRemoval->assertOk()->assertJsonPath('total', 1);
+    expect($afterMinRemoval->json('chips_html'))
+        ->toContain('Max price :')
+        ->not->toContain('Min price :');
+
+    $afterMaxRemoval = $this->get(route('shop.certified-pre-owned-devices.index', [
+        'device_color_text' => ['Gray'],
+        'price_min' => 100,
+    ]), $headers);
+
+    $afterMaxRemoval->assertOk()->assertJsonPath('total', 2);
+    expect($afterMaxRemoval->json('chips_html'))
+        ->toContain('Min price :')
+        ->not->toContain('Max price :');
+
+    $this->get(route('shop.certified-pre-owned-devices.index'))
+        ->assertOk()
+        ->assertDontSee('data-cpo-active-filter', false);
+});
+
 test('cart stores eclise and mobile sentrix items with distinct source identifiers', function () {
     $customer = cpoTestUser('cpo-cart@example.com');
     $product = Product::query()->create([

@@ -4,14 +4,63 @@
 
 @section('content')
     <style>
+        /* sh:codes - Close Button to Active Filter Tags styling update (Pre-owned devices) */
         .cpo-table thead th { background: #c91522; color: #fff; border-color: #b2101d; font-size: .78rem; text-transform: uppercase; white-space: nowrap; vertical-align: middle; }
         .cpo-table td { vertical-align: middle; font-size: .9rem; }
         .cpo-price { color: #c91522; font-weight: 800; white-space: nowrap; }
         .cpo-filter-menu { min-width: 260px; max-height: 360px; overflow-y: auto; }
-        .cpo-chip { border: 1px solid #dbe4f0; border-radius: 999px; padding: .35rem .65rem; background: #f8fafc; font-size: .8rem; }
+        .cpo-active-filters { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem 1.25rem; margin-bottom: .85rem; font-size: .8rem; }
+        .cpo-active-filter-group { display: inline-flex; align-items: center; flex-wrap: wrap; gap: .45rem; }
+        .cpo-active-filter-title { color: #252a31; font-weight: 700; white-space: nowrap; }
+        .cpo-active-filter-values { display: inline-flex; align-items: center; flex-wrap: wrap; gap: .45rem; }
+        /* .cpo-active-filter-pill { display: inline-flex; align-items: center; gap: .3rem; min-height: 26px; border: 1px solid #d5dae1; border-radius: 999px; padding: .15rem .35rem .15rem .6rem; background: #f1f2f4; color: #17191c; font-weight: 600; line-height: 1; } */
+        /* .cpo-active-filter-remove { display: inline-grid; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #24272b; font-size: 1rem; font-weight: 700; line-height: 1; place-items: center; } */
+        /* .cpo-active-filter-remove:hover, .cpo-active-filter-remove:focus-visible { background: #fff; color: #c91522; outline: none; } */
         .cpo-qty { width: 110px; }
         .cpo-action-bar { border: 2px solid #071d3a; border-radius: 8px; padding: 1rem; background: #fff; }
         .cpo-total { color: #071d3a; font-size: 1.1rem; }
+
+        .cpo-active-filter-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: .3rem;
+            min-height: 26px;
+            border: 1px solid #d5dae1;
+            border-radius: 999px;
+            padding: .15rem .35rem .15rem .6rem;
+            background: #f1f2f4;
+            color: #17191c;
+            font-weight: 600;
+            line-height: 1;
+        }
+        .cpo-active-filter-value {
+            display: inline-flex;
+            align-items: center;
+            line-height: 1;
+        }
+        .cpo-active-filter-remove {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+
+            width: 18px;
+            height: 18px;
+            padding: 0;
+            margin: 0;
+
+            border: 0;
+            border-radius: 50%;
+            background: transparent;
+            color: #24272b;
+
+            font-size: 1rem;
+            font-weight: 700;
+            line-height: 18px;
+
+            transform: translateY(-1px);
+        }
+        .cpo-active-filter-remove:hover, .cpo-active-filter-remove:focus-visible { background: #fff; color: #c91522; outline: none; }
+
     </style>
 
     <section class="page-header">
@@ -78,7 +127,7 @@
             </form>
 
             <div data-cpo-selected-chips>
-                @include('shop.certified-pre-owned-devices.partials.chips', ['selectedChips' => $selectedChips])
+                @include('shop.certified-pre-owned-devices.partials.chips', ['selectedFilterGroups' => $selectedFilterGroups])
             </div>
 
             <div data-cpo-results>
@@ -130,15 +179,7 @@
                 document.querySelectorAll('[data-cpo-filter-field]').forEach((checkbox) => {
                     checkbox.addEventListener('change', () => {
                         const field = checkbox.dataset.cpoFilterField;
-                        form.querySelectorAll(`[data-cpo-hidden-filter="${field}"]`).forEach((node) => node.remove());
-                        document.querySelectorAll(`[data-cpo-filter-field="${field}"]:checked`).forEach((checked) => {
-                            const hidden = document.createElement('input');
-                            hidden.type = 'hidden';
-                            hidden.name = `${field}[]`;
-                            hidden.value = checked.value;
-                            hidden.dataset.cpoHiddenFilter = field;
-                            form.appendChild(hidden);
-                        });
+                        syncColumnFilter(field);
                         runSearch();
                     });
                 });
@@ -189,6 +230,18 @@
                 bindPagination();
             };
 
+            const syncColumnFilter = (field) => {
+                form.querySelectorAll(`[data-cpo-hidden-filter="${field}"]`).forEach((node) => node.remove());
+                document.querySelectorAll(`[data-cpo-filter-field="${field}"]:checked`).forEach((checked) => {
+                    const hidden = document.createElement('input');
+                    hidden.type = 'hidden';
+                    hidden.name = `${field}[]`;
+                    hidden.value = checked.value;
+                    hidden.dataset.cpoHiddenFilter = field;
+                    form.appendChild(hidden);
+                });
+            };
+
             const runSearch = (url = null) => {
                 searchController?.abort();
                 searchController = new AbortController();
@@ -214,6 +267,28 @@
 
             form.addEventListener('submit', (event) => {
                 event.preventDefault();
+                runSearch();
+            });
+
+            selectedChips?.addEventListener('click', (event) => {
+                const button = event.target.closest('[data-cpo-remove-filter]');
+                if (!button) return;
+
+                const { filterType, filterField, filterValue } = button.dataset;
+
+                if (filterType === 'column') {
+                    document.querySelectorAll('[data-cpo-filter-field]').forEach((checkbox) => {
+                        if (checkbox.dataset.cpoFilterField === filterField && checkbox.value === filterValue) {
+                            checkbox.checked = false;
+                        }
+                    });
+                    syncColumnFilter(filterField);
+                } else {
+                    const field = form.querySelector(`[name="${filterField}"]`);
+                    if (field) field.value = '';
+                    form.querySelectorAll(`[data-cpo-hidden-filter="${filterField}"]`).forEach((node) => node.remove());
+                }
+
                 runSearch();
             });
 

@@ -23,7 +23,7 @@ class CertifiedPreOwnedDeviceController extends Controller
                     'filterOptions' => $filters->filterOptions(customer: true),
                 ])->render(),
                 'chips_html' => view('shop.certified-pre-owned-devices.partials.chips', [
-                    'selectedChips' => $filters->selectedChips($request),
+                    'selectedFilterGroups' => $filters->selectedFilterGroups($request),
                 ])->render(),
                 'total' => $devices->total(),
                 'first_item' => $devices->firstItem(),
@@ -34,7 +34,7 @@ class CertifiedPreOwnedDeviceController extends Controller
         return view('shop.certified-pre-owned-devices.index', [
             'devices' => $devices,
             'filterOptions' => $filters->filterOptions(customer: true),
-            'selectedChips' => $filters->selectedChips($request),
+            'selectedFilterGroups' => $filters->selectedFilterGroups($request),
             'perPageOptions' => [10, 25, 50, 100],
         ]);
     }

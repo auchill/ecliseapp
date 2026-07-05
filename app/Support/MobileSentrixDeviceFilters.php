@@ -59,11 +59,11 @@ class MobileSentrixDeviceFilters
         }
 
         if (is_numeric($request->query('price_min'))) {
-            $query->whereRaw('COALESCE(price, final_price, regular_price) >= ?', [(float) $request->query('price_min')]);
+            $query->whereRaw('CAST(COALESCE(price, final_price, regular_price) AS DECIMAL(12,2)) >= ?', [(float) $request->query('price_min')]);
         }
 
         if (is_numeric($request->query('price_max'))) {
-            $query->whereRaw('COALESCE(price, final_price, regular_price) <= ?', [(float) $request->query('price_max')]);
+            $query->whereRaw('CAST(COALESCE(price, final_price, regular_price) AS DECIMAL(12,2)) <= ?', [(float) $request->query('price_max')]);
         }
 
         return $this->sort($query, (string) $request->query('price_sort', ''));
@@ -104,18 +104,19 @@ class MobileSentrixDeviceFilters
 
         foreach (self::FILTER_FIELDS as $field => $label) {
             foreach ($this->filterValues($request, $field) as $value) {
-                $chips[] = ['field' => $field, 'label' => $label, 'value' => $value];
+                $chips[] = ['type' => 'column', 'field' => $field, 'label' => $label, 'value' => $value];
             }
         }
 
         foreach (['price_min' => 'Min price', 'price_max' => 'Max price'] as $field => $label) {
             if (filled($request->query($field))) {
-                $chips[] = ['field' => $field, 'label' => $label, 'value' => $request->query($field)];
+                $chips[] = ['type' => $field, 'field' => $field, 'label' => $label, 'value' => $request->query($field)];
             }
         }
 
         if (filled($request->query('availability'))) {
             $chips[] = [
+                'type' => 'scalar',
                 'field' => 'availability',
                 'label' => 'Availability',
                 'value' => $request->query('availability') === 'out_of_stock' ? 'Out of stock' : 'In stock',
@@ -123,6 +124,29 @@ class MobileSentrixDeviceFilters
         }
 
         return $chips;
+    }
+
+    public function selectedFilterGroups(Request $request): array
+    {
+        return collect($this->selectedChips($request))
+            ->groupBy('field')
+            ->map(function (Collection $chips): array {
+                $first = $chips->first();
+
+                return [
+                    'field' => $first['field'],
+                    'label' => $first['label'],
+                    'values' => $chips
+                        ->map(fn (array $chip): array => [
+                            'type' => $chip['type'],
+                            'value' => $chip['value'],
+                        ])
+                        ->values()
+                        ->all(),
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     public function perPage(Request $request): int
