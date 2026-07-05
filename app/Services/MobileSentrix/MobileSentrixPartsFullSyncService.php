@@ -52,7 +52,7 @@ class MobileSentrixPartsFullSyncService
             ? 'Complete MobileSentrix parts sync finished successfully.'
             : 'Complete MobileSentrix parts sync finished with warnings or failures. Review the stage logs.';
         $details = collect($results)
-            ->map(fn (array $result, string $stage): array => [
+            ->map(fn (array $result, string $stage): array => array_merge([
                 'stage' => $stage,
                 'status' => $result['status'] ?? 'unknown',
                 'message' => $result['message'] ?? null,
@@ -62,7 +62,21 @@ class MobileSentrixPartsFullSyncService
                 'skipped_count' => $result['skipped_count'] ?? 0,
                 'warning_count' => $result['warning_count'] ?? 0,
                 'failed_count' => $result['failed_count'] ?? 0,
-            ])
+            ], collect($result)->only([
+                'detail_lookup_count',
+                'detail_updated_count',
+                'description_updated_count',
+                'category_ids_updated_count',
+                'detail_lookup_failed_count',
+                'empty_category_ids_count',
+                'category_ids_remained_missing_count',
+                'category_pivot_created_count',
+                'existing_count',
+                'null_placeholder_created_count',
+                'null_placeholder_existing_count',
+                'invalid_id_count',
+                'no_category_ids_count',
+            ])->all()))
             ->values()
             ->all();
 

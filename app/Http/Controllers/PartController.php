@@ -61,7 +61,7 @@ class PartController extends Controller
 
         abort_unless($part->is_active && $part->status === 'active', 404);
 
-        $part->load(['partCategory', 'categories']);
+        $part->load('categories');
 
         return view('parts.show', ['part' => $part]);
     }

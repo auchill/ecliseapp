@@ -68,6 +68,13 @@ class MobileSentrixSyncService
             'stock_changed_count' => 0,
             'processed_count' => 0,
             'warning_count' => 0,
+            'detail_lookup_count' => 0,
+            'detail_updated_count' => 0,
+            'description_updated_count' => 0,
+            'category_ids_updated_count' => 0,
+            'detail_lookup_failed_count' => 0,
+            'empty_category_ids_count' => 0,
+            'category_ids_remained_missing_count' => 0,
             'dry_run' => $dryRun,
         ]);
 
@@ -132,6 +139,7 @@ class MobileSentrixSyncService
                         }
 
                         try {
+                            $record = $this->enrichMissingPartDetails($record, $summary);
                             $this->processPartRecord($record, $summary, [
                                 'dry_run' => $dryRun,
                                 'force' => $force,
@@ -152,7 +160,15 @@ class MobileSentrixSyncService
                 $page++;
             } while ($hasNextPage);
 
-            return $this->finishLog($log, $summary, 'MobileSentrix parts sync completed.');
+            return $this->finishLog($log, $summary, sprintf(
+                'MobileSentrix parts sync completed. Detail lookups: %d, records enriched: %d, descriptions updated: %d, category IDs updated: %d, detail failures: %d, category IDs still missing: %d.',
+                $summary['detail_lookup_count'],
+                $summary['detail_updated_count'],
+                $summary['description_updated_count'],
+                $summary['category_ids_updated_count'],
+                $summary['detail_lookup_failed_count'],
+                $summary['category_ids_remained_missing_count'],
+            ));
         } catch (\Throwable $exception) {
             $summary['failed_count']++;
             $this->addError($summary, $exception->getMessage());
@@ -259,8 +275,8 @@ class MobileSentrixSyncService
                 'name' => $name,
                 'slug' => $this->limitString(Str::slug($name.' '.($productId ?: $sku))),
                 'url_key' => $urlKey,
-                'description' => $this->stringValue($record, 'description'),
-                'short_description' => $this->stringValue($record, 'short_description'),
+                'description' => $this->stringValue($record, 'description') ?: $part->description,
+                'short_description' => $this->stringValue($record, 'short_description') ?: $part->short_description,
                 'product_extra_info' => $this->stringValue($record, 'product_extra_info'),
                 'url' => $mobilesentrixUrl,
                 'default_image' => $imageUrl,
@@ -316,7 +332,9 @@ class MobileSentrixSyncService
                 'meta_title' => $this->stringValue($record, 'meta_title'),
                 'meta_keyword' => $this->stringValue($record, 'meta_keyword'),
                 'meta_description' => $this->stringValue($record, 'meta_description'),
-                'category_ids' => $this->categoryIdsValue($record['category_ids'] ?? null),
+                'category_ids' => $this->categoryIdsMissing($record['category_ids'] ?? null)
+                    ? ($part->category_ids ?? [])
+                    : $this->categoryIdsValue($record['category_ids']),
                 'display_currency' => $this->limitString($this->stringValue($record, 'display_currency')),
                 'is_saleable' => $this->boolValue($record, 'is_saleable'),
                 'image_gallery' => $this->arrayValue($record['image_gallery'] ?? null),
@@ -355,10 +373,6 @@ class MobileSentrixSyncService
                 'last_synced_at' => $now,
             ];
 
-            if ($syncCategories) {
-                $partData['part_category_id'] = $primaryCategory?->id;
-            }
-
             $part->fill($partData);
 
             $part->save();
@@ -391,6 +405,92 @@ class MobileSentrixSyncService
         }
 
         return $this->upsertPart($record, $summary, $options);
+    }
+
+    private function enrichMissingPartDetails(array $record, array &$summary): array
+    {
+        $descriptionWasMissing = blank($record['description'] ?? null);
+        $categoryIdsWereMissing = $this->categoryIdsMissing($record['category_ids'] ?? null);
+
+        if ($categoryIdsWereMissing && $this->isExplicitEmptyCategoryIds($record['category_ids'] ?? null)) {
+            $summary['empty_category_ids_count']++;
+        }
+
+        if (! $descriptionWasMissing && ! $categoryIdsWereMissing) {
+            return $record;
+        }
+
+        [$productId, $sku, $newSku] = $this->partIdentifiers($record);
+        $summary['detail_lookup_count']++;
+
+        if (! $productId) {
+            $summary['detail_lookup_failed_count']++;
+            $summary['warning_count']++;
+            $this->addError($summary, [
+                'message' => 'Could not request missing MobileSentrix part details because the product ID is unavailable.',
+                'sku' => $sku ?: $newSku,
+            ]);
+        } else {
+            try {
+                $this->delayBetweenRequests();
+                $detailRecord = $this->records($this->client->product($productId))->first();
+
+                if (! is_array($detailRecord)) {
+                    throw new \RuntimeException("MobileSentrix product detail {$productId} returned no record.");
+                }
+
+                $changed = false;
+
+                foreach ($detailRecord as $key => $value) {
+                    $currentValueMissing = $key === 'category_ids'
+                        ? $this->categoryIdsMissing($record[$key] ?? null)
+                        : $this->recordValueMissing($record[$key] ?? null);
+                    $detailValueMissing = $key === 'category_ids'
+                        ? $this->categoryIdsMissing($value)
+                        : $this->recordValueMissing($value);
+
+                    if (! $currentValueMissing || $detailValueMissing) {
+                        continue;
+                    }
+
+                    $record[$key] = $value;
+                    $changed = true;
+                }
+
+                if ($changed) {
+                    $summary['detail_updated_count']++;
+                }
+
+                if ($descriptionWasMissing && filled($record['description'] ?? null)) {
+                    $summary['description_updated_count']++;
+                }
+
+                if ($categoryIdsWereMissing && ! $this->categoryIdsMissing($record['category_ids'] ?? null)) {
+                    $summary['category_ids_updated_count']++;
+                }
+            } catch (\Throwable $exception) {
+                $summary['detail_lookup_failed_count']++;
+                $summary['warning_count']++;
+                $this->addError($summary, [
+                    'message' => Str::limit($exception->getMessage(), 500, '...'),
+                    'entity_id' => $productId,
+                    'sku' => $sku ?: $newSku,
+                    'stage' => 'product_detail',
+                ]);
+            }
+        }
+
+        if ($this->categoryIdsMissing($record['category_ids'] ?? null)) {
+            $summary['category_ids_remained_missing_count']++;
+            $summary['warning_count']++;
+            $this->addError($summary, [
+                'message' => 'MobileSentrix part category_ids remained missing after the product detail lookup.',
+                'entity_id' => $productId,
+                'sku' => $sku ?: $newSku,
+            ]);
+        }
+
+        return $record;
     }
 
     private function dryRunPart(array $record, array &$summary): void
@@ -570,7 +670,7 @@ class MobileSentrixSyncService
             $category->id => [],
         ])->all();
 
-        $part->categories()->sync($sync);
+        $part->categories()->syncWithoutDetaching($sync);
     }
 
     private function partIdentifiers(array $record): array
@@ -633,6 +733,10 @@ class MobileSentrixSyncService
 
         if (isset($payload['data']) && is_array($payload['data']) && ! $this->looksLikeRecord($payload['data'])) {
             return collect($payload['data'])->filter(fn ($value, $key) => $key !== 'page_info' && is_array($value))->values();
+        }
+
+        if (isset($payload['data']) && is_array($payload['data']) && $this->looksLikeRecord($payload['data'])) {
+            return collect([$payload['data']]);
         }
 
         if ($this->looksLikeRecord($payload)) {
@@ -796,6 +900,19 @@ class MobileSentrixSyncService
     {
         $errors = $summary['errors'] ?? [];
         $omitted = (int) ($summary['omitted_error_count'] ?? 0);
+        $detailMetrics = collect($summary)->only([
+            'detail_lookup_count',
+            'detail_updated_count',
+            'description_updated_count',
+            'category_ids_updated_count',
+            'detail_lookup_failed_count',
+            'empty_category_ids_count',
+            'category_ids_remained_missing_count',
+        ])->all();
+
+        if ($detailMetrics !== []) {
+            array_unshift($errors, ['summary' => $detailMetrics]);
+        }
 
         if ($omitted > 0) {
             $errors[] = ['message' => "{$omitted} additional sync errors were omitted from this log."];
@@ -920,6 +1037,49 @@ class MobileSentrixSyncService
         }
 
         return $this->arrayValue($value);
+    }
+
+    private function categoryIdsMissing(mixed $value): bool
+    {
+        if ($value === null || $value === '') {
+            return true;
+        }
+
+        if (is_array($value)) {
+            return collect($value)->flatten()->filter(fn ($id): bool => filled($id))->isEmpty();
+        }
+
+        if (is_string($value)) {
+            $decoded = json_decode(trim($value), true);
+
+            if (json_last_error() === JSON_ERROR_NONE) {
+                return $this->categoryIdsMissing($decoded);
+            }
+        }
+
+        return false;
+    }
+
+    private function isExplicitEmptyCategoryIds(mixed $value): bool
+    {
+        if (is_array($value)) {
+            return $value === [];
+        }
+
+        if (! is_string($value)) {
+            return false;
+        }
+
+        $decoded = json_decode(trim($value), true);
+
+        return json_last_error() === JSON_ERROR_NONE && $decoded === [];
+    }
+
+    private function recordValueMissing(mixed $value): bool
+    {
+        return $value === null
+            || $value === []
+            || (is_string($value) && trim($value) === '');
     }
 
     private function stockQuantity(array $record): int

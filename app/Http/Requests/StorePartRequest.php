@@ -15,7 +15,7 @@ class StorePartRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'part_category_id' => ['required', 'exists:part_categories,id'],
+            'category_ids' => ['nullable', 'string', 'max:2000'],
             'name' => ['required', 'string', 'max:255'],
             'slug' => ['nullable', 'string', 'max:255'],
             'sku' => ['nullable', 'string', 'max:120'],

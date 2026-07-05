@@ -4,6 +4,7 @@ use App\Models\Part;
 use App\Models\PartCategory;
 use App\Models\Permission;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 
 function createSearchPart(array $overrides = []): Part
 {
@@ -16,7 +17,7 @@ function createSearchPart(array $overrides = []): Part
 
     $part = Part::query()->create(array_merge([
         'id' => 1001,
-        'part_category_id' => $category->id,
+        'category_ids' => [(string) $category->id],
         'name' => 'iPhone 15 OLED Screen',
         'slug' => 'iphone-15-oled-screen',
         'sku' => 'MS-1001',
@@ -63,6 +64,29 @@ function partSearchAdminUser(string $email): User
         'status' => 'active',
     ]);
 }
+
+test('admin part creation stores raw category ids and direct pivot rows', function () {
+    $admin = partSearchAdminUser('create-part-category-ids@example.com');
+
+    $this->actingAs($admin)
+        ->post(route('admin.parts.store'), [
+            'name' => 'Direct Category Part',
+            'device_type' => 'Phone',
+            'brand' => 'Eclise',
+            'category_ids' => '777,888,777',
+            'price' => 25,
+            'quantity' => 2,
+            'stock_status' => 'In stock',
+            'supplier' => 'Manual',
+        ])
+        ->assertRedirect(route('admin.parts.index'));
+
+    $part = Part::query()->where('name', 'Direct Category Part')->firstOrFail();
+
+    expect($part->category_ids)->toBe(['777', '888'])
+        ->and(DB::table('part_category_part')->where('part_id', $part->id)->pluck('category_id')->sort()->values()->all())->toBe([777, 888])
+        ->and(PartCategory::query()->whereIn('id', [777, 888])->exists())->toBeFalse();
+});
 
 test('public parts search returns dynamic results without exposing supplier cost or raw data', function () {
     createSearchPart();

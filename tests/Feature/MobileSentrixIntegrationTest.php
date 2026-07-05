@@ -425,6 +425,7 @@ test('mobile sentrix parts sync keeps missing category ids raw without creating 
                 'sku' => 'MS-MISSING-CATEGORY',
                 'status' => 1,
                 'name' => 'Part With Missing Category',
+                'description' => 'Part description.',
                 'price' => '12.00',
                 'category_ids' => ['999999'],
                 'is_in_stock' => true,
@@ -449,12 +450,100 @@ test('mobile sentrix parts sync keeps missing category ids raw without creating 
     $pivotLog = MobileSentrixSyncLog::query()->where('sync_type', 'part_category_pivot')->latest()->firstOrFail();
 
     expect($pivotLog->failed_count)->toBe(0)
-        ->and($pivotLog->warning_count)->toBe(1)
-        ->and(json_encode($pivotLog->error_details))->toContain('missing category 999999');
+        ->and($pivotLog->warning_count)->toBe(0);
+
+    $this->assertDatabaseHas('part_category_part', [
+        'part_id' => $part->id,
+        'category_id' => 999999,
+    ]);
 
     $this->assertDatabaseMissing('part_categories', [
         'name' => 'MobileSentrix Category 999999',
     ]);
+});
+
+test('mobile sentrix parts sync enriches missing details without category table lookups or failed parts', function () {
+    Part::query()->create([
+        'id' => 9302,
+        'sku' => 'MS-9302',
+        'name' => 'Existing Sparse Part',
+        'slug' => 'existing-sparse-part',
+        'description' => 'Existing local description.',
+        'category_ids' => ['555'],
+    ]);
+
+    $queries = [];
+    DB::listen(function ($query) use (&$queries): void {
+        $queries[] = $query->sql;
+    });
+
+    Http::fake(function ($request) {
+        $url = $request->url();
+
+        if (str_contains($url, '/api/rest/products/9301')) {
+            return Http::response(['data' => [
+                'entity_id' => '9301',
+                'description' => 'Description from product detail.',
+                'category_ids' => ['777', '888'],
+            ]]);
+        }
+
+        if (str_contains($url, '/api/rest/products/9302')) {
+            return Http::response(['message' => 'detail unavailable'], 500);
+        }
+
+        return Http::response(['data' => [
+            'items' => [
+                [
+                    'entity_id' => '9301',
+                    'sku' => 'MS-9301',
+                    'name' => 'Sparse Part One',
+                    'price' => '10.00',
+                    'category_ids' => [],
+                    'is_in_stock' => true,
+                    'in_stock_qty' => 1,
+                ],
+                [
+                    'entity_id' => '9302',
+                    'sku' => 'MS-9302',
+                    'name' => 'Sparse Part Two',
+                    'price' => '11.00',
+                    'category_ids' => '[]',
+                    'is_in_stock' => true,
+                    'in_stock_qty' => 1,
+                ],
+            ],
+            'page_info' => [
+                'current_page' => 1,
+                'total_pages' => 1,
+                'page_size' => 2,
+                'total_count' => 2,
+            ],
+        ]]);
+    });
+
+    $this->artisan('mobilesentrix:sync-parts', ['--limit' => 2])->assertSuccessful();
+
+    $enrichedPart = Part::query()->findOrFail(9301);
+    $sparsePart = Part::query()->findOrFail(9302);
+    $log = MobileSentrixSyncLog::query()->where('sync_type', 'parts_full')->latest('id')->firstOrFail();
+
+    expect($enrichedPart->description)->toBe('Description from product detail.')
+        ->and($enrichedPart->category_ids)->toBe(['777', '888'])
+        ->and($sparsePart->description)->toBe('Existing local description.')
+        ->and($sparsePart->category_ids)->toBe(['555'])
+        ->and($sparsePart->raw_payload['category_ids'])->toBe('[]')
+        ->and($log->status)->toBe('success')
+        ->and($log->failed_count)->toBe(0)
+        ->and($log->warning_count)->toBe(2)
+        ->and(json_encode($log->error_details))->toContain('"detail_lookup_count":2')
+        ->and(json_encode($log->error_details))->toContain('"detail_updated_count":1')
+        ->and(json_encode($log->error_details))->toContain('"description_updated_count":1')
+        ->and(json_encode($log->error_details))->toContain('"category_ids_updated_count":1')
+        ->and(json_encode($log->error_details))->toContain('"detail_lookup_failed_count":1')
+        ->and(json_encode($log->error_details))->toContain('"empty_category_ids_count":2')
+        ->and(json_encode($log->error_details))->toContain('"category_ids_remained_missing_count":1')
+        ->and(collect($queries)->contains(fn (string $query): bool => str_contains($query, 'part_categories')))->toBeFalse();
 });
 
 test('part category pivot generation parses supported values and is idempotent', function () {
@@ -490,21 +579,22 @@ test('part category pivot generation parses supported values and is idempotent',
 
     $firstLog = MobileSentrixSyncLog::query()->where('sync_type', 'part_category_pivot')->latest('id')->firstOrFail();
 
-    expect(DB::table('part_category_part')->count())->toBe(5)
-        ->and($firstLog->created_count)->toBe(5)
+    expect(DB::table('part_category_part')->count())->toBe(7)
+        ->and($firstLog->created_count)->toBe(7)
         ->and($firstLog->failed_count)->toBe(0)
         ->and($firstLog->warning_count)->toBe(2)
         ->and(json_encode($firstLog->error_details))->toContain('"invalid_id_count":1')
-        ->and(json_encode($firstLog->error_details))->toContain('"missing_category_count":1')
-        ->and(json_encode($firstLog->error_details))->toContain('"no_category_ids_count":1');
+        ->and(json_encode($firstLog->error_details))->toContain('"no_category_ids_count":1')
+        ->and(DB::table('part_category_part')->where('part_id', 9505)->whereNull('category_id')->count())->toBe(1);
 
     $this->artisan('mobilesentrix:generate-part-category-pivot', ['--chunk' => 2])->assertSuccessful();
 
     $secondLog = MobileSentrixSyncLog::query()->where('sync_type', 'part_category_pivot')->latest('id')->firstOrFail();
 
-    expect(DB::table('part_category_part')->count())->toBe(5)
+    expect(DB::table('part_category_part')->count())->toBe(7)
         ->and($secondLog->created_count)->toBe(0)
-        ->and($secondLog->updated_count)->toBe(5)
+        ->and($secondLog->updated_count)->toBe(7)
+        ->and(json_encode($secondLog->error_details))->toContain('"null_placeholder_existing_count":1')
         ->and($secondLog->failed_count)->toBe(0);
 });
 
@@ -580,6 +670,7 @@ test('mobile sentrix full parts sync paginates products and logs parts full', fu
                     'entity_id' => '9101',
                     'sku' => 'MS-9101',
                     'name' => 'iPhone 15 Battery',
+                    'description' => 'Battery.',
                     'price' => '25.00',
                     'category_ids' => ['200'],
                     'is_in_stock' => true,
@@ -591,6 +682,7 @@ test('mobile sentrix full parts sync paginates products and logs parts full', fu
                     'entity_id' => '9102',
                     'sku' => 'MS-9102',
                     'name' => 'Galaxy S24 Screen',
+                    'description' => 'Screen.',
                     'price' => '80.00',
                     'category_ids' => ['201'],
                     'is_in_stock' => true,
@@ -604,6 +696,7 @@ test('mobile sentrix full parts sync paginates products and logs parts full', fu
                     'entity_id' => '9103',
                     'sku' => 'MS-9103',
                     'name' => 'Pixel 9 Charging Port',
+                    'description' => 'Charging port.',
                     'price' => '15.00',
                     'category_ids' => ['202'],
                     'is_in_stock' => false,
@@ -615,6 +708,7 @@ test('mobile sentrix full parts sync paginates products and logs parts full', fu
                     'entity_id' => '9104',
                     'sku' => 'MS-9104',
                     'name' => 'Generic Tablet Cable',
+                    'description' => 'Tablet cable.',
                     'price' => '6.00',
                     'category_ids' => ['203'],
                     'is_in_stock' => true,

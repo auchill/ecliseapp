@@ -37,7 +37,7 @@ function createEnrichmentPart(array $overrides = []): Part
 
     $part = Part::query()->create(array_merge([
         'id' => 73,
-        'part_category_id' => $category->id,
+        'category_ids' => [(string) $category->id],
         'name' => 'Local iPhone Screen',
         'slug' => 'local-iphone-screen',
         'sku' => 'MS-73',
@@ -292,7 +292,7 @@ test('obsolete lookup schema is removed while display resolvers and category sch
         ->and(Schema::hasTable('part_tags'))->toBeFalse()
         ->and(Schema::hasTable('part_compatibilities'))->toBeFalse()
         ->and(Schema::hasColumn('parts', 'part_warranty_id'))->toBeFalse()
-        ->and(Schema::hasColumn('parts', 'part_category_id'))->toBeTrue()
+        ->and(Schema::hasColumn('parts', 'part_category_id'))->toBeFalse()
         ->and(Schema::hasTable('part_categories'))->toBeTrue()
         ->and(Schema::hasTable('part_category_part'))->toBeTrue()
         ->and(PartWarranty::WARRANTY_LABELS['7627'])->toBe('No Warranty')

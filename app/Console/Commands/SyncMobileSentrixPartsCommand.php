@@ -46,6 +46,15 @@ class SyncMobileSentrixPartsCommand extends Command
             $result['price_changed_count'] ?? 0,
             $result['stock_changed_count'] ?? 0,
         ));
+        $this->line(sprintf(
+            'Detail lookups: %d, records enriched: %d, descriptions updated: %d, category IDs updated: %d, detail failures: %d, category IDs still missing: %d',
+            $result['detail_lookup_count'] ?? 0,
+            $result['detail_updated_count'] ?? 0,
+            $result['description_updated_count'] ?? 0,
+            $result['category_ids_updated_count'] ?? 0,
+            $result['detail_lookup_failed_count'] ?? 0,
+            $result['category_ids_remained_missing_count'] ?? 0,
+        ));
 
         return ($result['status'] ?? null) === 'failed' ? self::FAILURE : self::SUCCESS;
     }

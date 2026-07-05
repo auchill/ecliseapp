@@ -3,12 +3,14 @@
 namespace App\Services\MobileSentrix;
 
 use App\Models\MobileSentrixSyncLog;
-use App\Models\PartCategory;
+use App\Models\Part;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class PartCategoryPivotService
 {
+    private const NULL_KEY = '__null__';
+
     public function generate(int $chunkSize = 500): array
     {
         $chunkSize = max(1, min($chunkSize, 2000));
@@ -18,39 +20,22 @@ class PartCategoryPivotService
             'started_at' => now(),
             'message' => 'Generating part category assignments from saved category_ids.',
         ]);
-        $summary = [
-            'processed_parts_count' => 0,
-            'created_count' => 0,
-            'existing_count' => 0,
-            'skipped_count' => 0,
-            'invalid_id_count' => 0,
-            'missing_category_count' => 0,
-            'no_category_ids_count' => 0,
-            'warning_count' => 0,
-            'failed_count' => 0,
-            'warnings' => [],
-            'omitted_warning_count' => 0,
-        ];
+        $summary = $this->emptySummary();
 
         try {
-            $categoryIds = PartCategory::query()
-                ->pluck('id')
-                ->mapWithKeys(fn ($id): array => [(string) $id => true])
-                ->all();
-
             DB::table('parts')
                 ->select(['id', 'category_ids'])
                 ->orderBy('id')
-                ->chunkById($chunkSize, function ($parts) use (&$summary, $categoryIds, $log): void {
-                    $partIds = $parts->pluck('id')->all();
+                ->chunkById($chunkSize, function ($parts) use (&$summary, $log): void {
                     $existing = DB::table('part_category_part')
-                        ->whereIn('part_id', $partIds)
+                        ->whereIn('part_id', $parts->pluck('id')->all())
                         ->get(['part_id', 'category_id'])
                         ->groupBy(fn ($row): string => (string) $row->part_id)
                         ->map(fn ($rows): array => $rows->mapWithKeys(
-                            fn ($row): array => [(string) $row->category_id => true]
+                            fn ($row): array => [$this->categoryKey($row->category_id) => true]
                         )->all());
-                    $inserts = [];
+                    $categoryInserts = [];
+                    $placeholderInserts = [];
                     $now = now();
 
                     foreach ($parts as $part) {
@@ -68,39 +53,42 @@ class PartCategoryPivotService
                                 ]);
                             }
 
+                            $existingForPart = $existing->get((string) $part->id, []);
+
                             if ($ids === []) {
                                 $summary['no_category_ids_count']++;
+                                $summary['warning_count']++;
+                                $this->addWarning($summary, [
+                                    'message' => "Part {$part->id} has no usable category_ids; a null pivot placeholder was used.",
+                                    'part_id' => $part->id,
+                                ]);
+
+                                if (isset($existingForPart[self::NULL_KEY])) {
+                                    $summary['null_placeholder_existing_count']++;
+                                } else {
+                                    $placeholderInserts[] = $this->pivotRow($part->id, null, $now);
+                                    $existingForPart[self::NULL_KEY] = true;
+                                }
 
                                 continue;
                             }
 
-                            $existingForPart = $existing->get((string) $part->id, []);
+                            if (isset($existingForPart[self::NULL_KEY])) {
+                                DB::table('part_category_part')
+                                    ->where('part_id', $part->id)
+                                    ->whereNull('category_id')
+                                    ->delete();
+                                unset($existingForPart[self::NULL_KEY]);
+                            }
 
                             foreach ($ids as $categoryId) {
-                                if (! isset($categoryIds[$categoryId])) {
-                                    $summary['missing_category_count']++;
-                                    $summary['warning_count']++;
-                                    $this->addWarning($summary, [
-                                        'message' => "Part {$part->id} references missing category {$categoryId}.",
-                                        'part_id' => $part->id,
-                                        'missing_category_id' => $categoryId,
-                                    ]);
-
-                                    continue;
-                                }
-
                                 if (isset($existingForPart[$categoryId])) {
                                     $summary['existing_count']++;
 
                                     continue;
                                 }
 
-                                $inserts[] = [
-                                    'part_id' => $part->id,
-                                    'category_id' => (int) $categoryId,
-                                    'created_at' => $now,
-                                    'updated_at' => $now,
-                                ];
+                                $categoryInserts[] = $this->pivotRow($part->id, (int) $categoryId, $now);
                                 $existingForPart[$categoryId] = true;
                             }
                         } catch (\Throwable $exception) {
@@ -112,14 +100,21 @@ class PartCategoryPivotService
                         }
                     }
 
-                    foreach (array_chunk($inserts, 1000) as $insertChunk) {
-                        $summary['created_count'] += DB::table('part_category_part')->insertOrIgnore($insertChunk);
+                    foreach (array_chunk($categoryInserts, 1000) as $insertChunk) {
+                        $created = DB::table('part_category_part')->insertOrIgnore($insertChunk);
+                        $summary['created_count'] += $created;
+                        $summary['category_pivot_created_count'] += $created;
+                    }
+
+                    foreach (array_chunk($placeholderInserts, 1000) as $insertChunk) {
+                        $created = DB::table('part_category_part')->insertOrIgnore($insertChunk);
+                        $summary['created_count'] += $created;
+                        $summary['null_placeholder_created_count'] += $created;
                     }
 
                     $summary['skipped_count'] = $summary['existing_count']
-                        + $summary['invalid_id_count']
-                        + $summary['missing_category_count']
-                        + $summary['no_category_ids_count'];
+                        + $summary['null_placeholder_existing_count']
+                        + $summary['invalid_id_count'];
                     $this->updateLog($log, $summary, 'Generating part category assignments.');
                 }, 'id');
 
@@ -130,6 +125,27 @@ class PartCategoryPivotService
 
             return $this->finishLog($log, $summary, true);
         }
+    }
+
+    public function syncPart(Part $part): void
+    {
+        [$ids] = $this->parseCategoryIds($part->category_ids);
+        $now = now();
+
+        if ($ids === []) {
+            if (! DB::table('part_category_part')->where('part_id', $part->id)->whereNull('category_id')->exists()) {
+                DB::table('part_category_part')->insert($this->pivotRow($part->id, null, $now));
+            }
+
+            return;
+        }
+
+        DB::table('part_category_part')->where('part_id', $part->id)->whereNull('category_id')->delete();
+        DB::table('part_category_part')->insertOrIgnore(
+            collect($ids)
+                ->map(fn (string $categoryId): array => $this->pivotRow($part->id, (int) $categoryId, $now))
+                ->all()
+        );
     }
 
     public function parseCategoryIds(mixed $value): array
@@ -158,8 +174,9 @@ class PartCategoryPivotService
 
         if (is_int($value) || (is_string($value) && preg_match('/^\d+$/', trim($value)) === 1)) {
             $id = ltrim(trim((string) $value), '0');
+            $id = $id === '' ? '0' : $id;
 
-            if ($id !== '') {
+            if ($id !== '0' && $this->fitsUnsignedBigInteger($id)) {
                 return [$id];
             }
 
@@ -192,11 +209,53 @@ class PartCategoryPivotService
         return [];
     }
 
+    private function fitsUnsignedBigInteger(string $id): bool
+    {
+        $maximum = (string) PHP_INT_MAX;
+
+        return strlen($id) < strlen($maximum)
+            || (strlen($id) === strlen($maximum) && strcmp($id, $maximum) <= 0);
+    }
+
+    private function categoryKey(mixed $categoryId): string
+    {
+        return $categoryId === null ? self::NULL_KEY : (string) $categoryId;
+    }
+
+    private function pivotRow(int|string $partId, ?int $categoryId, mixed $now): array
+    {
+        return [
+            'part_id' => $partId,
+            'category_id' => $categoryId,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ];
+    }
+
+    private function emptySummary(): array
+    {
+        return [
+            'processed_parts_count' => 0,
+            'created_count' => 0,
+            'category_pivot_created_count' => 0,
+            'existing_count' => 0,
+            'null_placeholder_created_count' => 0,
+            'null_placeholder_existing_count' => 0,
+            'skipped_count' => 0,
+            'invalid_id_count' => 0,
+            'no_category_ids_count' => 0,
+            'warning_count' => 0,
+            'failed_count' => 0,
+            'warnings' => [],
+            'omitted_warning_count' => 0,
+        ];
+    }
+
     private function updateLog(MobileSentrixSyncLog $log, array $summary, string $message): void
     {
         $log->update([
             'created_count' => $summary['created_count'],
-            'updated_count' => $summary['existing_count'],
+            'updated_count' => $summary['existing_count'] + $summary['null_placeholder_existing_count'],
             'skipped_count' => $summary['skipped_count'],
             'failed_count' => $summary['failed_count'],
             'warning_count' => $summary['warning_count'],
@@ -209,30 +268,26 @@ class PartCategoryPivotService
     {
         $status = $failed ? 'failed' : ($summary['failed_count'] > 0 ? 'partial' : 'success');
         $message = sprintf(
-            'Part category assignment generation %s. Created: %d, existing: %d, invalid IDs: %d, missing categories: %d, no category IDs: %d, warnings: %d, failures: %d.',
+            'Part category assignment generation %s. Category pivots created: %d, existing: %d, null placeholders created: %d, null placeholders existing: %d, invalid IDs: %d, no category IDs: %d, warnings: %d, failures: %d.',
             $status === 'failed' ? 'failed' : 'completed',
-            $summary['created_count'],
+            $summary['category_pivot_created_count'],
             $summary['existing_count'],
+            $summary['null_placeholder_created_count'],
+            $summary['null_placeholder_existing_count'],
             $summary['invalid_id_count'],
-            $summary['missing_category_count'],
             $summary['no_category_ids_count'],
             $summary['warning_count'],
             $summary['failed_count'],
         );
 
+        $this->updateLog($log, $summary, $message);
         $log->update([
             'status' => $status,
             'finished_at' => now(),
-            'created_count' => $summary['created_count'],
-            'updated_count' => $summary['existing_count'],
-            'skipped_count' => $summary['skipped_count'],
-            'failed_count' => $summary['failed_count'],
-            'warning_count' => $summary['warning_count'],
-            'message' => $message,
-            'error_details' => $this->warningDetails($summary),
         ]);
 
         return array_merge($summary, [
+            'updated_count' => $summary['existing_count'] + $summary['null_placeholder_existing_count'],
             'success' => $status === 'success',
             'status' => $status,
             'message' => $message,
@@ -256,14 +311,7 @@ class PartCategoryPivotService
     private function warningDetails(array $summary): array
     {
         $details = [[
-            'summary' => [
-                'processed_parts_count' => $summary['processed_parts_count'],
-                'existing_count' => $summary['existing_count'],
-                'invalid_id_count' => $summary['invalid_id_count'],
-                'missing_category_count' => $summary['missing_category_count'],
-                'no_category_ids_count' => $summary['no_category_ids_count'],
-                'warning_count' => $summary['warning_count'],
-            ],
+            'summary' => collect($summary)->except(['warnings', 'omitted_warning_count'])->all(),
         ], ...$summary['warnings']];
 
         if ($summary['omitted_warning_count'] > 0) {

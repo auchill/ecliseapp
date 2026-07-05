@@ -28,7 +28,7 @@ class PartSearchService
     public function publicQuery(Request $request): Builder
     {
         return Part::query()
-            ->with('partCategory', 'categories')
+            ->with('categories')
             ->where('is_active', true)
             ->where('status', 'active')
             ->when($request->filled('q'), fn (Builder $query) => $this->applyKeyword($query, $request->string('q')->toString()))
@@ -53,7 +53,7 @@ class PartSearchService
     public function adminQuery(Request $request): Builder
     {
         return Part::query()
-            ->with('partCategory', 'categories')
+            ->with('categories')
             ->when($request->filled('q'), fn (Builder $query) => $this->applyKeyword($query, $request->string('q')->toString(), true))
             ->when($request->filled('brand'), fn (Builder $query) => $query->where('brand', $request->string('brand')->toString()))
             ->when($request->filled('model'), function (Builder $query) use ($request): void {
@@ -112,7 +112,6 @@ class PartSearchService
                 ->orWhere('part_category', 'like', "%{$search}%")
                 ->orWhere('front_position_text', 'like', "%{$search}%")
                 ->orWhere('description', 'like', "%{$search}%")
-                ->orWhereHas('partCategory', fn (Builder $query) => $query->where('name', 'like', "%{$search}%"))
                 ->orWhereHas('categories', fn (Builder $query) => $query->where('name', 'like', "%{$search}%"));
 
             if ($admin) {

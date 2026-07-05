@@ -5,7 +5,6 @@ namespace App\Models;
 use App\Support\ProductDescriptionSanitizer;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Part extends Model
@@ -104,11 +103,6 @@ class Part extends Model
         ];
     }
 
-    public function partCategory(): BelongsTo
-    {
-        return $this->belongsTo(PartCategory::class);
-    }
-
     public function categories(): BelongsToMany
     {
         return $this->belongsToMany(PartCategory::class, 'part_category_part', 'part_id', 'category_id')
@@ -127,7 +121,7 @@ class Part extends Model
 
     public function categoryName(): ?string
     {
-        return $this->partCategory?->name ?? $this->categories->first()?->name ?? $this->part_category;
+        return $this->categories->first()?->name ?? $this->part_category;
     }
 
     public function modelName(): ?string

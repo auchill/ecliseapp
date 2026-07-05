@@ -32,13 +32,8 @@
                         <input class="form-control" id="brand" name="brand" value="{{ old('brand', $part->brand) }}" required>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label" for="part_category_id">Parts Category</label>
-                        <select class="form-select" id="part_category_id" name="part_category_id" required>
-                            <option value="">Choose category</option>
-                            @foreach ($partCategories as $category)
-                                <option value="{{ $category->id }}" @selected((int) old('part_category_id', $part->part_category_id) === $category->id)>{{ $category->name }}</option>
-                            @endforeach
-                        </select>
+                        <label class="form-label" for="category_ids">Category IDs</label>
+                        <input class="form-control" id="category_ids" name="category_ids" value="{{ old('category_ids', collect($part->category_ids)->implode(',')) }}" placeholder="For example: 1,45,67">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label" for="model_compatibility">Model compatibility</label>

@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePartRequest;
 use App\Jobs\MobileSentrix\SyncMobileSentrixPartsFullJob;
 use App\Models\Part;
-use App\Models\PartCategory;
+use App\Services\MobileSentrix\PartCategoryPivotService;
 use App\Services\Parts\PartSearchService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -44,15 +44,14 @@ class PartController extends Controller
     {
         return view('admin.parts.form', [
             'part' => new Part,
-            'partCategories' => PartCategory::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
             'markupTypes' => Part::MARKUP_TYPES,
         ]);
     }
 
-    public function store(StorePartRequest $request)
+    public function store(StorePartRequest $request, PartCategoryPivotService $pivotService)
     {
         $part = Part::query()->create($this->validatedData($request));
-        $this->syncPrimaryCategory($part);
+        $pivotService->syncPart($part);
 
         return redirect()->route('admin.parts.index')->with('status', 'Part created.');
     }
@@ -61,15 +60,14 @@ class PartController extends Controller
     {
         return view('admin.parts.form', [
             'part' => $part,
-            'partCategories' => PartCategory::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
             'markupTypes' => Part::MARKUP_TYPES,
         ]);
     }
 
-    public function update(StorePartRequest $request, Part $part)
+    public function update(StorePartRequest $request, Part $part, PartCategoryPivotService $pivotService)
     {
         $part->update($this->validatedData($request));
-        $this->syncPrimaryCategory($part);
+        $pivotService->syncPart($part);
 
         return redirect()->route('admin.parts.edit', $part)->with('status', 'Part updated.');
     }
@@ -103,9 +101,12 @@ class PartController extends Controller
             $data['local_image_path'] = $data['image_path'];
         }
 
-        $partCategory = PartCategory::query()->find($data['part_category_id']);
-
-        $data['part_category'] = $partCategory?->name ?? $data['part_category'] ?? null;
+        $data['category_ids'] = collect(explode(',', (string) ($data['category_ids'] ?? '')))
+            ->map(fn (string $id): string => trim($id))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
         $data['slug'] = ($data['slug'] ?? null) ?: Str::slug($data['name'].' '.($data['sku'] ?? $data['internal_sku'] ?? uniqid()));
         $data['selling_price'] = $data['selling_price'] ?? $data['price'];
         $data['markup_type'] = $data['markup_type'] ?? 'none';
@@ -145,13 +146,6 @@ class PartController extends Controller
             'fixed' => round($costPrice + $markupValue, 2),
             default => round((float) ($manualPrice ?? $costPrice), 2),
         };
-    }
-
-    private function syncPrimaryCategory(Part $part): void
-    {
-        if ($part->part_category_id) {
-            $part->partCategories()->syncWithoutDetaching([$part->part_category_id]);
-        }
     }
 
     private function brandOptions()
