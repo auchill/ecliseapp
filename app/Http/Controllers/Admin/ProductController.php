@@ -7,8 +7,13 @@ use App\Http\Requests\StoreProductRequest;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductBrand;
+use App\Models\ProductCarrier;
 use App\Models\ProductCategory;
+use App\Models\ProductColor;
+use App\Models\ProductCondition;
+use App\Models\ProductGrade;
 use App\Models\ProductModel;
+use App\Models\ProductSize;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -17,19 +22,27 @@ class ProductController extends Controller
     public function index(Request $request)
     {
         $products = Product::query()
-            ->with('category', 'productBrand', 'productCategory', 'productModel')
+            ->with('category', 'productBrand', 'productCategory', 'productModel', 'productSize', 'productGrade', 'productCondition', 'productColor', 'productCarrier')
             ->when($request->filled('q'), function ($query) use ($request): void {
                 $search = $request->string('q');
-                $query->where('name', 'like', "%{$search}%")
-                    ->orWhere('sku', 'like', "%{$search}%")
-                    ->orWhere('brand', 'like', "%{$search}%");
+                $query->where(function ($query) use ($search): void {
+                    $query->where('name', 'like', "%{$search}%")
+                        ->orWhere('sku', 'like', "%{$search}%")
+                        ->orWhere('brand', 'like', "%{$search}%");
+                });
             })
+            ->when($request->filled('brand'), fn ($query) => $query->where('product_brand_id', $request->integer('brand')))
+            ->when($request->filled('model'), fn ($query) => $query->where('product_model_id', $request->integer('model')))
+            ->when($request->filled('condition'), fn ($query) => $query->where('product_condition_id', $request->integer('condition')))
             ->latest()
             ->paginate(20)
             ->withQueryString();
 
         return view('admin.products.index', [
             'products' => $products,
+            'productBrands' => ProductBrand::query()->active()->orderBy('name')->get(),
+            'productModels' => ProductModel::query()->active()->orderBy('name')->get(),
+            'productConditions' => ProductCondition::query()->active()->orderBy('name')->get(),
         ]);
     }
 
@@ -41,7 +54,11 @@ class ProductController extends Controller
             'productBrands' => ProductBrand::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
             'productCategories' => ProductCategory::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
             'productModels' => ProductModel::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
-            'conditions' => Product::CONDITIONS,
+            'productSizes' => ProductSize::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
+            'productGrades' => ProductGrade::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
+            'productConditions' => ProductCondition::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
+            'productColors' => ProductColor::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
+            'productCarriers' => ProductCarrier::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
             'statuses' => Product::STATUSES,
         ]);
     }
@@ -64,7 +81,11 @@ class ProductController extends Controller
             'productBrands' => ProductBrand::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
             'productCategories' => ProductCategory::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
             'productModels' => ProductModel::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
-            'conditions' => Product::CONDITIONS,
+            'productSizes' => ProductSize::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
+            'productGrades' => ProductGrade::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
+            'productConditions' => ProductCondition::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
+            'productColors' => ProductColor::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
+            'productCarriers' => ProductCarrier::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
             'statuses' => Product::STATUSES,
         ]);
     }
@@ -113,6 +134,8 @@ class ProductController extends Controller
         if (! empty($data['product_model_id'])) {
             $data['model'] = ProductModel::query()->find($data['product_model_id'])?->name;
         }
+
+        $data['condition'] = ProductCondition::query()->find($data['product_condition_id'])?->name ?? 'New';
 
         unset($data['product_image']);
 

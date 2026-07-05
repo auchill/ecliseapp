@@ -16,6 +16,8 @@ class ProductModel extends Model
     protected $fillable = [
         'name',
         'slug',
+        'code',
+        'source',
         'status',
         'description',
         'sort_order',
@@ -31,6 +33,16 @@ class ProductModel extends Model
     public function products(): HasMany
     {
         return $this->hasMany(Product::class);
+    }
+
+    public function quotes(): HasMany
+    {
+        return $this->hasMany(Quote::class);
+    }
+
+    public function repairBookings(): HasMany
+    {
+        return $this->hasMany(RepairBooking::class);
     }
 
     public function scopeActive(Builder $query): Builder

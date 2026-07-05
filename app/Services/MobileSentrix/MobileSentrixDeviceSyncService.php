@@ -2,16 +2,8 @@
 
 namespace App\Services\MobileSentrix;
 
-use App\Models\DeviceCarrier;
-use App\Models\DeviceColor;
-use App\Models\DeviceCondition;
-use App\Models\DeviceGrade;
-use App\Models\DeviceManufacturer;
-use App\Models\DeviceModel;
-use App\Models\DeviceSize;
 use App\Models\MobileSentrixDevice;
 use App\Models\MobileSentrixSyncLog;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -19,8 +11,6 @@ use Illuminate\Support\Str;
 
 class MobileSentrixDeviceSyncService
 {
-    private const SOURCE = 'MobileSentrix';
-
     public function __construct(private readonly MobileSentrixClient $client) {}
 
     public function syncAllDevices(int $limit = 30, int $startPage = 1, ?callable $progress = null): array
@@ -149,13 +139,6 @@ class MobileSentrixDeviceSyncService
             $gradeText = $this->limitString($this->textValue($record, 'device_grade_text'));
 
             $device->fill([
-                'device_manufacturer_id' => $this->lookup(DeviceManufacturer::class, $manufacturerText)?->id,
-                'device_model_id' => $this->lookup(DeviceModel::class, $modelText)?->id,
-                'device_color_id' => $this->lookup(DeviceColor::class, $colorText)?->id,
-                'device_condition_id' => $this->lookup(DeviceCondition::class, $conditionText)?->id,
-                'device_carrier_id' => $this->lookup(DeviceCarrier::class, $carrierText)?->id,
-                'device_size_id' => $this->lookup(DeviceSize::class, $sizeText)?->id,
-                'device_grade_id' => $this->lookup(DeviceGrade::class, $gradeText)?->id,
                 'entity_id' => $entityId,
                 'sku' => $sku,
                 'name' => $this->limitString($this->textValue($record, 'name') ?: $this->textValue($record, 'title'), 512),
@@ -184,28 +167,6 @@ class MobileSentrixDeviceSyncService
 
             return ['device' => $device, 'created' => ! $exists];
         });
-    }
-
-    private function lookup(string $modelClass, ?string $name): ?Model
-    {
-        if (! filled($name)) {
-            return null;
-        }
-
-        $slug = Str::slug($name);
-
-        if ($slug === '') {
-            return null;
-        }
-
-        return $modelClass::query()->updateOrCreate(
-            ['slug' => $slug],
-            [
-                'name' => $name,
-                'source' => self::SOURCE,
-                'status' => 'active',
-            ],
-        );
     }
 
     private function records(array $payload): Collection

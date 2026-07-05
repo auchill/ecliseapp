@@ -7,9 +7,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class DeviceGrade extends Model
+class ProductCondition extends Model
 {
     use HasFactory;
+
+    protected $table = 'productconditions';
 
     protected $fillable = ['name', 'slug', 'code', 'source', 'status', 'description', 'sort_order'];
 
@@ -18,9 +20,9 @@ class DeviceGrade extends Model
         return ['sort_order' => 'integer'];
     }
 
-    public function mobileSentrixDevices(): HasMany
+    public function products(): HasMany
     {
-        return $this->hasMany(MobileSentrixDevice::class);
+        return $this->hasMany(Product::class);
     }
 
     public function scopeActive(Builder $query): Builder

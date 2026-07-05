@@ -11,7 +11,6 @@ use App\Http\Controllers\Admin\PartCategoryController as AdminPartCategoryContro
 use App\Http\Controllers\Admin\PartController as AdminPartController;
 use App\Http\Controllers\Admin\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Admin\PermissionController as AdminPermissionController;
-use App\Http\Controllers\Admin\ProductBrandController as AdminProductBrandController;
 use App\Http\Controllers\Admin\ProductCategoryController as AdminProductCategoryController;
 use App\Http\Controllers\Admin\ProductController as AdminProductController;
 use App\Http\Controllers\Admin\QuoteController as AdminQuoteController;
@@ -119,17 +118,15 @@ Route::middleware('admin')->prefix('admin')->name('admin.')->group(function (): 
 
     foreach ([
         'repairs/device-types' => 'device-types',
-        'repairs/device-brands' => 'device-brands',
-        'repairs/device-models' => 'device-models',
         'repairs/issues' => 'issue-categories',
+        'shop/product-brands' => 'product-brands',
         'shop/product-models' => 'product-models',
+        'shop/product-sizes' => 'product-sizes',
+        'shop/product-grades' => 'product-grades',
+        'shop/product-conditions' => 'product-conditions',
+        'shop/product-colors' => 'product-colors',
+        'shop/product-carriers' => 'product-carriers',
         'parts/part-models' => 'part-models',
-        'mobilesentrix/device-manufacturers' => 'device-manufacturers',
-        'mobilesentrix/device-colors' => 'device-colors',
-        'mobilesentrix/device-conditions' => 'device-conditions',
-        'mobilesentrix/device-carriers' => 'device-carriers',
-        'mobilesentrix/device-sizes' => 'device-sizes',
-        'mobilesentrix/device-grades' => 'device-grades',
     ] as $path => $reference) {
         Route::get($path, [AdminReferenceController::class, 'index'])->defaults('reference', $reference)->name($reference.'.index');
         Route::get($path.'/create', [AdminReferenceController::class, 'create'])->defaults('reference', $reference)->name($reference.'.create');
@@ -147,7 +144,6 @@ Route::middleware('admin')->prefix('admin')->name('admin.')->group(function (): 
     Route::get('/repairs/payments', [AdminPaymentController::class, 'index'])->defaults('source', 'repair')->name('repair-payments.index');
 
     Route::resource('shop/products', AdminProductController::class)->names('products')->except(['show']);
-    Route::resource('shop/product-brands', AdminProductBrandController::class)->names('product-brands')->except(['show']);
     Route::resource('shop/product-categories', AdminProductCategoryController::class)->names('product-categories')->except(['show']);
     Route::get('/shop/orders', [AdminOrderController::class, 'index'])->defaults('source', 'shop')->name('orders.index');
     Route::get('/shop/orders/{order}', [AdminOrderController::class, 'show'])->name('orders.show');

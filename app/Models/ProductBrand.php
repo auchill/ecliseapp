@@ -11,18 +11,21 @@ class ProductBrand extends Model
 {
     use HasFactory;
 
+    public const STATUSES = ['active', 'inactive'];
+
     protected $fillable = [
         'name',
         'slug',
+        'code',
+        'source',
+        'status',
         'description',
-        'is_active',
         'sort_order',
     ];
 
     protected function casts(): array
     {
         return [
-            'is_active' => 'boolean',
             'sort_order' => 'integer',
         ];
     }
@@ -32,8 +35,18 @@ class ProductBrand extends Model
         return $this->hasMany(Product::class);
     }
 
+    public function quotes(): HasMany
+    {
+        return $this->hasMany(Quote::class);
+    }
+
+    public function repairBookings(): HasMany
+    {
+        return $this->hasMany(RepairBooking::class);
+    }
+
     public function scopeActive(Builder $query): Builder
     {
-        return $query->where('is_active', true);
+        return $query->where('status', 'active');
     }
 }

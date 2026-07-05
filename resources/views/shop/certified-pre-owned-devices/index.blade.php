@@ -56,15 +56,18 @@
                             @endforeach
                         </select>
                     </div>
-                    <div class="col-sm-6 col-xl-1">
+                    {{-- sh:codes - Disable some buttons --}}
+                    {{-- <div class="col-sm-6 col-xl-1">
                         <button class="btn btn-primary w-100" type="submit"><i class="bi bi-search"></i><span class="visually-hidden">Filter</span></button>
-                    </div>
-                    <div class="col-sm-6 col-xl-1">
-                        <a class="btn btn-dark w-100" href="{{ route('shop.certified-pre-owned-devices.index') }}"><i class="bi bi-x-lg"></i><span class="visually-hidden">Reset Filters</span></a>
-                    </div>
+                    </div> --}}
+                    {{-- <div class="col-sm-6 col-xl-1"> --}}
                     <div class="col-sm-6 col-xl-2">
-                        <a class="btn btn-outline-primary w-100" href="{{ route('shop.certified-pre-owned-devices.export', request()->query()) }}"><i class="bi bi-download me-2"></i>Export Result CSV</a>
+                        {{-- <a class="btn btn-dark w-100" href="{{ route('shop.certified-pre-owned-devices.index') }}"><i class="bi bi-x-lg"></i><span class="visually-hidden">Reset Filters</span></a> --}}
+                        <a class="btn btn-dark w-80" href="{{ route('shop.certified-pre-owned-devices.index') }}"><span>Reset Filters</span></a>
                     </div>
+                    {{-- <div class="col-sm-6 col-xl-2">
+                        <a class="btn btn-outline-primary w-100" href="{{ route('shop.certified-pre-owned-devices.export', request()->query()) }}"><i class="bi bi-download me-2"></i>Export Result CSV</a>
+                    </div> --}}
                 </div>
 
                 @foreach ($filterOptions as $field => $option)

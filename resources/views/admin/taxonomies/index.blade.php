@@ -20,6 +20,10 @@
                             <tr>
                                 <th>Name</th>
                                 <th>Slug</th>
+                                @if($usesCodeSource ?? false)
+                                    <th>Code</th>
+                                    <th>Source</th>
+                                @endif
                                 <th>Sort</th>
                                 <th>Status</th>
                                 <th></th>
@@ -33,6 +37,10 @@
                                         <div class="small muted">{{ $item->description }}</div>
                                     </td>
                                     <td>{{ $item->slug }}</td>
+                                    @if($usesCodeSource ?? false)
+                                        <td>{{ $item->code ?: '--' }}</td>
+                                        <td>{{ $item->source ?: '--' }}</td>
+                                    @endif
                                     <td>{{ $item->sort_order }}</td>
                                     <td>
                                         <span class="status-pill">
@@ -51,7 +59,7 @@
                                     </td>
                                 </tr>
                             @empty
-                                <tr><td colspan="5">No records found.</td></tr>
+                                <tr><td colspan="{{ ($usesCodeSource ?? false) ? 7 : 5 }}">No records found.</td></tr>
                             @endforelse
                         </tbody>
                     </table>

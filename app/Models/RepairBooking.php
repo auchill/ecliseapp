@@ -61,9 +61,9 @@ class RepairBooking extends Model
         'device_type',
         'device_type_id',
         'device_brand',
-        'device_brand_id',
+        'product_brand_id',
         'device_model',
-        'device_model_id',
+        'product_model_id',
         'issue_category',
         'issue_category_id',
         'issue_description',
@@ -151,12 +151,12 @@ class RepairBooking extends Model
 
     public function deviceBrand(): BelongsTo
     {
-        return $this->belongsTo(DeviceBrand::class);
+        return $this->belongsTo(ProductBrand::class, 'product_brand_id');
     }
 
     public function deviceModel(): BelongsTo
     {
-        return $this->belongsTo(DeviceModel::class);
+        return $this->belongsTo(ProductModel::class, 'product_model_id');
     }
 
     public function issueCategory(): BelongsTo

@@ -19,30 +19,46 @@
     <div class="surface p-0 overflow-hidden">
         <div class="table-responsive">
             <table class="table table-sm table-bordered table-hover cpo-table mb-0">
+                {{-- sh:codes - Increase header height and other formatting--}}
                 <thead>
                     <tr>
                         @foreach ($deviceFilterColumns as $field => $label)
                             <th>
                                 <div class="dropdown" data-cpo-filter-dropdown>
-                                    <button class="btn btn-sm text-white dropdown-toggle p-0 fw-bold text-uppercase" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">{{ $label }}</button>
-                                    <div class="dropdown-menu p-3 cpo-filter-menu" data-cpo-filter-menu>
-                                        <input class="form-control form-control-sm mb-2" placeholder="Search {{ strtolower($label) }}" data-cpo-filter-search>
-                                        @foreach (($filterOptions[$field]['values'] ?? []) as $item)
-                                            <label class="dropdown-item d-flex justify-content-between gap-3">
-                                                <span>
-                                                    <input class="form-check-input me-2" type="checkbox" value="{{ $item['value'] }}" data-cpo-filter-field="{{ $field }}" @checked(in_array($item['value'], (array) request($field, []), true))>
-                                                    <span data-cpo-filter-label>{{ $item['value'] }}</span>
+                                    <button class="cpo-th-filter dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside"
+                                        aria-expanded="false">
+                                        <span class="cpo-th-label">{{ $label }}</span>
+                                        <span class="cpo-th-arrow"></span>
+                                    </button>
+
+                                    <div class="dropdown-menu cpo-filter-menu" data-cpo-filter-menu>
+                                        <input class="form-control form-control-sm cpo-filter-search mb-2" placeholder="Search Entire {{ $label }}"
+                                            data-cpo-filter-search>
+
+                                        <div class="cpo-filter-options">
+                                            @foreach (($filterOptions[$field]['values'] ?? []) as $item)
+                                            <label class="dropdown-item cpo-filter-option">
+                                                <span class="cpo-filter-option-left">
+                                                    <input class="form-check-input cpo-filter-checkbox" type="checkbox" value="{{ $item['value'] }}"
+                                                        data-cpo-filter-field="{{ $field }}" @checked(in_array($item['value'], (array) request($field, []),
+                                                        true))>
+                                                    <span class="cpo-filter-label" data-cpo-filter-label>
+                                                        {{ $item['value'] }}
+                                                    </span>
                                                 </span>
-                                                <span class="muted small">{{ $item['count'] }}</span>
+                                                <span class="cpo-filter-count">
+                                                    ({{ $item['count'] }})
+                                                </span>
                                             </label>
-                                        @endforeach
+                                            @endforeach
+                                        </div>
                                     </div>
                                 </div>
                             </th>
                         @endforeach
-                        <th>Available</th>
-                        <th>Price</th>
-                        <th>Quantity</th>
+                        <th class="cpo-th-static">Available</th>
+                        <th class="cpo-th-static">Price</th>
+                        <th class="cpo-th-static">Quantity</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -58,13 +74,29 @@
                             <td>{{ $device->device_color_text ?: '--' }}</td>
                             <td>{{ $device->condition_text ?: '--' }}</td>
                             <td>{{ $device->device_carrier_text ?: '--' }}</td>
-                            <td>{{ number_format($available) }}</td>
+                            {{-- sh:codes - adding 'pcs' to the qty --}}
+                            {{-- <td>{{ number_format($available) }}</td> --}}
+                            <td>{{ number_format($available) }} pcs</td>
                             <td class="cpo-price">{{ $device->displayPrice() !== null ? 'CA$'.number_format($device->displayPrice(), 2) : '--' }}</td>
-                            <td>
+
+                            {{-- sh:codes - Quantity column formatting --}}
+                            {{-- <td>
                                 <div class="input-group input-group-sm cpo-qty" data-cpo-quantity>
                                     <button class="btn btn-outline-secondary" type="button" data-cpo-minus @disabled($available <= 0)>-</button>
                                     <input class="form-control text-center" name="devices[{{ $device->id }}]" value="0" min="0" max="{{ $available }}" type="number" inputmode="numeric" data-cpo-qty-input @disabled($available <= 0)>
                                     <button class="btn btn-outline-secondary" type="button" data-cpo-plus @disabled($available <= 0)>+</button>
+                                </div>
+                            </td> --}}
+                            <td class="cpo-qty-cell">
+                                <div class="cpo-qty" data-cpo-quantity>
+                                    <button class="cpo-qty-btn" type="button" data-cpo-minus @disabled($available <=0)>
+                                        <span>-</span>
+                                    </button>
+                                    <input class="cpo-qty-input" name="devices[{{ $device->id }}]" value="0" min="0" max="{{ $available }}"
+                                        type="number" inputmode="numeric" data-cpo-qty-input @disabled($available <=0)>
+                                    <button class="cpo-qty-btn" type="button" data-cpo-plus @disabled($available <=0)>
+                                        <span>+</span>
+                                    </button>
                                 </div>
                             </td>
                         </tr>
@@ -77,7 +109,8 @@
     </div>
 
     <div class="cpo-action-bar d-flex flex-wrap justify-content-between align-items-center gap-3 mt-3">
-        <strong class="cpo-total">TOTAL: <span data-cpo-selected-total>CA$0.00</span></strong>
+        {{-- sh:codes - Pushed to th bottom --}}
+        {{-- <strong class="cpo-total">TOTAL: <span data-cpo-selected-total>CA$0.00</span></strong> --}}
         <div class="d-flex flex-wrap gap-2">
             @auth
                 @if(auth()->user()->isCustomer())
@@ -92,6 +125,7 @@
             @endauth
             <a class="btn btn-outline-primary" href="{{ route('shop.certified-pre-owned-devices.export', request()->query()) }}"><i class="bi bi-download me-2"></i>Export Result CSV</a>
         </div>
+        <strong class="cpo-total">TOTAL: <span data-cpo-selected-total>CA$0.00</span></strong>
     </div>
 
     <div class="mt-4" data-cpo-pagination>{{ $devices->links() }}</div>

@@ -27,6 +27,16 @@
                         <label class="form-label" for="slug">Slug</label>
                         <input class="form-control" id="slug" name="slug" value="{{ old('slug', $item->slug) }}">
                     </div>
+                    @if($usesCodeSource ?? false)
+                        <div class="col-md-6">
+                            <label class="form-label" for="code">Code</label>
+                            <input class="form-control" id="code" name="code" value="{{ old('code', $item->code) }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="source">Source</label>
+                            <input class="form-control" id="source" name="source" value="{{ old('source', $item->source) }}">
+                        </div>
+                    @endif
                     <div class="col-md-4">
                         <label class="form-label" for="sort_order">Sort order</label>
                         <input class="form-control" id="sort_order" name="sort_order" type="number" min="0" value="{{ old('sort_order', $item->sort_order ?? 0) }}" required>

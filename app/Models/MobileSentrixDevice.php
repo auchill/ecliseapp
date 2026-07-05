@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class MobileSentrixDevice extends Model
 {
@@ -14,13 +13,6 @@ class MobileSentrixDevice extends Model
     protected $table = 'mobilesentrix_devices';
 
     protected $fillable = [
-        'device_manufacturer_id',
-        'device_model_id',
-        'device_color_id',
-        'device_condition_id',
-        'device_carrier_id',
-        'device_size_id',
-        'device_grade_id',
         'entity_id',
         'sku',
         'name',
@@ -58,41 +50,6 @@ class MobileSentrixDevice extends Model
             'qty' => 'integer',
             'synced_at' => 'datetime',
         ];
-    }
-
-    public function manufacturer(): BelongsTo
-    {
-        return $this->belongsTo(DeviceManufacturer::class, 'device_manufacturer_id');
-    }
-
-    public function deviceModel(): BelongsTo
-    {
-        return $this->belongsTo(DeviceModel::class);
-    }
-
-    public function color(): BelongsTo
-    {
-        return $this->belongsTo(DeviceColor::class, 'device_color_id');
-    }
-
-    public function condition(): BelongsTo
-    {
-        return $this->belongsTo(DeviceCondition::class, 'device_condition_id');
-    }
-
-    public function carrier(): BelongsTo
-    {
-        return $this->belongsTo(DeviceCarrier::class, 'device_carrier_id');
-    }
-
-    public function size(): BelongsTo
-    {
-        return $this->belongsTo(DeviceSize::class, 'device_size_id');
-    }
-
-    public function grade(): BelongsTo
-    {
-        return $this->belongsTo(DeviceGrade::class, 'device_grade_id');
     }
 
     public function scopeAvailable(Builder $query): Builder

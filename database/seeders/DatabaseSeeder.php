@@ -3,19 +3,12 @@
 namespace Database\Seeders;
 
 use App\Models\Category;
-use App\Models\DeviceBrand;
-use App\Models\DeviceModel;
 use App\Models\DeviceType;
 use App\Models\IssueCategory;
-use App\Models\Part;
-use App\Models\PartBrand;
-use App\Models\PartCategory;
-use App\Models\PartModel;
 use App\Models\Permission;
 use App\Models\Product;
-use App\Models\ProductBrand;
 use App\Models\ProductCategory;
-use App\Models\ProductModel;
+use App\Models\ProductCondition;
 use App\Models\RepairBooking;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
@@ -132,8 +125,7 @@ class DatabaseSeeder extends Seeder
                         'Phone Accessories', 'Computer Accessories' => 'Accessories',
                         default => $product['category'],
                     }))->value('id'),
-                    'product_brand_id' => ProductBrand::query()->where('slug', Str::slug($product['brand']))->value('id'),
-                    'product_model_id' => ProductModel::query()->where('slug', Str::slug($product['model']))->value('id'),
+                    'product_condition_id' => ProductCondition::query()->where('slug', Str::slug($product['condition']))->value('id'),
                     'name' => $product['name'],
                     'slug' => Str::slug($product['name']),
                     'brand' => $product['brand'],
@@ -194,9 +186,7 @@ class DatabaseSeeder extends Seeder
                 'device_type' => 'Phone',
                 'device_type_id' => DeviceType::query()->where('slug', 'phone')->value('id'),
                 'device_brand' => 'Apple',
-                'device_brand_id' => DeviceBrand::query()->where('slug', 'apple')->value('id'),
                 'device_model' => 'iPhone 13',
-                'device_model_id' => DeviceModel::query()->where('slug', 'iphone-13')->value('id'),
                 'issue_category' => 'Screen repair',
                 'issue_category_id' => IssueCategory::query()->where('slug', 'screen-replacement')->value('id'),
                 'issue_description' => 'Cracked display after a drop. Touch still works.',

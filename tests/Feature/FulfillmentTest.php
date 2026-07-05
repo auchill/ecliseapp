@@ -5,12 +5,12 @@ use App\Mail\QuoteBookingCreatedMail;
 use App\Mail\QuoteSubmittedCustomerMail;
 use App\Mail\RepairStatusUpdatedMail;
 use App\Models\Cart;
-use App\Models\DeviceBrand;
-use App\Models\DeviceModel;
 use App\Models\DeviceType;
 use App\Models\IssueCategory;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\ProductBrand;
+use App\Models\ProductModel;
 use App\Models\Quote;
 use App\Models\RepairBooking;
 use App\Models\ShippingDiscountRule;
@@ -403,8 +403,16 @@ test('customer quote submission can be converted to a priced repair booking', fu
     ]);
 
     $deviceType = DeviceType::query()->where('slug', 'phone')->firstOrFail();
-    $deviceBrand = DeviceBrand::query()->where('slug', 'apple')->firstOrFail();
-    $deviceModel = DeviceModel::query()->where('slug', 'iphone-13')->firstOrFail();
+    $productBrand = ProductBrand::query()->create([
+        'name' => 'Apple',
+        'slug' => 'apple',
+        'status' => 'active',
+    ]);
+    $productModel = ProductModel::query()->create([
+        'name' => 'iPhone 13',
+        'slug' => 'iphone-13',
+        'status' => 'active',
+    ]);
     $issueCategory = IssueCategory::query()->where('slug', 'screen-replacement')->firstOrFail();
 
     $this->post(route('quotes.store'), [
@@ -412,8 +420,8 @@ test('customer quote submission can be converted to a priced repair booking', fu
         'email' => 'quote@example.com',
         'phone_number' => '416-555-7777',
         'device_type_id' => $deviceType->id,
-        'device_brand_id' => $deviceBrand->id,
-        'device_model_id' => $deviceModel->id,
+        'product_brand_id' => $productBrand->id,
+        'product_model_id' => $productModel->id,
         'issue_category_id' => $issueCategory->id,
         'preferred_date' => now()->addDay()->toDateString(),
         'preferred_time' => '11:30',
@@ -430,8 +438,8 @@ test('customer quote submission can be converted to a priced repair booking', fu
     $this->actingAs($admin)
         ->post(route('admin.quotes.convert.store', $quote), [
             'device_type_id' => $deviceType->id,
-            'device_brand_id' => $deviceBrand->id,
-            'device_model_id' => $deviceModel->id,
+            'product_brand_id' => $productBrand->id,
+            'product_model_id' => $productModel->id,
             'issue_category_id' => $issueCategory->id,
             'preferred_appointment_date' => now()->addDay()->toDateString(),
             'preferred_appointment_time' => '11:30',

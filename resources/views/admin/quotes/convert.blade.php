@@ -25,20 +25,20 @@
                         </select>
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label" for="device_brand_id">Brand</label>
-                        <select class="form-select" id="device_brand_id" name="device_brand_id">
+                        <label class="form-label" for="product_brand_id">Brand</label>
+                        <select class="form-select" id="product_brand_id" name="product_brand_id">
                             <option value="">No brand</option>
-                            @foreach ($deviceBrands as $brand)
-                                <option value="{{ $brand->id }}" @selected((int) old('device_brand_id', $quote->device_brand_id) === $brand->id)>{{ $brand->name }}</option>
+                            @foreach ($productBrands as $brand)
+                                <option value="{{ $brand->id }}" @selected((int) old('product_brand_id', $quote->product_brand_id) === $brand->id)>{{ $brand->name }}</option>
                             @endforeach
                         </select>
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label" for="device_model_id">Listed model</label>
-                        <select class="form-select" id="device_model_id" name="device_model_id">
+                        <label class="form-label" for="product_model_id">Listed model</label>
+                        <select class="form-select" id="product_model_id" name="product_model_id">
                             <option value="">Custom model</option>
-                            @foreach ($deviceModels as $model)
-                                <option value="{{ $model->id }}" @selected((int) old('device_model_id', $quote->device_model_id) === $model->id)>{{ $model->name }}</option>
+                            @foreach ($productModels as $model)
+                                <option value="{{ $model->id }}" @selected((int) old('product_model_id', $quote->product_model_id) === $model->id)>{{ $model->name }}</option>
                             @endforeach
                         </select>
                     </div>

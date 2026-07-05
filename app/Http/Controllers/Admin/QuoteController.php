@@ -4,10 +4,10 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Mail\QuoteBookingCreatedMail;
-use App\Models\DeviceBrand;
-use App\Models\DeviceModel;
 use App\Models\DeviceType;
 use App\Models\IssueCategory;
+use App\Models\ProductBrand;
+use App\Models\ProductModel;
 use App\Models\Quote;
 use App\Models\RepairBooking;
 use Illuminate\Http\Request;
@@ -72,8 +72,8 @@ class QuoteController extends Controller
         return view('admin.quotes.convert', [
             'quote' => $quote->load('deviceType', 'deviceBrand', 'deviceModel', 'issueCategory'),
             'deviceTypes' => DeviceType::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
-            'deviceBrands' => DeviceBrand::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
-            'deviceModels' => DeviceModel::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
+            'productBrands' => ProductBrand::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
+            'productModels' => ProductModel::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
             'issueCategories' => IssueCategory::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
         ]);
     }
@@ -85,8 +85,8 @@ class QuoteController extends Controller
 
         $data = $request->validate([
             'device_type_id' => ['required', 'exists:repair_device_types,id'],
-            'device_brand_id' => ['nullable', 'exists:device_brands,id'],
-            'device_model_id' => ['nullable', 'exists:device_models,id'],
+            'product_brand_id' => ['nullable', 'exists:product_brands,id'],
+            'product_model_id' => ['nullable', 'exists:product_models,id'],
             'device_model' => ['nullable', 'string', 'max:255'],
             'issue_category_id' => ['required', 'exists:issue_categories,id'],
             'preferred_appointment_date' => ['nullable', 'date'],
@@ -112,8 +112,8 @@ class QuoteController extends Controller
 
         $booking = DB::transaction(function () use ($quote, $data, $repairItems, $subtotal, $taxAmount, $total, $request): RepairBooking {
             $deviceType = DeviceType::query()->find($data['device_type_id']);
-            $deviceBrand = ! empty($data['device_brand_id']) ? DeviceBrand::query()->find($data['device_brand_id']) : null;
-            $deviceModel = ! empty($data['device_model_id']) ? DeviceModel::query()->find($data['device_model_id']) : null;
+            $productBrand = ! empty($data['product_brand_id']) ? ProductBrand::query()->find($data['product_brand_id']) : null;
+            $productModel = ! empty($data['product_model_id']) ? ProductModel::query()->find($data['product_model_id']) : null;
             $issueCategory = IssueCategory::query()->find($data['issue_category_id']);
 
             $booking = RepairBooking::query()->create([
@@ -124,10 +124,10 @@ class QuoteController extends Controller
                 'phone' => $quote->phone_number,
                 'device_type_id' => $data['device_type_id'],
                 'device_type' => $deviceType?->name ?: 'Device',
-                'device_brand_id' => $data['device_brand_id'] ?? null,
-                'device_brand' => $deviceBrand?->name,
-                'device_model_id' => $data['device_model_id'] ?? null,
-                'device_model' => $deviceModel?->name ?? $data['device_model'] ?? $quote->device_model,
+                'product_brand_id' => $data['product_brand_id'] ?? null,
+                'device_brand' => $productBrand?->name,
+                'product_model_id' => $data['product_model_id'] ?? null,
+                'device_model' => $productModel?->name ?? $data['device_model'] ?? $quote->device_model,
                 'issue_category_id' => $data['issue_category_id'],
                 'issue_category' => $issueCategory?->name ?: 'General Diagnosis',
                 'issue_description' => $quote->issue_description,

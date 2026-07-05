@@ -26,8 +26,8 @@ class Quote extends Model
         'email',
         'phone_number',
         'device_type_id',
-        'device_brand_id',
-        'device_model_id',
+        'product_brand_id',
+        'product_model_id',
         'device_model',
         'issue_category_id',
         'preferred_date',
@@ -54,12 +54,12 @@ class Quote extends Model
 
     public function deviceBrand(): BelongsTo
     {
-        return $this->belongsTo(DeviceBrand::class);
+        return $this->belongsTo(ProductBrand::class, 'product_brand_id');
     }
 
     public function deviceModel(): BelongsTo
     {
-        return $this->belongsTo(DeviceModel::class);
+        return $this->belongsTo(ProductModel::class, 'product_model_id');
     }
 
     public function issueCategory(): BelongsTo

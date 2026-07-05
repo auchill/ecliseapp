@@ -42,7 +42,52 @@
                         <select class="form-select" id="condition" name="condition">
                             <option value="">All</option>
                             @foreach ($conditions as $condition)
-                                <option value="{{ $condition }}" @selected(request('condition') === $condition)>{{ $condition }}</option>
+                                <option value="{{ $condition->id }}" @selected((int) request('condition') === $condition->id)>{{ $condition->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-sm-6 col-lg-2">
+                        <label class="form-label" for="model">Model</label>
+                        <select class="form-select" id="model" name="model">
+                            <option value="">All</option>
+                            @foreach ($models as $model)
+                                <option value="{{ $model->id }}" @selected((int) request('model') === $model->id)>{{ $model->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-sm-6 col-lg-2">
+                        <label class="form-label" for="size">Size</label>
+                        <select class="form-select" id="size" name="size">
+                            <option value="">All</option>
+                            @foreach ($sizes as $size)
+                                <option value="{{ $size->id }}" @selected((int) request('size') === $size->id)>{{ $size->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-sm-6 col-lg-2">
+                        <label class="form-label" for="grade">Grade</label>
+                        <select class="form-select" id="grade" name="grade">
+                            <option value="">All</option>
+                            @foreach ($grades as $grade)
+                                <option value="{{ $grade->id }}" @selected((int) request('grade') === $grade->id)>{{ $grade->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-sm-6 col-lg-2">
+                        <label class="form-label" for="color">Color</label>
+                        <select class="form-select" id="color" name="color">
+                            <option value="">All</option>
+                            @foreach ($colors as $color)
+                                <option value="{{ $color->id }}" @selected((int) request('color') === $color->id)>{{ $color->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-sm-6 col-lg-2">
+                        <label class="form-label" for="carrier">Carrier</label>
+                        <select class="form-select" id="carrier" name="carrier">
+                            <option value="">All</option>
+                            @foreach ($carriers as $carrier)
+                                <option value="{{ $carrier->id }}" @selected((int) request('carrier') === $carrier->id)>{{ $carrier->name }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -68,7 +113,7 @@
                             <div class="p-4">
                                 <p class="eyebrow mb-1">{{ $product->categoryName() ?? 'Product' }}</p>
                                 <h2 class="h5 fw-bold">{{ $product->name }}</h2>
-                                <p class="muted small">{{ $product->condition }} &middot; {{ $product->brandName() }} &middot; {{ $product->modelName() }} &middot; {{ $product->quantity }} in stock</p>
+                                <p class="muted small">{{ $product->conditionName() }} &middot; {{ $product->brandName() }} &middot; {{ $product->modelName() }} &middot; {{ $product->quantity }} in stock</p>
                                 <div class="d-flex align-items-center justify-content-between gap-2">
                                     <div>
                                         @if ($product->sale_price)

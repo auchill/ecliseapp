@@ -5,10 +5,10 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreQuoteRequest;
 use App\Mail\AdminQuoteSubmittedMail;
 use App\Mail\QuoteSubmittedCustomerMail;
-use App\Models\DeviceBrand;
-use App\Models\DeviceModel;
 use App\Models\DeviceType;
 use App\Models\IssueCategory;
+use App\Models\ProductBrand;
+use App\Models\ProductModel;
 use App\Models\Quote;
 use App\Models\User;
 use Illuminate\Support\Facades\Mail;
@@ -19,8 +19,8 @@ class QuoteController extends Controller
     {
         return view('quotes.create', [
             'deviceTypes' => DeviceType::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
-            'deviceBrands' => DeviceBrand::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
-            'deviceModels' => DeviceModel::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
+            'productBrands' => ProductBrand::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
+            'productModels' => ProductModel::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
             'issueCategories' => IssueCategory::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
         ]);
     }

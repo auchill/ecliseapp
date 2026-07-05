@@ -55,10 +55,47 @@
                         </select>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label" for="condition">Condition</label>
-                        <select class="form-select" id="condition" name="condition" required>
-                            @foreach ($conditions as $condition)
-                                <option value="{{ $condition }}" @selected(old('condition', $product->condition ?: 'New') === $condition)>{{ $condition }}</option>
+                        <label class="form-label" for="product_size_id">Product Size</label>
+                        <select class="form-select" id="product_size_id" name="product_size_id">
+                            <option value="">No product size</option>
+                            @foreach ($productSizes as $size)
+                                <option value="{{ $size->id }}" @selected((int) old('product_size_id', $product->product_size_id) === $size->id)>{{ $size->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="product_grade_id">Product Grade</label>
+                        <select class="form-select" id="product_grade_id" name="product_grade_id">
+                            <option value="">No product grade</option>
+                            @foreach ($productGrades as $grade)
+                                <option value="{{ $grade->id }}" @selected((int) old('product_grade_id', $product->product_grade_id) === $grade->id)>{{ $grade->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="product_condition_id">Product Condition</label>
+                        <select class="form-select" id="product_condition_id" name="product_condition_id" required>
+                            <option value="">Choose condition</option>
+                            @foreach ($productConditions as $condition)
+                                <option value="{{ $condition->id }}" @selected((int) old('product_condition_id', $product->product_condition_id) === $condition->id)>{{ $condition->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="product_color_id">Product Color</label>
+                        <select class="form-select" id="product_color_id" name="product_color_id">
+                            <option value="">No product color</option>
+                            @foreach ($productColors as $color)
+                                <option value="{{ $color->id }}" @selected((int) old('product_color_id', $product->product_color_id) === $color->id)>{{ $color->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="product_carrier_id">Product Carrier</label>
+                        <select class="form-select" id="product_carrier_id" name="product_carrier_id">
+                            <option value="">No product carrier</option>
+                            @foreach ($productCarriers as $carrier)
+                                <option value="{{ $carrier->id }}" @selected((int) old('product_carrier_id', $product->product_carrier_id) === $carrier->id)>{{ $carrier->name }}</option>
                             @endforeach
                         </select>
                     </div>

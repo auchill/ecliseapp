@@ -3,18 +3,16 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\DeviceBrand;
-use App\Models\DeviceCarrier;
-use App\Models\DeviceColor;
-use App\Models\DeviceCondition;
-use App\Models\DeviceGrade;
-use App\Models\DeviceManufacturer;
-use App\Models\DeviceModel;
-use App\Models\DeviceSize;
 use App\Models\DeviceType;
 use App\Models\IssueCategory;
 use App\Models\PartModel;
+use App\Models\ProductBrand;
+use App\Models\ProductCarrier;
+use App\Models\ProductColor;
+use App\Models\ProductCondition;
+use App\Models\ProductGrade;
 use App\Models\ProductModel;
+use App\Models\ProductSize;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -23,12 +21,61 @@ use Illuminate\Validation\Rule;
 class ReferenceController extends Controller
 {
     private const REFERENCES = [
+        'product-brands' => [
+            'model' => ProductBrand::class,
+            'title' => 'Product Brands',
+            'singular' => 'Product Brand',
+            'route' => 'admin.product-brands',
+            'table' => 'product_brands',
+            'code_source' => true,
+        ],
         'product-models' => [
             'model' => ProductModel::class,
             'title' => 'Product Models',
             'singular' => 'Product Model',
             'route' => 'admin.product-models',
             'table' => 'product_models',
+            'code_source' => true,
+        ],
+        'product-sizes' => [
+            'model' => ProductSize::class,
+            'title' => 'Product Sizes',
+            'singular' => 'Product Size',
+            'route' => 'admin.product-sizes',
+            'table' => 'product_sizes',
+            'code_source' => true,
+        ],
+        'product-grades' => [
+            'model' => ProductGrade::class,
+            'title' => 'Product Grades',
+            'singular' => 'Product Grade',
+            'route' => 'admin.product-grades',
+            'table' => 'product_grades',
+            'code_source' => true,
+        ],
+        'product-conditions' => [
+            'model' => ProductCondition::class,
+            'title' => 'Product Conditions',
+            'singular' => 'Product Condition',
+            'route' => 'admin.product-conditions',
+            'table' => 'productconditions',
+            'code_source' => true,
+        ],
+        'product-colors' => [
+            'model' => ProductColor::class,
+            'title' => 'Product Colors',
+            'singular' => 'Product Color',
+            'route' => 'admin.product-colors',
+            'table' => 'product_colors',
+            'code_source' => true,
+        ],
+        'product-carriers' => [
+            'model' => ProductCarrier::class,
+            'title' => 'Product Carriers',
+            'singular' => 'Product Carrier',
+            'route' => 'admin.product-carriers',
+            'table' => 'product_carriers',
+            'code_source' => true,
         ],
         'part-models' => [
             'model' => PartModel::class,
@@ -43,62 +90,6 @@ class ReferenceController extends Controller
             'singular' => 'Device Type',
             'route' => 'admin.device-types',
             'table' => 'repair_device_types',
-        ],
-        'device-brands' => [
-            'model' => DeviceBrand::class,
-            'title' => 'Device Brands',
-            'singular' => 'Device Brand',
-            'route' => 'admin.device-brands',
-            'table' => 'device_brands',
-        ],
-        'device-models' => [
-            'model' => DeviceModel::class,
-            'title' => 'Device Models',
-            'singular' => 'Device Model',
-            'route' => 'admin.device-models',
-            'table' => 'device_models',
-        ],
-        'device-manufacturers' => [
-            'model' => DeviceManufacturer::class,
-            'title' => 'Device Manufacturers',
-            'singular' => 'Device Manufacturer',
-            'route' => 'admin.device-manufacturers',
-            'table' => 'device_manufacturers',
-        ],
-        'device-colors' => [
-            'model' => DeviceColor::class,
-            'title' => 'Device Colors',
-            'singular' => 'Device Color',
-            'route' => 'admin.device-colors',
-            'table' => 'device_colors',
-        ],
-        'device-conditions' => [
-            'model' => DeviceCondition::class,
-            'title' => 'Device Conditions',
-            'singular' => 'Device Condition',
-            'route' => 'admin.device-conditions',
-            'table' => 'device_conditions',
-        ],
-        'device-carriers' => [
-            'model' => DeviceCarrier::class,
-            'title' => 'Device Carriers',
-            'singular' => 'Device Carrier',
-            'route' => 'admin.device-carriers',
-            'table' => 'device_carriers',
-        ],
-        'device-sizes' => [
-            'model' => DeviceSize::class,
-            'title' => 'Device Sizes',
-            'singular' => 'Device Size',
-            'route' => 'admin.device-sizes',
-            'table' => 'device_sizes',
-        ],
-        'device-grades' => [
-            'model' => DeviceGrade::class,
-            'title' => 'Device Grades',
-            'singular' => 'Device Grade',
-            'route' => 'admin.device-grades',
-            'table' => 'device_grades',
         ],
         'issue-categories' => [
             'model' => IssueCategory::class,
@@ -119,6 +110,7 @@ class ReferenceController extends Controller
             'items' => $model::query()->orderBy('sort_order')->orderBy('name')->paginate(20),
             'routePrefix' => $config['route'],
             'usesStatus' => true,
+            'usesCodeSource' => (bool) ($config['code_source'] ?? false),
         ]);
     }
 
@@ -132,6 +124,7 @@ class ReferenceController extends Controller
             'item' => new $model(['status' => 'active', 'sort_order' => 0]),
             'routePrefix' => $config['route'],
             'usesStatus' => true,
+            'usesCodeSource' => (bool) ($config['code_source'] ?? false),
         ]);
     }
 
@@ -155,6 +148,7 @@ class ReferenceController extends Controller
             'item' => $item,
             'routePrefix' => $config['route'],
             'usesStatus' => true,
+            'usesCodeSource' => (bool) ($config['code_source'] ?? false),
         ]);
     }
 
@@ -189,13 +183,20 @@ class ReferenceController extends Controller
 
     private function validatedData(Request $request, array $config, ?int $ignoreId = null): array
     {
-        $data = $request->validate([
+        $rules = [
             'name' => ['required', 'string', 'max:255'],
             'slug' => ['nullable', 'string', 'max:255', Rule::unique($config['table'], 'slug')->ignore($ignoreId)],
             'status' => ['required', Rule::in(['active', 'inactive'])],
             'description' => ['nullable', 'string'],
             'sort_order' => ['required', 'integer', 'min:0'],
-        ]);
+        ];
+
+        if ($config['code_source'] ?? false) {
+            $rules['code'] = ['nullable', 'string', 'max:255'];
+            $rules['source'] = ['nullable', 'string', 'max:255'];
+        }
+
+        $data = $request->validate($rules);
 
         $data['slug'] = Str::slug($data['slug'] ?: $data['name']);
 

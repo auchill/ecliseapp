@@ -11,8 +11,6 @@ class Product extends Model
 {
     use HasFactory;
 
-    public const CONDITIONS = ['New', 'Used', 'Refurbished'];
-
     public const STATUSES = ['Active', 'Inactive', 'Out of Stock'];
 
     protected $fillable = [
@@ -20,6 +18,11 @@ class Product extends Model
         'product_brand_id',
         'product_category_id',
         'product_model_id',
+        'product_size_id',
+        'product_grade_id',
+        'product_condition_id',
+        'product_color_id',
+        'product_carrier_id',
         'name',
         'slug',
         'sku',
@@ -67,6 +70,31 @@ class Product extends Model
         return $this->belongsTo(ProductModel::class);
     }
 
+    public function productSize(): BelongsTo
+    {
+        return $this->belongsTo(ProductSize::class);
+    }
+
+    public function productGrade(): BelongsTo
+    {
+        return $this->belongsTo(ProductGrade::class);
+    }
+
+    public function productCondition(): BelongsTo
+    {
+        return $this->belongsTo(ProductCondition::class);
+    }
+
+    public function productColor(): BelongsTo
+    {
+        return $this->belongsTo(ProductColor::class);
+    }
+
+    public function productCarrier(): BelongsTo
+    {
+        return $this->belongsTo(ProductCarrier::class);
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('status', 'Active')->where('quantity', '>', 0);
@@ -90,6 +118,11 @@ class Product extends Model
     public function modelName(): ?string
     {
         return $this->productModel?->name ?? $this->model;
+    }
+
+    public function conditionName(): ?string
+    {
+        return $this->productCondition?->name ?? $this->condition;
     }
 
     public function imageUrl(): string

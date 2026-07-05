@@ -2,7 +2,6 @@
 
 use App\Models\Cart;
 use App\Models\CartItem;
-use App\Models\DeviceManufacturer;
 use App\Models\MobileSentrixDevice;
 use App\Models\Order;
 use App\Models\Permission;
@@ -10,6 +9,7 @@ use App\Models\Product;
 use App\Models\User;
 use Database\Seeders\ShippingSeeder;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 
 beforeEach(function (): void {
     config([
@@ -41,7 +41,7 @@ function cpoTestUser(string $email, string $permissionName = 'customer'): User
     ]);
 }
 
-test('mobile sentrix device sync stores raw payload and lookup data without duplicates', function () {
+test('mobile sentrix device sync stores direct fields without creating lookup data', function () {
     $rawDevice = [
         'entity_id' => 73001,
         'sku' => 'CPO-IPHONE-14-128',
@@ -76,7 +76,10 @@ test('mobile sentrix device sync stores raw payload and lookup data without dupl
         ->and($device->sku)->toBe('CPO-IPHONE-14-128')
         ->and($device->device_model_text)->toBe('iPhone 14')
         ->and($device->raw_payload == $rawDevice)->toBeTrue()
-        ->and(DeviceManufacturer::query()->where('slug', 'apple')->exists())->toBeTrue();
+        ->and(Schema::hasTable('device_manufacturers'))->toBeFalse()
+        ->and(Schema::hasTable('device_models'))->toBeFalse()
+        ->and(Schema::hasColumn('mobilesentrix_devices', 'device_manufacturer_id'))->toBeFalse()
+        ->and(Schema::hasColumn('mobilesentrix_devices', 'device_model_id'))->toBeFalse();
 
     Http::assertSent(function ($request): bool {
         parse_str(parse_url($request->url(), PHP_URL_QUERY) ?: '', $query);

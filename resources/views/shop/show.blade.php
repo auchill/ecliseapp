@@ -16,9 +16,21 @@
                     <h1 class="display-5 fw-bold">{{ $product->name }}</h1>
                     <p class="muted fs-5">{{ $product->description }}</p>
                     <div class="d-flex flex-wrap gap-2 mb-4">
-                        <span class="status-pill">{{ $product->condition }}</span>
+                        <span class="status-pill">{{ $product->conditionName() }}</span>
                         <span class="status-pill">{{ $product->brandName() }}</span>
                         <span class="status-pill">{{ $product->modelName() }}</span>
+                        @if($product->productSize)
+                            <span class="status-pill">{{ $product->productSize->name }}</span>
+                        @endif
+                        @if($product->productGrade)
+                            <span class="status-pill">{{ $product->productGrade->name }}</span>
+                        @endif
+                        @if($product->productColor)
+                            <span class="status-pill">{{ $product->productColor->name }}</span>
+                        @endif
+                        @if($product->productCarrier)
+                            <span class="status-pill">{{ $product->productCarrier->name }}</span>
+                        @endif
                         <span class="status-pill">{{ $product->quantity }} in stock</span>
                     </div>
                     <div class="mb-4">

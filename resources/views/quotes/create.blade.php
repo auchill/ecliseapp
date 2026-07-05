@@ -38,20 +38,20 @@
                         </select>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label" for="device_brand_id">Device brand</label>
-                        <select class="form-select" id="device_brand_id" name="device_brand_id" required>
+                        <label class="form-label" for="product_brand_id">Device brand</label>
+                        <select class="form-select" id="product_brand_id" name="product_brand_id" required>
                             <option value="">Choose brand</option>
-                            @foreach ($deviceBrands as $brand)
-                                <option value="{{ $brand->id }}" @selected((int) old('device_brand_id') === $brand->id)>{{ $brand->name }}</option>
+                            @foreach ($productBrands as $brand)
+                                <option value="{{ $brand->id }}" @selected((int) old('product_brand_id') === $brand->id)>{{ $brand->name }}</option>
                             @endforeach
                         </select>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label" for="device_model_id">Device model</label>
-                        <select class="form-select" id="device_model_id" name="device_model_id">
+                        <label class="form-label" for="product_model_id">Device model</label>
+                        <select class="form-select" id="product_model_id" name="product_model_id">
                             <option value="">Not listed</option>
-                            @foreach ($deviceModels as $model)
-                                <option value="{{ $model->id }}" @selected((int) old('device_model_id') === $model->id)>{{ $model->name }}</option>
+                            @foreach ($productModels as $model)
+                                <option value="{{ $model->id }}" @selected((int) old('product_model_id') === $model->id)>{{ $model->name }}</option>
                             @endforeach
                         </select>
                     </div>

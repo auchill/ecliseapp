@@ -15,9 +15,36 @@
 
             <form class="surface p-4 mb-4" method="GET" action="{{ route('admin.products.index') }}">
                 <div class="row g-3 align-items-end">
-                    <div class="col-lg-10">
+                    <div class="col-lg-4">
                         <label class="form-label" for="q">Search</label>
                         <input class="form-control" id="q" name="q" value="{{ request('q') }}" placeholder="Name, SKU, brand">
+                    </div>
+                    <div class="col-sm-6 col-lg-2">
+                        <label class="form-label" for="brand">Brand</label>
+                        <select class="form-select" id="brand" name="brand">
+                            <option value="">All</option>
+                            @foreach ($productBrands as $brand)
+                                <option value="{{ $brand->id }}" @selected((int) request('brand') === $brand->id)>{{ $brand->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-sm-6 col-lg-2">
+                        <label class="form-label" for="model">Model</label>
+                        <select class="form-select" id="model" name="model">
+                            <option value="">All</option>
+                            @foreach ($productModels as $model)
+                                <option value="{{ $model->id }}" @selected((int) request('model') === $model->id)>{{ $model->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-sm-6 col-lg-2">
+                        <label class="form-label" for="condition">Condition</label>
+                        <select class="form-select" id="condition" name="condition">
+                            <option value="">All</option>
+                            @foreach ($productConditions as $condition)
+                                <option value="{{ $condition->id }}" @selected((int) request('condition') === $condition->id)>{{ $condition->name }}</option>
+                            @endforeach
+                        </select>
                     </div>
                     <div class="col-lg-2">
                         <button class="btn btn-primary w-100" type="submit"><i class="bi bi-search"></i><span class="visually-hidden">Search</span></button>
@@ -33,7 +60,9 @@
                                 <th>Product</th>
                                 <th>SKU</th>
                                 <th>Category</th>
+                                <th>Brand</th>
                                 <th>Model</th>
+                                <th>Condition</th>
                                 <th>Price</th>
                                 <th>Stock</th>
                                 <th>Status</th>
@@ -46,7 +75,9 @@
                                     <td>{{ $product->name }}</td>
                                     <td>{{ $product->sku }}</td>
                                     <td>{{ $product->categoryName() }}</td>
+                                    <td>{{ $product->brandName() }}</td>
                                     <td>{{ $product->modelName() }}</td>
+                                    <td>{{ $product->conditionName() }}</td>
                                     <td>${{ number_format($product->currentPrice(), 2) }}</td>
                                     <td>{{ $product->quantity }}</td>
                                     <td><span class="status-pill">{{ $product->status }}</span></td>
@@ -62,7 +93,7 @@
                                     </td>
                                 </tr>
                             @empty
-                                <tr><td colspan="8">No products found.</td></tr>
+                                <tr><td colspan="10">No products found.</td></tr>
                             @endforelse
                         </tbody>
                     </table>
