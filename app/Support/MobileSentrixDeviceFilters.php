@@ -184,10 +184,13 @@ class MobileSentrixDeviceFilters
 
     private function sort(Builder $query, string $sort): Builder
     {
-        return match ($sort) {
-            'price_asc' => $query->orderByRaw('COALESCE(price, final_price, regular_price) asc')->orderBy('manufacturer_text')->orderBy('device_model_text'),
-            'price_desc' => $query->orderByRaw('COALESCE(price, final_price, regular_price) desc')->orderBy('manufacturer_text')->orderBy('device_model_text'),
-            default => $query->orderBy('manufacturer_text')->orderBy('device_model_text')->orderBy('device_size_text'),
-        };
+        $direction = $sort === 'price_desc' ? 'desc' : 'asc';
+
+        return $query
+            ->orderByRaw('COALESCE(price, final_price, regular_price) IS NULL')
+            ->orderByRaw("COALESCE(price, final_price, regular_price) {$direction}")
+            ->orderBy('manufacturer_text')
+            ->orderBy('device_model_text')
+            ->orderBy('id');
     }
 }

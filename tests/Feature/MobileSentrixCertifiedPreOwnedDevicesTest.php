@@ -7,7 +7,9 @@ use App\Models\Order;
 use App\Models\Permission;
 use App\Models\Product;
 use App\Models\User;
+use App\Support\MobileSentrixDeviceFilters;
 use Database\Seeders\ShippingSeeder;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 
@@ -132,6 +134,59 @@ test('customer device listing only shows available devices and admin listing has
         ->assertSee('iPhone 15')
         ->assertSee('Galaxy S24')
         ->assertDontSee('Add To Cart');
+});
+
+test('certified pre owned devices default to database price order with null prices last', function () {
+    foreach ([
+        [88201, 'Final Price Device', null, 50, null],
+        [88202, 'Direct Price Device', 100, null, null],
+        [88203, 'Regular Price Device', null, null, 200],
+        [88204, 'No Price Device', null, null, null],
+    ] as [$entityId, $name, $price, $finalPrice, $regularPrice]) {
+        MobileSentrixDevice::query()->create([
+            'entity_id' => $entityId,
+            'sku' => 'SORT-'.$entityId,
+            'name' => $name,
+            'manufacturer_text' => 'Test',
+            'device_model_text' => $name,
+            'available_qty' => 1,
+            'price' => $price,
+            'final_price' => $finalPrice,
+            'regular_price' => $regularPrice,
+            'status' => 'active',
+        ]);
+    }
+
+    $filters = app(MobileSentrixDeviceFilters::class);
+
+    expect($filters->query(Request::create('/', 'GET'), customer: true)->pluck('name')->all())
+        ->toBe([
+            'Final Price Device',
+            'Direct Price Device',
+            'Regular Price Device',
+            'No Price Device',
+        ])
+        ->and($filters->query(Request::create('/', 'GET', ['price_sort' => 'price_desc']), customer: true)->pluck('name')->all())
+        ->toBe([
+            'Regular Price Device',
+            'Direct Price Device',
+            'Final Price Device',
+            'No Price Device',
+        ])
+        ->and($filters->query(Request::create('/', 'GET'), customer: true)->paginate(2, ['*'], 'page', 1)->pluck('name')->all())
+        ->toBe(['Final Price Device', 'Direct Price Device'])
+        ->and($filters->query(Request::create('/', 'GET'), customer: true)->paginate(2, ['*'], 'page', 2)->pluck('name')->all())
+        ->toBe(['Regular Price Device', 'No Price Device']);
+
+    $this->get(route('shop.certified-pre-owned-devices.index'))
+        ->assertOk()
+        ->assertSee('<option value="price_asc" selected>Low to High</option>', false)
+        ->assertSeeInOrder([
+            'Final Price Device',
+            'Direct Price Device',
+            'Regular Price Device',
+            'No Price Device',
+        ]);
 });
 
 test('active device filter chips render accessible individual remove buttons', function () {

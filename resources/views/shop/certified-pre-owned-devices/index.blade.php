@@ -84,9 +84,8 @@
                     <div class="col-sm-6 col-xl-2">
                         <label class="form-label" for="price_sort">Sort price</label>
                         <select class="form-select" id="price_sort" name="price_sort">
-                            <option value="">Default</option>
-                            <option value="price_asc" @selected(request('price_sort') === 'price_asc')>Low to High</option>
-                            <option value="price_desc" @selected(request('price_sort') === 'price_desc')>High to Low</option>
+                            <option value="price_asc" @selected(request('price_sort', 'price_asc') === 'price_asc')>Low to High</option>
+                            <option value="price_desc" @selected(request('price_sort', 'price_asc') === 'price_desc')>High to Low</option>
                         </select>
                     </div>
                     <div class="col-sm-6 col-xl-1">
