@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\MobileSentrix\SyncMobileSentrixCategoriesJob;
+use App\Jobs\MobileSentrix\SyncMobileSentrixPartsFullJob;
 use App\Jobs\MobileSentrix\SyncMobileSentrixPartsJob;
 use App\Models\MobileSentrixApiSetting;
 use App\Models\MobileSentrixSyncLog;
@@ -11,6 +12,8 @@ use App\Models\User;
 use App\Services\MobileSentrix\MobileSentrixAuthService;
 use App\Services\MobileSentrix\MobileSentrixClient;
 use App\Services\MobileSentrix\MobileSentrixException;
+use App\Services\MobileSentrix\MobileSentrixSyncService;
+use App\Services\MobileSentrix\PartCategoryPivotService;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -389,9 +392,10 @@ test('mobile sentrix parts sync maps products into parts without exposing suppli
         ->and($part->modelName())->toBe('iPhone 14')
         ->and($part->attribute_set)->toBe('20')
         ->and($part->raw_payload['related_product'])->toBe(['9002'])
+        ->and($part->category_ids)->toBe(['165'])
         ->and((float) $part->cost_price)->toBe(50.0)
         ->and((float) $part->selling_price)->toBe(60.0)
-        ->and($part->categories()->whereKey($category->id)->exists())->toBeTrue()
+        ->and($part->categories()->exists())->toBeFalse()
         ->and($part->gallery_images->pluck('image_url'))->toContain('https://cdn.example.test/part.jpg')
         ->and(Schema::hasColumn('parts', 'mobilesentrix_product_id'))->toBeFalse()
         ->and(Schema::hasColumn('parts', 'part_brand_id'))->toBeFalse()
@@ -400,6 +404,10 @@ test('mobile sentrix parts sync maps products into parts without exposing suppli
         ->and(Schema::hasTable('part_models'))->toBeFalse()
         ->and(Schema::hasTable('part_categories'))->toBeTrue()
         ->and(Schema::hasTable('part_category_part'))->toBeTrue();
+
+    $this->artisan('mobilesentrix:generate-part-category-pivot')->assertSuccessful();
+
+    expect($part->categories()->whereKey($category->id)->exists())->toBeTrue();
 
     $this->get(route('parts.index'))
         ->assertOk()
@@ -431,12 +439,133 @@ test('mobile sentrix parts sync keeps missing category ids raw without creating 
     $log = MobileSentrixSyncLog::query()->where('sync_type', 'parts_full')->latest()->firstOrFail();
 
     expect($part->raw_payload['category_ids'])->toBe(['999999'])
+        ->and($part->category_ids)->toBe(['999999'])
         ->and($part->categories()->count())->toBe(0)
-        ->and($log->skipped_count)->toBeGreaterThanOrEqual(1)
-        ->and(json_encode($log->error_details))->toContain('missing category 999999');
+        ->and($log->skipped_count)->toBe(0)
+        ->and(json_encode($log->error_details))->not->toContain('missing category 999999');
+
+    $this->artisan('mobilesentrix:generate-part-category-pivot')->assertSuccessful();
+
+    $pivotLog = MobileSentrixSyncLog::query()->where('sync_type', 'part_category_pivot')->latest()->firstOrFail();
+
+    expect($pivotLog->failed_count)->toBe(0)
+        ->and($pivotLog->warning_count)->toBe(1)
+        ->and(json_encode($pivotLog->error_details))->toContain('missing category 999999');
 
     $this->assertDatabaseMissing('part_categories', [
         'name' => 'MobileSentrix Category 999999',
+    ]);
+});
+
+test('part category pivot generation parses supported values and is idempotent', function () {
+    foreach ([165, 166] as $categoryId) {
+        PartCategory::query()->create([
+            'id' => $categoryId,
+            'name' => "Category {$categoryId}",
+            'slug' => "category-{$categoryId}",
+            'is_active' => true,
+            'status' => 'active',
+        ]);
+    }
+
+    $values = [
+        9501 => ['165', '166', '165'],
+        9502 => '165,999999',
+        9503 => '["166","bad"]',
+        9504 => 165,
+        9505 => null,
+    ];
+
+    foreach ($values as $partId => $categoryIds) {
+        Part::query()->create([
+            'id' => $partId,
+            'name' => "Pivot Part {$partId}",
+            'slug' => "pivot-part-{$partId}",
+            'sku' => "PIVOT-{$partId}",
+            'category_ids' => $categoryIds,
+        ]);
+    }
+
+    $this->artisan('mobilesentrix:generate-part-category-pivot', ['--chunk' => 2])->assertSuccessful();
+
+    $firstLog = MobileSentrixSyncLog::query()->where('sync_type', 'part_category_pivot')->latest('id')->firstOrFail();
+
+    expect(DB::table('part_category_part')->count())->toBe(5)
+        ->and($firstLog->created_count)->toBe(5)
+        ->and($firstLog->failed_count)->toBe(0)
+        ->and($firstLog->warning_count)->toBe(2)
+        ->and(json_encode($firstLog->error_details))->toContain('"invalid_id_count":1')
+        ->and(json_encode($firstLog->error_details))->toContain('"missing_category_count":1')
+        ->and(json_encode($firstLog->error_details))->toContain('"no_category_ids_count":1');
+
+    $this->artisan('mobilesentrix:generate-part-category-pivot', ['--chunk' => 2])->assertSuccessful();
+
+    $secondLog = MobileSentrixSyncLog::query()->where('sync_type', 'part_category_pivot')->latest('id')->firstOrFail();
+
+    expect(DB::table('part_category_part')->count())->toBe(5)
+        ->and($secondLog->created_count)->toBe(0)
+        ->and($secondLog->updated_count)->toBe(5)
+        ->and($secondLog->failed_count)->toBe(0);
+});
+
+test('mobile sentrix full parts command runs all three stages in order', function () {
+    $syncService = Mockery::mock(MobileSentrixSyncService::class);
+    $pivotService = Mockery::mock(PartCategoryPivotService::class);
+
+    $syncService->shouldReceive('syncCategories')
+        ->once()
+        ->ordered()
+        ->with(null, null)
+        ->andReturn([
+            'status' => 'success',
+            'message' => 'Categories complete.',
+            'created_count' => 2,
+            'updated_count' => 0,
+            'skipped_count' => 0,
+            'warning_count' => 0,
+            'failed_count' => 0,
+            'log_id' => 10,
+        ]);
+    $syncService->shouldReceive('syncParts')
+        ->once()
+        ->ordered()
+        ->with(null, [], ['limit' => 10, 'force' => false])
+        ->andReturn([
+            'status' => 'success',
+            'message' => 'Parts complete.',
+            'created_count' => 3,
+            'updated_count' => 1,
+            'skipped_count' => 0,
+            'warning_count' => 0,
+            'failed_count' => 0,
+            'log_id' => 11,
+        ]);
+    $pivotService->shouldReceive('generate')
+        ->once()
+        ->ordered()
+        ->andReturn([
+            'status' => 'success',
+            'message' => 'Pivot complete.',
+            'created_count' => 4,
+            'updated_count' => 0,
+            'skipped_count' => 0,
+            'warning_count' => 0,
+            'failed_count' => 0,
+            'log_id' => 12,
+        ]);
+
+    $this->app->instance(MobileSentrixSyncService::class, $syncService);
+    $this->app->instance(PartCategoryPivotService::class, $pivotService);
+
+    $this->artisan('mobilesentrix:sync-parts-full', ['--limit' => 10])->assertSuccessful();
+
+    $this->assertDatabaseHas('mobilesentrix_sync_logs', [
+        'sync_type' => 'parts_full_process',
+        'status' => 'success',
+        'created_count' => 9,
+        'updated_count' => 1,
+        'warning_count' => 0,
+        'failed_count' => 0,
     ]);
 });
 
@@ -937,6 +1066,9 @@ test('mobile sentrix admin page redacts configured secrets and uses admin login 
         ->assertSee('Callback route exists')
         ->assertSee('Callback URL allowed')
         ->assertSee('Browser authentication is disabled')
+        ->assertSee('Queue Complete Sync')
+        ->assertSee('Runs categories, parts-only import, then category assignments.')
+        ->assertSee('Warnings')
         ->assertDontSee('Copy Safe Support Message')
         ->assertDontSee('Cloudflare Ray ID')
         ->assertDontSee('Please confirm')
@@ -994,7 +1126,7 @@ test('mobile sentrix admin parts sync queues instead of running inside the reque
         ]);
 
     $response->assertRedirect(route('admin.parts.mobilesentrix.index'));
-    $response->assertSessionHas('status', 'MobileSentrix parts sync for category 165 has been queued. Check Sync Logs for progress.');
+    $response->assertSessionHas('status', 'MobileSentrix parts-only sync for category 165 has been queued. Check Sync Logs for progress.');
 
     Queue::assertPushed(SyncMobileSentrixPartsJob::class, function (SyncMobileSentrixPartsJob $job): bool {
         return $job->categoryId === '165';
@@ -1016,10 +1148,10 @@ test('mobile sentrix admin all parts sync queues without a category', function (
         ]);
 
     $response->assertRedirect(route('admin.parts.mobilesentrix.index'));
-    $response->assertSessionHas('status', 'Full MobileSentrix parts sync has been queued. Check Sync Logs for progress.');
+    $response->assertSessionHas('status', 'Complete MobileSentrix parts sync has been queued: categories, parts, then category assignments. Check Sync Logs for progress.');
 
-    Queue::assertPushed(SyncMobileSentrixPartsJob::class, function (SyncMobileSentrixPartsJob $job): bool {
-        return $job->categoryId === null && $job->limit === 500;
+    Queue::assertPushed(SyncMobileSentrixPartsFullJob::class, function (SyncMobileSentrixPartsFullJob $job): bool {
+        return $job->limit === 500;
     });
 });
 
@@ -1043,7 +1175,7 @@ test('mobile sentrix admin sync shows cli command when queue is synchronous', fu
 
     $errors = session('errors')->get('mobilesentrix');
 
-    expect($errors[0])->toContain('php -d max_execution_time=0 artisan mobilesentrix:sync-categories')
+    expect($errors[0])->toContain('php -d max_execution_time=0 artisan mobilesentrix:sync-parts-categories')
         ->and($errors[0])->toContain("--category='165'")
         ->and($errors[0])->toContain('--depth=3');
 

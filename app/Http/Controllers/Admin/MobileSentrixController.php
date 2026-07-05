@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\MobileSentrix\SyncMobileSentrixCategoriesJob;
+use App\Jobs\MobileSentrix\SyncMobileSentrixPartsFullJob;
 use App\Jobs\MobileSentrix\SyncMobileSentrixPartsJob;
 use App\Models\MobileSentrixDevice;
 use App\Models\MobileSentrixSyncLog;
@@ -31,10 +32,10 @@ class MobileSentrixController extends Controller
             'safeSupportMessage' => $this->safeSupportMessage($configStatus),
             'browserSecretRedirectAllowed' => (bool) config('mobilesentrix.allow_browser_secret_redirect'),
             'missingCredentials' => $client->missingCredentialNames(),
-            'latestLogs' => MobileSentrixSyncLog::query()->latest()->limit(12)->get(),
-            'lastCategoryLog' => MobileSentrixSyncLog::query()->where('sync_type', 'categories')->latest()->first(),
-            'lastDeviceLog' => MobileSentrixSyncLog::query()->where('sync_type', 'devices')->latest()->first(),
-            'lastPartLog' => MobileSentrixSyncLog::query()->whereIn('sync_type', ['parts_full', 'parts_category', 'parts', 'single_part'])->latest()->first(),
+            'latestLogs' => MobileSentrixSyncLog::query()->latest('id')->limit(12)->get(),
+            'lastCategoryLog' => MobileSentrixSyncLog::query()->where('sync_type', 'categories')->latest('id')->first(),
+            'lastDeviceLog' => MobileSentrixSyncLog::query()->where('sync_type', 'devices')->latest('id')->first(),
+            'lastPartLog' => MobileSentrixSyncLog::query()->whereIn('sync_type', ['parts_full_process', 'parts_full', 'parts_category', 'parts', 'part_category_pivot', 'single_part'])->latest('id')->first(),
             'devicesCount' => MobileSentrixDevice::query()->count(),
             'partsCount' => Part::query()->where('is_api_item', true)->count(),
             'categoriesCount' => PartCategory::query()->whereNotNull('raw_payload')->count(),
@@ -172,11 +173,15 @@ class MobileSentrixController extends Controller
             ]);
         }
 
-        SyncMobileSentrixPartsJob::dispatch($categoryId, $limit);
+        if ($categoryId) {
+            SyncMobileSentrixPartsJob::dispatch($categoryId, $limit);
 
-        return back()->with('status', $categoryId
-            ? 'MobileSentrix parts sync for category '.$categoryId.' has been queued. Check Sync Logs for progress.'
-            : 'Full MobileSentrix parts sync has been queued. Check Sync Logs for progress.');
+            return back()->with('status', 'MobileSentrix parts-only sync for category '.$categoryId.' has been queued. Check Sync Logs for progress.');
+        }
+
+        SyncMobileSentrixPartsFullJob::dispatch($limit);
+
+        return back()->with('status', 'Complete MobileSentrix parts sync has been queued: categories, parts, then category assignments. Check Sync Logs for progress.');
     }
 
     public function refreshPart(Request $request, MobileSentrixSyncService $syncService): RedirectResponse
@@ -217,7 +222,7 @@ class MobileSentrixController extends Controller
 
     private function categorySyncCommand(?string $categoryId = null, ?int $depth = null): string
     {
-        $command = 'php -d max_execution_time=0 artisan mobilesentrix:sync-categories';
+        $command = 'php -d max_execution_time=0 artisan mobilesentrix:sync-parts-categories';
 
         if (filled($categoryId)) {
             $command .= ' --category='.escapeshellarg($categoryId);
@@ -232,7 +237,9 @@ class MobileSentrixController extends Controller
 
     private function partsSyncCommand(?string $categoryId = null, ?int $limit = null): string
     {
-        $command = 'php -d max_execution_time=0 artisan mobilesentrix:sync-parts';
+        $command = $categoryId
+            ? 'php -d max_execution_time=0 artisan mobilesentrix:sync-parts'
+            : 'php -d max_execution_time=0 artisan mobilesentrix:sync-parts-full';
 
         if (filled($categoryId)) {
             $command .= ' --category='.escapeshellarg($categoryId);

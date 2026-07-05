@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePartRequest;
-use App\Jobs\MobileSentrix\SyncMobileSentrixPartsJob;
+use App\Jobs\MobileSentrix\SyncMobileSentrixPartsFullJob;
 use App\Models\Part;
 use App\Models\PartCategory;
 use App\Services\Parts\PartSearchService;
@@ -86,12 +86,12 @@ class PartController extends Controller
         if (config('queue.default') === 'sync') {
             return redirect()
                 ->route('admin.parts.mobilesentrix.index')
-                ->withErrors(['mobilesentrix' => 'Queue is not configured for long MobileSentrix syncs. Run from terminal: php -d max_execution_time=0 artisan mobilesentrix:sync-parts']);
+                ->withErrors(['mobilesentrix' => 'Queue is not configured for long MobileSentrix syncs. Run from terminal: php -d max_execution_time=0 artisan mobilesentrix:sync-parts-full']);
         }
 
-        SyncMobileSentrixPartsJob::dispatch();
+        SyncMobileSentrixPartsFullJob::dispatch();
 
-        return redirect()->route('admin.parts.mobilesentrix.index')->with('status', 'MobileSentrix parts sync has been queued. Check Sync Logs for progress.');
+        return redirect()->route('admin.parts.mobilesentrix.index')->with('status', 'Complete MobileSentrix parts sync has been queued. Check Sync Logs for progress.');
     }
 
     private function validatedData(StorePartRequest $request): array

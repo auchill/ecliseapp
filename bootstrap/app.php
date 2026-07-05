@@ -2,9 +2,11 @@
 
 use App\Console\Commands\AuthenticateMobileSentrixCommand;
 use App\Console\Commands\DebugMobileSentrixAuthCommand;
+use App\Console\Commands\GeneratePartCategoryPivotCommand;
 use App\Console\Commands\RefreshMobileSentrixPartCommand;
 use App\Console\Commands\SyncMobileSentrixCategoriesCommand;
 use App\Console\Commands\SyncMobileSentrixPartsCommand;
+use App\Console\Commands\SyncMobileSentrixPartsFullCommand;
 use App\Console\Commands\TestMobileSentrixConnectionCommand;
 use App\Http\Middleware\AdminMiddleware;
 use App\Http\Middleware\CustomerMiddleware;
@@ -23,8 +25,10 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withCommands([
         AuthenticateMobileSentrixCommand::class,
         DebugMobileSentrixAuthCommand::class,
+        GeneratePartCategoryPivotCommand::class,
         SyncMobileSentrixCategoriesCommand::class,
         SyncMobileSentrixPartsCommand::class,
+        SyncMobileSentrixPartsFullCommand::class,
         RefreshMobileSentrixPartCommand::class,
         TestMobileSentrixConnectionCommand::class,
     ])

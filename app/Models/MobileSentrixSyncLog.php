@@ -17,6 +17,8 @@ class MobileSentrixSyncLog extends Model
         'parts',
         'parts_full',
         'parts_category',
+        'parts_full_process',
+        'part_category_pivot',
         'single_part',
         'devices',
         'search',
@@ -38,6 +40,7 @@ class MobileSentrixSyncLog extends Model
         'updated_count',
         'skipped_count',
         'failed_count',
+        'warning_count',
         'message',
         'error_details',
     ];

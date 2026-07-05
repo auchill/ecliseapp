@@ -7,6 +7,8 @@ use Illuminate\Console\Command;
 
 class SyncMobileSentrixCategoriesCommand extends Command
 {
+    protected $aliases = ['mobilesentrix:sync-parts-categories'];
+
     protected $signature = 'mobilesentrix:sync-categories
         {--category= : Optional MobileSentrix category ID}
         {--depth= : Maximum recursive category depth from 1 to 25}';
@@ -27,10 +29,11 @@ class SyncMobileSentrixCategoriesCommand extends Command
 
         $this->info($result['message'] ?? 'MobileSentrix category sync finished.');
         $this->line(sprintf(
-            'Created: %d, Updated: %d, Skipped: %d, Failed: %d',
+            'Created: %d, Updated: %d, Skipped: %d, Warnings: %d, Failed: %d',
             $result['created_count'] ?? 0,
             $result['updated_count'] ?? 0,
             $result['skipped_count'] ?? 0,
+            $result['warning_count'] ?? 0,
             $result['failed_count'] ?? 0,
         ));
 

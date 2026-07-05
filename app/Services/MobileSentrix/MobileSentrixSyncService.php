@@ -67,6 +67,7 @@ class MobileSentrixSyncService
             'price_changed_count' => 0,
             'stock_changed_count' => 0,
             'processed_count' => 0,
+            'warning_count' => 0,
             'dry_run' => $dryRun,
         ]);
 
@@ -134,6 +135,7 @@ class MobileSentrixSyncService
                             $this->processPartRecord($record, $summary, [
                                 'dry_run' => $dryRun,
                                 'force' => $force,
+                                'sync_categories' => false,
                             ]);
                         } catch (\Throwable $exception) {
                             $summary['failed_count']++;
@@ -165,6 +167,7 @@ class MobileSentrixSyncService
         $summary = array_merge($this->emptySummary(), [
             'price_changed_count' => 0,
             'stock_changed_count' => 0,
+            'warning_count' => 0,
         ]);
 
         try {
@@ -183,7 +186,7 @@ class MobileSentrixSyncService
                 return $this->finishLog($log, $summary, "No MobileSentrix part was found for {$sku}.", true);
             }
 
-            $this->upsertPart($records->first(), $summary);
+            $this->upsertPart($records->first(), $summary, ['sync_categories' => true]);
 
             return $this->finishLog($log, $summary, "MobileSentrix part {$sku} refreshed.");
         } catch (\Throwable $exception) {
@@ -204,7 +207,7 @@ class MobileSentrixSyncService
             return null;
         }
 
-        return DB::transaction(function () use ($record, $productId, $sku, $newSku, &$summary): Part {
+        return DB::transaction(function () use ($record, $productId, $sku, $newSku, $options, &$summary): Part {
             $part = $this->findExistingPart($productId, $sku, $newSku);
 
             $exists = (bool) $part;
@@ -214,7 +217,10 @@ class MobileSentrixSyncService
             $oldQuantity = $part->quantity;
             $oldStock = $part->is_in_stock;
 
-            $categories = $this->categoriesFromProduct($record, $summary);
+            $syncCategories = (bool) ($options['sync_categories'] ?? true);
+            $categories = $syncCategories
+                ? $this->categoriesFromProduct($record, $summary)
+                : collect();
             $primaryCategory = $categories->first();
             $brandName = $this->stringValue($record, 'brand_text')
                 ?: $this->stringValue($record, 'manufacturer_text')
@@ -244,7 +250,7 @@ class MobileSentrixSyncService
                 $part->id = (int) $productId;
             }
 
-            $part->fill([
+            $partData = [
                 'external_api_id' => $productId,
                 'external_api_source' => 'MobileSentrix',
                 'sku' => $this->limitString($sku),
@@ -259,9 +265,8 @@ class MobileSentrixSyncService
                 'url' => $mobilesentrixUrl,
                 'default_image' => $imageUrl,
                 'image_url' => $imageUrl,
-                'part_category_id' => $primaryCategory?->id,
                 'brand' => $this->limitString($brandName),
-                'part_category' => $this->limitString($primaryCategory?->name ?: $this->stringValue($record, 'front_position_text') ?: 'MobileSentrix'),
+                'part_category' => $this->limitString($primaryCategory?->name ?: $this->stringValue($record, 'front_position_text') ?: $part->part_category ?: 'MobileSentrix'),
                 'model_compatibility' => $this->limitString($modelName),
                 'device_type' => $this->limitString($this->stringValue($record, 'front_position_text') ?: $this->stringValue($record, 'attribute_set') ?: 'Part'),
                 'price' => $costPrice,
@@ -311,7 +316,7 @@ class MobileSentrixSyncService
                 'meta_title' => $this->stringValue($record, 'meta_title'),
                 'meta_keyword' => $this->stringValue($record, 'meta_keyword'),
                 'meta_description' => $this->stringValue($record, 'meta_description'),
-                'category_ids' => $this->arrayValue($record['category_ids'] ?? null),
+                'category_ids' => $this->categoryIdsValue($record['category_ids'] ?? null),
                 'display_currency' => $this->limitString($this->stringValue($record, 'display_currency')),
                 'is_saleable' => $this->boolValue($record, 'is_saleable'),
                 'image_gallery' => $this->arrayValue($record['image_gallery'] ?? null),
@@ -348,10 +353,19 @@ class MobileSentrixSyncService
                 'last_stock_synced_at' => $now,
                 'synced_at' => $now,
                 'last_synced_at' => $now,
-            ]);
+            ];
+
+            if ($syncCategories) {
+                $partData['part_category_id'] = $primaryCategory?->id;
+            }
+
+            $part->fill($partData);
 
             $part->save();
-            $this->syncPartCategories($part, $categories);
+
+            if ($syncCategories) {
+                $this->syncPartCategories($part, $categories);
+            }
 
             $summary['processed_count']++;
             $summary[$exists ? 'updated_count' : 'created_count']++;
@@ -535,7 +549,7 @@ class MobileSentrixSyncService
                 $category = PartCategory::query()->find($categoryId);
 
                 if (! $category) {
-                    $summary['skipped_count']++;
+                    $summary['warning_count'] = ($summary['warning_count'] ?? 0) + 1;
                     $this->addError($summary, [
                         'message' => "MobileSentrix part references missing category {$categoryId}; keeping raw category_ids without creating a placeholder category.",
                         'entity_id' => $record['entity_id'] ?? $record['product_id'] ?? null,
@@ -715,6 +729,7 @@ class MobileSentrixSyncService
             'updated_count' => $summary['updated_count'] ?? 0,
             'skipped_count' => $summary['skipped_count'] ?? 0,
             'failed_count' => $summary['failed_count'] ?? 0,
+            'warning_count' => $summary['warning_count'] ?? 0,
             'message' => $message,
             'error_details' => $this->logErrors($summary),
         ]);
@@ -734,6 +749,7 @@ class MobileSentrixSyncService
             'updated_count' => $summary['updated_count'] ?? 0,
             'skipped_count' => $summary['skipped_count'] ?? 0,
             'failed_count' => $summary['failed_count'] ?? 0,
+            'warning_count' => $summary['warning_count'] ?? 0,
             'message' => $message,
             'error_details' => $this->logErrors($summary),
         ]);
@@ -756,6 +772,7 @@ class MobileSentrixSyncService
             'updated_count' => 0,
             'skipped_count' => 0,
             'failed_count' => 0,
+            'warning_count' => 0,
             'errors' => [],
             'omitted_error_count' => 0,
         ];
@@ -890,6 +907,19 @@ class MobileSentrixSyncService
         }
 
         return filled($value) && $value !== false ? [(string) $value] : [];
+    }
+
+    private function categoryIdsValue(mixed $value): array
+    {
+        if (is_string($value)) {
+            $decoded = json_decode($value, true);
+
+            if (json_last_error() === JSON_ERROR_NONE && $decoded !== $value) {
+                return $this->categoryIdsValue($decoded);
+            }
+        }
+
+        return $this->arrayValue($value);
     }
 
     private function stockQuantity(array $record): int

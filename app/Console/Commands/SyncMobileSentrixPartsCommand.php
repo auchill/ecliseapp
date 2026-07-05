@@ -36,11 +36,12 @@ class SyncMobileSentrixPartsCommand extends Command
             $this->warn('Dry run only. No parts or category assignments were saved.');
         }
         $this->line(sprintf(
-            'Processed: %d, Created: %d, Updated: %d, Skipped: %d, Failed: %d, Price changes: %d, Stock changes: %d',
+            'Processed: %d, Created: %d, Updated: %d, Skipped: %d, Warnings: %d, Failed: %d, Price changes: %d, Stock changes: %d',
             $result['processed_count'] ?? 0,
             $result['created_count'] ?? 0,
             $result['updated_count'] ?? 0,
             $result['skipped_count'] ?? 0,
+            $result['warning_count'] ?? 0,
             $result['failed_count'] ?? 0,
             $result['price_changed_count'] ?? 0,
             $result['stock_changed_count'] ?? 0,

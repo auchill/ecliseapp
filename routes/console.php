@@ -13,7 +13,7 @@ Schedule::command('mobilesentrix:sync-categories')
     ->when(fn () => (bool) config('mobilesentrix.sync_enabled'))
     ->withoutOverlapping();
 
-Schedule::command('mobilesentrix:sync-parts')
+Schedule::command('mobilesentrix:sync-parts-full')
     ->everyFourHours()
     ->when(fn () => (bool) config('mobilesentrix.sync_enabled'))
     ->withoutOverlapping();
