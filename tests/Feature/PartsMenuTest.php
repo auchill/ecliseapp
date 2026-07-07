@@ -105,6 +105,8 @@ test('parts menu displays the approved top-level customer categories only', func
         ->assertSee('Apple')
         ->assertSee('Other Parts')
         ->assertSee('Game Console')
+        ->assertSee('data-fallback-image="http://ecliseapp.test/images/brand/logo_main.png"', false)
+        ->assertDontSee('data-parts-menu-load-more', false)
         ->assertDontSee('data-category-id="165"', false)
         ->assertDontSee('data-category-id="8363"', false)
         ->assertDontSee('data-category-id="3958"', false)
@@ -145,10 +147,17 @@ test('parts category parts endpoint returns paginated active parts from the pivo
     $response->assertOk()
         ->assertJsonPath('total', 2)
         ->assertJsonPath('current_page', 1)
-        ->assertJsonPath('has_more', true);
+        ->assertJsonPath('last_page', 2)
+        ->assertJsonPath('has_more', true)
+        ->assertJsonPath('next_page', 2);
 
     expect($response->json('html'))
         ->toContain('A iPhone Screen')
+        ->toContain('parts-card-image-wrap parts-menu-part-image')
+        ->toContain('class="parts-card-image"')
+        ->toContain('parts-card-actions parts-menu-part-footer')
+        ->toContain('images/brand/logo_main.png')
+        ->toContain('onerror="this.onerror=null;this.src=')
         ->not->toContain('B iPhone Screen')
         ->not->toContain('Inactive iPhone Screen');
 });
@@ -165,5 +174,7 @@ test('parts menu search returns matching categories and parts', function () {
 
     expect(collect($response->json('categories'))->pluck('name'))->toContain('iPhone')
         ->and(collect($response->json('parts'))->pluck('name'))->toContain('iPhone 15 Battery')
+        ->and($response->json('parts.0.image_url'))->toContain('images/brand/logo_main.png')
+        ->and($response->json('parts.0.fallback_image_url'))->toContain('images/brand/logo_main.png')
         ->and($response->json('html'))->toContain('iPhone 15 Battery');
 });

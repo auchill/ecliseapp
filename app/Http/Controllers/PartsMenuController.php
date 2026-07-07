@@ -68,6 +68,7 @@ class PartsMenuController extends Controller
             'current_page' => $parts->currentPage(),
             'last_page' => $parts->lastPage(),
             'has_more' => $parts->hasMorePages(),
+            'next_page' => $parts->hasMorePages() ? $parts->currentPage() + 1 : null,
             'next_page_url' => $parts->nextPageUrl(),
             'total' => $parts->total(),
         ]);
@@ -120,7 +121,8 @@ class PartsMenuController extends Controller
                 'model' => $part->modelName(),
                 'brand' => $part->brandName(),
                 'price' => number_format($part->displayPrice(), 2),
-                'image_url' => $part->imageUrl(),
+                'image_url' => $this->partMenuImageUrl($part),
+                'fallback_image_url' => asset('images/brand/logo_main.png'),
                 'url' => route('parts.show', $part),
             ])
             ->values();
@@ -148,5 +150,18 @@ class PartsMenuController extends Controller
             ->distinct()
             ->orderBy('device_type')
             ->pluck('device_type');
+    }
+
+    private function partMenuImageUrl(Part $part): string
+    {
+        if ($part->local_image_path ?: $part->image_path) {
+            return asset('storage/'.($part->local_image_path ?: $part->image_path));
+        }
+
+        if ($part->default_image ?: $part->image_url) {
+            return $part->default_image ?: $part->image_url;
+        }
+
+        return asset('images/brand/logo_main.png');
     }
 }

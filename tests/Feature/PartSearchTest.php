@@ -104,9 +104,15 @@ test('public parts search returns dynamic results without exposing supplier cost
     $html = $response->json('html');
 
     expect($html)->toContain('iPhone 15 OLED Screen')
+        ->and($html)->toContain('row g-3 parts-card-grid')
+        ->and($html)->toContain('col-12 col-sm-6 col-lg-4 parts-card-column')
+        ->and($html)->toContain('parts-card-image-wrap')
+        ->and($html)->toContain('parts-card-image')
+        ->and($html)->toContain('parts-card-actions')
         ->and($html)->toContain('MS-1001')
         ->and($html)->toContain('$65.00')
         ->and($html)->not->toContain('$50.00')
+        ->and($html)->not->toContain('col-xl-3')
         ->and($html)->not->toContain('access_token')
         ->and($html)->not->toContain('MSP-1001');
 });

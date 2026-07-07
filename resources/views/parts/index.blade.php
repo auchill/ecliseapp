@@ -14,7 +14,8 @@
             <div class="parts-browser"
                 data-parts-menu-browser
                 data-menu-url="{{ route('parts.menu') }}"
-                data-search-url="{{ route('parts.search') }}">
+                data-search-url="{{ route('parts.search') }}"
+                data-fallback-image="{{ asset('images/brand/logo_main.png') }}">
                 <div class="parts-menu-search-wrap">
                     <label class="visually-hidden" for="parts-menu-search">Search by model or model number</label>
                     <div class="parts-menu-search">
@@ -59,11 +60,12 @@
                             <div class="parts-menu-empty">Choose a category from the left to browse subcategories or parts.</div>
                         </div>
 
-                        <div class="parts-menu-more d-none" data-parts-menu-more-wrap>
-                            <button class="btn btn-outline-primary" type="button" data-parts-menu-load-more>
-                                Load More
-                            </button>
+                        <div class="parts-menu-infinite-loader d-none" data-parts-menu-infinite-loader>
+                            <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                            <span>Loading more parts...</span>
                         </div>
+
+                        <div class="parts-menu-scroll-sentinel" data-parts-menu-scroll-sentinel aria-hidden="true"></div>
                     </section>
                 </div>
             </div>
@@ -84,19 +86,24 @@
             const kicker = browser.querySelector('[data-parts-menu-kicker]');
             const count = browser.querySelector('[data-parts-menu-count]');
             const loading = browser.querySelector('[data-parts-menu-loading]');
-            const moreWrap = browser.querySelector('[data-parts-menu-more-wrap]');
-            const loadMore = browser.querySelector('[data-parts-menu-load-more]');
+            const infiniteLoader = browser.querySelector('[data-parts-menu-infinite-loader]');
+            const scrollSentinel = browser.querySelector('[data-parts-menu-scroll-sentinel]');
             const searchInput = browser.querySelector('[data-parts-menu-search]');
             const searchButton = browser.querySelector('[data-parts-menu-search-button]');
             const searchResults = browser.querySelector('[data-parts-menu-search-results]');
             const categoryCache = new Map();
+            const fallbackImage = browser.dataset.fallbackImage;
 
             let currentCategory = null;
-            let nextPartsUrl = null;
+            let currentPage = 1;
+            let lastPage = null;
+            let hasMore = false;
+            let isLoadingParts = false;
             let childrenController = null;
             let partsController = null;
             let searchController = null;
             let searchTimer = null;
+            let infiniteObserver = null;
 
             const escapeHtml = (value) => String(value ?? '')
                 .replaceAll('&', '&amp;')
@@ -110,14 +117,44 @@
             initialMenu.forEach((item) => categoryCache.set(Number(item.id), item));
 
             const setLoading = (active) => loading?.classList.toggle('d-none', !active);
-            const hideMore = () => moreWrap?.classList.add('d-none');
-            const showMore = () => moreWrap?.classList.remove('d-none');
+            const setInfiniteLoading = (active) => infiniteLoader?.classList.toggle('d-none', !active);
             const hideSearchResults = () => searchResults?.classList.add('d-none');
 
             const emptyState = (message) => {
                 content.innerHTML = `<div class="parts-menu-empty">${message}</div>`;
-                hideMore();
+                setInfiniteLoading(false);
+                resetPartsPagination();
                 count?.classList.add('d-none');
+            };
+
+            const resetPartsPagination = () => {
+                currentPage = 1;
+                lastPage = null;
+                hasMore = false;
+                isLoadingParts = false;
+                partsController?.abort();
+            };
+
+            const withImageFallback = (src) => {
+                const safeSrc = src || fallbackImage;
+
+                return `src="${escapeHtml(safeSrc)}" onerror="this.onerror=null;this.src='${escapeHtml(fallbackImage)}';"`;
+            };
+
+            const sentinelIsNearViewport = () => {
+                if (!scrollSentinel) return false;
+
+                const rect = scrollSentinel.getBoundingClientRect();
+
+                return rect.top <= window.innerHeight + 360;
+            };
+
+            const scheduleInfiniteCheck = () => {
+                window.requestAnimationFrame(() => {
+                    if (currentCategory && hasMore && !isLoadingParts && sentinelIsNearViewport()) {
+                        loadParts(currentCategory, null, true);
+                    }
+                });
             };
 
             const setActiveSidebar = (categoryId) => {
@@ -142,7 +179,7 @@
                     button.className = 'parts-category-card';
                     button.dataset.categoryId = category.id;
                     button.innerHTML = `
-                        ${category.image_url ? `<span class="parts-category-image"><img src="${escapeHtml(category.image_url)}" alt=""></span>` : '<span class="parts-category-icon"><i class="bi bi-cpu" aria-hidden="true"></i></span>'}
+                        <span class="parts-category-image"><img ${withImageFallback(category.image_url)} alt=""></span>
                         <span class="parts-category-name">${escapeHtml(category.name)}</span>
                         <span class="parts-category-meta">${category.has_children ? 'Browse models' : 'View parts'}</span>
                     `;
@@ -150,17 +187,24 @@
                     grid.appendChild(button);
                 });
 
-                hideMore();
+                setInfiniteLoading(false);
+                resetPartsPagination();
                 count?.classList.add('d-none');
             };
 
             const loadParts = (category, url = null, append = false) => {
+                if (isLoadingParts) return Promise.resolve();
+                if (append && !hasMore) return Promise.resolve();
+
                 partsController?.abort();
                 partsController = new AbortController();
-                setLoading(true);
+                const requestCategoryId = Number(category.id);
+                isLoadingParts = true;
+                append ? setInfiniteLoading(true) : setLoading(true);
 
                 const target = new URL(url || category.parts_url, window.location.origin);
                 if (!target.searchParams.has('per_page')) target.searchParams.set('per_page', '24');
+                if (!target.searchParams.has('page')) target.searchParams.set('page', String(append ? currentPage + 1 : 1));
 
                 return fetch(target, {
                     headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
@@ -168,13 +212,19 @@
                 })
                     .then((response) => response.ok ? response.json() : Promise.reject())
                     .then((payload) => {
+                        if (Number(currentCategory?.id) !== requestCategoryId) {
+                            return;
+                        }
+
                         if (!append) {
                             content.innerHTML = '<div class="parts-menu-grid" data-parts-menu-grid></div>';
                         }
 
                         const grid = content.querySelector('[data-parts-menu-grid]');
                         grid.insertAdjacentHTML('beforeend', payload.html || '');
-                        nextPartsUrl = payload.next_page_url;
+                        currentPage = Number(payload.current_page || currentPage);
+                        lastPage = Number(payload.last_page || currentPage);
+                        hasMore = Boolean(payload.has_more) && currentPage < lastPage;
 
                         if (payload.total > 0) {
                             count.textContent = `${new Intl.NumberFormat().format(payload.total)} part${payload.total === 1 ? '' : 's'}`;
@@ -183,14 +233,21 @@
                             count.classList.add('d-none');
                         }
 
-                        payload.has_more ? showMore() : hideMore();
+                        setInfiniteLoading(false);
                     })
                     .catch((error) => {
-                        if (error?.name !== 'AbortError') {
+                        if (error?.name !== 'AbortError' && Number(currentCategory?.id) === requestCategoryId) {
                             emptyState('No parts found for this category.');
                         }
                     })
-                    .finally(() => setLoading(false));
+                    .finally(() => {
+                        if (Number(currentCategory?.id) === requestCategoryId) {
+                            isLoadingParts = false;
+                            setLoading(false);
+                            setInfiniteLoading(false);
+                            if (hasMore) scheduleInfiniteCheck();
+                        }
+                    });
             };
 
             const selectCategory = (category) => {
@@ -199,6 +256,7 @@
                 title.textContent = category.name;
                 kicker.textContent = category.has_children ? 'Browse subcategories' : 'Browse parts';
                 emptyState('');
+                resetPartsPagination();
                 setLoading(true);
                 hideSearchResults();
 
@@ -218,6 +276,8 @@
                             return;
                         }
 
+                        content.innerHTML = '<div class="parts-menu-grid" data-parts-menu-grid></div>';
+                        hasMore = true;
                         return loadParts(category);
                     })
                     .catch((error) => {
@@ -264,7 +324,7 @@
                         link.className = 'parts-menu-search-row parts-menu-search-part';
                         link.href = part.url;
                         link.innerHTML = `
-                            <img src="${escapeHtml(part.image_url)}" alt="">
+                            <img ${withImageFallback(part.image_url)} alt="">
                             <span>
                                 <strong>${escapeHtml(part.name)}</strong>
                                 <small>${escapeHtml(part.sku || 'No SKU')}${part.model ? ` &middot; ${escapeHtml(part.model)}` : ''}</small>
@@ -318,11 +378,27 @@
                 });
             });
 
-            loadMore?.addEventListener('click', () => {
-                if (currentCategory && nextPartsUrl) {
-                    loadParts(currentCategory, nextPartsUrl, true);
-                }
-            });
+            if ('IntersectionObserver' in window && scrollSentinel) {
+                infiniteObserver = new IntersectionObserver((entries) => {
+                    const entry = entries[0];
+
+                    if (entry?.isIntersecting && currentCategory && hasMore && !isLoadingParts) {
+                        loadParts(currentCategory, null, true);
+                    }
+                }, {
+                    rootMargin: '360px 0px',
+                    threshold: 0,
+                });
+                infiniteObserver.observe(scrollSentinel);
+            } else {
+                window.addEventListener('scroll', () => {
+                    if (!currentCategory || !hasMore || isLoadingParts) return;
+
+                    const nearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 360;
+
+                    if (nearBottom) loadParts(currentCategory, null, true);
+                }, { passive: true });
+            }
 
             searchInput?.addEventListener('input', scheduleSearch);
             searchButton?.addEventListener('click', runSearch);
