@@ -409,7 +409,7 @@ test('mobile sentrix parts sync maps products into parts without exposing suppli
 
     expect($part->categories()->whereKey($category->id)->exists())->toBeTrue();
 
-    $this->get(route('parts.index'))
+    $this->get(route('parts.index', ['q' => 'iPhone 14']))
         ->assertOk()
         ->assertSee('iPhone 14 OLED Screen')
         ->assertSee('$60.00')

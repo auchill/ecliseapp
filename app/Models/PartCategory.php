@@ -68,9 +68,19 @@ class PartCategory extends Model
         return $this->belongsTo(self::class, 'parent_id');
     }
 
+    public function parent(): BelongsTo
+    {
+        return $this->parentCategory();
+    }
+
     public function childCategories(): HasMany
     {
         return $this->hasMany(self::class, 'parent_id');
+    }
+
+    public function children(): HasMany
+    {
+        return $this->childCategories();
     }
 
     public function syncedParts(): BelongsToMany
