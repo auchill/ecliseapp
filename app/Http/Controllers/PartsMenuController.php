@@ -48,6 +48,19 @@ class PartsMenuController extends Controller
         ]);
     }
 
+    public function path(PartCategory $category, PartsMenuService $partsMenu): JsonResponse
+    {
+        abort_unless($partsMenu->isVisible($category), 404);
+
+        $path = $partsMenu->categoryPath($category);
+
+        abort_if($path->isEmpty(), 404);
+
+        return response()->json([
+            'path' => $path,
+        ]);
+    }
+
     public function parts(Request $request, PartCategory $category, PartsMenuService $partsMenu): JsonResponse
     {
         abort_unless($partsMenu->isVisible($category), 404);

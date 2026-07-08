@@ -54,6 +54,7 @@ Route::post('/orders/track/result', [OrderTrackingController::class, 'result'])-
 Route::get('/parts', [PartsMenuController::class, 'index'])->name('parts.index');
 Route::get('/parts/menu', [PartsMenuController::class, 'menu'])->name('parts.menu');
 Route::get('/parts/category/{category}/children', [PartsMenuController::class, 'children'])->whereNumber('category')->name('parts.category.children');
+Route::get('/parts/category/{category}/path', [PartsMenuController::class, 'path'])->whereNumber('category')->name('parts.category.path');
 Route::get('/parts/category/{category}/parts', [PartsMenuController::class, 'parts'])->whereNumber('category')->name('parts.category.parts');
 Route::get('/parts/search', [PartsMenuController::class, 'search'])->name('parts.search');
 Route::get('/parts/suggestions', [PartController::class, 'suggestions'])->name('parts.suggestions');

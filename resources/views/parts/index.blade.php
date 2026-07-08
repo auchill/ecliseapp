@@ -8,6 +8,7 @@
             <div class="parts-menu-header">
                 <p class="eyebrow mb-2">Parts</p>
                 <h1>Find repair parts by device family.</h1>
+                {{-- sh:code - Remove 'MobileSentrix' and avoid appearing anywhere on the frontend --}}
                 <p>Browse MobileSentrix categories and verify repair part pricing from the synced Eclise parts catalog.</p>
             </div>
 
@@ -32,7 +33,7 @@
                         <div class="parts-menu-sidebar-title">Parts Menu</div>
                         <div class="parts-menu-list" data-parts-menu-list>
                             @forelse ($mainMenu as $item)
-                                <button class="parts-menu-item" type="button" data-parts-menu-item data-category-id="{{ $item['id'] }}">
+                                <button class="parts-menu-item parts-main-menu-item" type="button" data-parts-menu-item data-category-id="{{ $item['id'] }}">
                                     <span>{{ $item['name'] }}</span>
                                     <i class="bi bi-chevron-right" aria-hidden="true"></i>
                                 </button>
@@ -43,6 +44,7 @@
                     </aside>
 
                     <section class="parts-menu-content" aria-live="polite">
+                        {{-- sh:code - Rearrange and style --}}
                         <div class="parts-menu-content-head">
                             <div>
                                 <p class="parts-menu-kicker mb-1" data-parts-menu-kicker>Browse categories</p>
@@ -50,6 +52,10 @@
                             </div>
                             <p class="parts-menu-count mb-0 d-none" data-parts-menu-count></p>
                         </div>
+
+                        <nav class="parts-breadcrumb-wrap d-none" aria-label="Parts category breadcrumb" data-parts-breadcrumb-wrap>
+                            <ol class="parts-breadcrumb" data-parts-breadcrumb></ol>
+                        </nav>
 
                         <div class="parts-menu-loading d-none" data-parts-menu-loading>
                             <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
@@ -85,6 +91,8 @@
             const title = browser.querySelector('[data-parts-menu-title]');
             const kicker = browser.querySelector('[data-parts-menu-kicker]');
             const count = browser.querySelector('[data-parts-menu-count]');
+            const breadcrumbWrap = browser.querySelector('[data-parts-breadcrumb-wrap]');
+            const breadcrumbList = browser.querySelector('[data-parts-breadcrumb]');
             const loading = browser.querySelector('[data-parts-menu-loading]');
             const infiniteLoader = browser.querySelector('[data-parts-menu-infinite-loader]');
             const scrollSentinel = browser.querySelector('[data-parts-menu-scroll-sentinel]');
@@ -95,6 +103,7 @@
             const fallbackImage = browser.dataset.fallbackImage;
 
             let currentCategory = null;
+            let categoryPath = [];
             let currentPage = 1;
             let lastPage = null;
             let hasMore = false;
@@ -112,13 +121,73 @@
                 .replaceAll('"', '&quot;')
                 .replaceAll("'", '&#039;');
 
+            const categoryPathUrl = (category) => category.path_url || `/parts/category/${encodeURIComponent(category.id)}/path`;
+            const normalizeCategory = (category) => ({
+                ...category,
+                id: Number(category.id),
+                name: category.display_name || category.name,
+                display_name: category.display_name || category.name,
+                has_children: Boolean(category.has_children),
+                children_url: category.children_url,
+                parts_url: category.parts_url,
+                path_url: categoryPathUrl(category),
+            });
+
             const initialMenu = @json($mainMenu);
 
-            initialMenu.forEach((item) => categoryCache.set(Number(item.id), item));
+            initialMenu.forEach((item, index) => {
+                initialMenu[index] = normalizeCategory(item);
+                categoryCache.set(Number(initialMenu[index].id), initialMenu[index]);
+            });
 
             const setLoading = (active) => loading?.classList.toggle('d-none', !active);
             const setInfiniteLoading = (active) => infiniteLoader?.classList.toggle('d-none', !active);
             const hideSearchResults = () => searchResults?.classList.add('d-none');
+
+            const updateActiveMainMenu = () => {
+                const activeMainCategory = categoryPath.length ? categoryPath[0] : null;
+
+                menuList?.querySelectorAll('[data-parts-menu-item]').forEach((button) => {
+                    const isActive = activeMainCategory && Number(button.dataset.categoryId) === Number(activeMainCategory.id);
+
+                    button.classList.toggle('active', Boolean(isActive));
+
+                    if (isActive) {
+                        button.setAttribute('aria-current', 'true');
+                    } else {
+                        button.removeAttribute('aria-current');
+                    }
+                });
+            };
+
+            const renderBreadcrumb = () => {
+                if (!breadcrumbWrap || !breadcrumbList) return;
+
+                breadcrumbList.innerHTML = '';
+
+                categoryPath.forEach((category, index) => {
+                    const isCurrent = index === categoryPath.length - 1;
+                    const item = document.createElement('li');
+                    item.className = `parts-breadcrumb-item${isCurrent ? ' active' : ''}`;
+
+                    if (isCurrent) {
+                        item.setAttribute('aria-current', 'page');
+                        item.textContent = category.name;
+                    } else {
+                        const button = document.createElement('button');
+                        button.type = 'button';
+                        button.className = 'parts-breadcrumb-link';
+                        button.textContent = category.name;
+                        button.addEventListener('click', () => navigateToBreadcrumb(index));
+                        item.appendChild(button);
+                    }
+
+                    breadcrumbList.appendChild(item);
+                });
+
+                breadcrumbWrap.classList.toggle('d-none', categoryPath.length === 0);
+                updateActiveMainMenu();
+            };
 
             const emptyState = (message) => {
                 content.innerHTML = `<div class="parts-menu-empty">${message}</div>`;
@@ -157,12 +226,6 @@
                 });
             };
 
-            const setActiveSidebar = (categoryId) => {
-                menuList?.querySelectorAll('[data-parts-menu-item]').forEach((button) => {
-                    button.classList.toggle('active', Number(button.dataset.categoryId) === Number(categoryId));
-                });
-            };
-
             const renderCategories = (categories) => {
                 if (!categories.length) {
                     emptyState('No subcategories found.');
@@ -173,6 +236,7 @@
                 const grid = content.querySelector('.parts-category-grid');
 
                 categories.forEach((category) => {
+                    category = normalizeCategory(category);
                     categoryCache.set(Number(category.id), category);
                     const button = document.createElement('button');
                     button.type = 'button';
@@ -183,7 +247,7 @@
                         <span class="parts-category-name">${escapeHtml(category.name)}</span>
                         <span class="parts-category-meta">${category.has_children ? 'Browse models' : 'View parts'}</span>
                     `;
-                    button.addEventListener('click', () => selectCategory(category));
+                    button.addEventListener('click', () => selectChildCategory(category));
                     grid.appendChild(button);
                 });
 
@@ -250,18 +314,22 @@
                     });
             };
 
-            const selectCategory = (category) => {
+            const displayCategory = (category) => {
+                category = normalizeCategory(category);
                 currentCategory = category;
-                setActiveSidebar(category.id);
                 title.textContent = category.name;
                 kicker.textContent = category.has_children ? 'Browse subcategories' : 'Browse parts';
-                emptyState('');
+                content.innerHTML = '';
+                count?.classList.add('d-none');
                 resetPartsPagination();
+                setInfiniteLoading(false);
                 setLoading(true);
                 hideSearchResults();
+                renderBreadcrumb();
 
                 childrenController?.abort();
                 childrenController = new AbortController();
+                const requestCategoryId = Number(category.id);
 
                 fetch(category.children_url, {
                     headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
@@ -269,6 +337,10 @@
                 })
                     .then((response) => response.ok ? response.json() : Promise.reject())
                     .then((payload) => {
+                        if (Number(currentCategory?.id) !== requestCategoryId) {
+                            return;
+                        }
+
                         const children = payload.children || [];
 
                         if (children.length) {
@@ -281,11 +353,57 @@
                         return loadParts(category);
                     })
                     .catch((error) => {
-                        if (error?.name !== 'AbortError') {
+                        if (error?.name !== 'AbortError' && Number(currentCategory?.id) === requestCategoryId) {
                             emptyState('No subcategories found.');
                         }
                     })
-                    .finally(() => setLoading(false));
+                    .finally(() => {
+                        if (Number(currentCategory?.id) === requestCategoryId) {
+                            setLoading(false);
+                        }
+                    });
+            };
+
+            const selectMainCategory = (category) => {
+                category = normalizeCategory(category);
+                categoryPath = [category];
+                displayCategory(category);
+            };
+
+            const selectChildCategory = (category) => {
+                category = normalizeCategory(category);
+
+                if (!currentCategory || Number(currentCategory.id) !== Number(category.id)) {
+                    categoryPath.push(category);
+                }
+
+                displayCategory(category);
+            };
+
+            const navigateToBreadcrumb = (index) => {
+                if (index < 0 || index >= categoryPath.length - 1) return;
+
+                categoryPath = categoryPath.slice(0, index + 1);
+                displayCategory(categoryPath[index]);
+            };
+
+            const selectSearchCategory = (category) => {
+                category = normalizeCategory(category);
+                hideSearchResults();
+
+                fetch(category.path_url, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                })
+                    .then((response) => response.ok ? response.json() : Promise.reject())
+                    .then((payload) => {
+                        const path = (payload.path || []).map(normalizeCategory);
+                        categoryPath = path.length ? path : [category];
+                        displayCategory(categoryPath[categoryPath.length - 1]);
+                    })
+                    .catch(() => {
+                        categoryPath = [category];
+                        displayCategory(category);
+                    });
             };
 
             const renderSearchResults = (payload) => {
@@ -304,12 +422,14 @@
                     categoryGroup.className = 'parts-menu-search-group';
                     categoryGroup.innerHTML = '<h3>Categories</h3>';
                     categories.forEach((category) => {
+                        category = normalizeCategory(category);
                         categoryCache.set(Number(category.id), category);
                         const button = document.createElement('button');
                         button.type = 'button';
                         button.className = 'parts-menu-search-row';
+                        button.dataset.categoryId = category.id;
                         button.innerHTML = `<span>${escapeHtml(category.name)}</span><small>${category.has_children ? 'Category' : 'Parts category'}</small>`;
-                        button.addEventListener('click', () => selectCategory(category));
+                        button.addEventListener('click', () => selectSearchCategory(category));
                         categoryGroup.appendChild(button);
                     });
                     searchResults.appendChild(categoryGroup);
@@ -373,7 +493,7 @@
                     const category = categoryCache.get(Number(button.dataset.categoryId));
 
                     if (category) {
-                        selectCategory(category);
+                        selectMainCategory(category);
                     }
                 });
             });
@@ -407,7 +527,7 @@
             });
 
             if (initialMenu.length) {
-                selectCategory(initialMenu[0]);
+                selectMainCategory(initialMenu[0]);
             }
         })();
     </script>

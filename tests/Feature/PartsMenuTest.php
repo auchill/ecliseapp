@@ -106,6 +106,13 @@ test('parts menu displays the approved top-level customer categories only', func
         ->assertSee('Other Parts')
         ->assertSee('Game Console')
         ->assertSee('data-fallback-image="http://ecliseapp.test/images/brand/logo_main.png"', false)
+        ->assertSee('data-parts-breadcrumb-wrap', false)
+        ->assertSee('data-parts-breadcrumb', false)
+        ->assertSee('let categoryPath = [];', false)
+        ->assertSee('selectMainCategory(initialMenu[0]);', false)
+        ->assertDontSee('data-parts-menu-back', false)
+        ->assertDontSee('let categoryHistory = [];', false)
+        ->assertDontSee('window.history.back', false)
         ->assertDontSee('data-parts-menu-load-more', false)
         ->assertDontSee('data-category-id="165"', false)
         ->assertDontSee('data-category-id="8363"', false)
@@ -125,6 +132,28 @@ test('parts category children endpoint returns active direct children', function
     $response->assertOk();
 
     expect(collect($response->json('children'))->pluck('name')->all())->toBe(['iPhone', 'iPad']);
+});
+
+test('parts category path starts at the visible main menu category', function () {
+    $tree = seedPartsMenuTree();
+    $iphone = createPartsMenuCategory(['id' => 2301, 'parent_id' => $tree['apple']->id, 'name' => 'iPhone', 'has_children' => true]);
+    $iphone12Pro = createPartsMenuCategory(['id' => 2302, 'parent_id' => $iphone->id, 'name' => 'iPhone 12 Pro']);
+    $playstation = createPartsMenuCategory(['id' => 2303, 'parent_id' => $tree['game']->id, 'name' => 'PlayStation']);
+
+    $response = $this->getJson(route('parts.category.path', $iphone12Pro));
+
+    $response->assertOk();
+
+    expect(collect($response->json('path'))->pluck('name')->all())->toBe(['Apple', 'iPhone', 'iPhone 12 Pro'])
+        ->and(collect($response->json('path'))->pluck('original_name'))->not->toContain('Replacement Parts')
+        ->and($response->json('path.0.path_url'))->toBe(route('parts.category.path', $tree['apple']))
+        ->and($response->json('path.2.children_url'))->toBe(route('parts.category.children', $iphone12Pro));
+
+    $this->getJson(route('parts.category.path', $playstation))
+        ->assertOk()
+        ->assertJsonPath('path.0.name', 'Game Console')
+        ->assertJsonPath('path.0.original_name', 'Game Console Parts')
+        ->assertJsonPath('path.1.name', 'PlayStation');
 });
 
 test('parts category parts endpoint returns paginated active parts from the pivot', function () {
@@ -174,6 +203,7 @@ test('parts menu search returns matching categories and parts', function () {
 
     expect(collect($response->json('categories'))->pluck('name'))->toContain('iPhone')
         ->and(collect($response->json('parts'))->pluck('name'))->toContain('iPhone 15 Battery')
+        ->and($response->json('categories.0.path_url'))->toBe(route('parts.category.path', $iphone))
         ->and($response->json('parts.0.image_url'))->toContain('images/brand/logo_main.png')
         ->and($response->json('parts.0.fallback_image_url'))->toContain('images/brand/logo_main.png')
         ->and($response->json('html'))->toContain('iPhone 15 Battery');

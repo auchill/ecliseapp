@@ -87,6 +87,27 @@ class PartsMenuService
             ->values();
     }
 
+    public function categoryPath(PartCategory $category): Collection
+    {
+        $path = collect();
+        $current = $category;
+
+        while ($current instanceof PartCategory) {
+            $path->prepend($current);
+
+            if (blank($current->parent_id)) {
+                break;
+            }
+
+            $current = $current->parentCategory()->first();
+        }
+
+        return $path
+            ->filter(fn (PartCategory $category): bool => $this->isBreadcrumbCategory($category))
+            ->map(fn (PartCategory $category): array => $this->categoryPayload($category))
+            ->values();
+    }
+
     public function isVisible(PartCategory $category): bool
     {
         return (bool) $category->is_active
@@ -98,16 +119,19 @@ class PartsMenuService
     public function categoryPayload(PartCategory $category): array
     {
         $activeChildrenCount = $this->activeChildrenCount($category);
+        $displayName = $this->displayName((string) $category->name);
 
         return [
             'id' => (int) $category->id,
-            'name' => $this->displayName((string) $category->name),
+            'name' => $displayName,
+            'display_name' => $displayName,
             'original_name' => $category->name,
             'image_url' => $category->image_url,
             'has_children' => (bool) $category->has_children || $activeChildrenCount > 0,
             'children_count' => $activeChildrenCount,
             'children_url' => route('parts.category.children', $category),
             'parts_url' => route('parts.category.parts', $category),
+            'path_url' => route('parts.category.path', $category),
         ];
     }
 
@@ -152,6 +176,12 @@ class PartsMenuService
             ->active()
             ->where('is_part', true)
             ->whereNotIn('id', self::EXCLUDED_CATEGORY_IDS);
+    }
+
+    private function isBreadcrumbCategory(PartCategory $category): bool
+    {
+        return (int) $category->id !== self::REPLACEMENT_PARTS_CATEGORY_ID
+            && $this->isVisible($category);
     }
 
     private function activeChildrenCount(PartCategory $category): int
