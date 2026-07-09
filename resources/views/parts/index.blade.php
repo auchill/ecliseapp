@@ -18,9 +18,9 @@
                 data-search-url="{{ route('parts.search') }}"
                 data-fallback-image="{{ asset('images/brand/logo_main.png') }}">
                 <div class="parts-menu-search-wrap">
-                    <label class="visually-hidden" for="parts-menu-search">Search by model or model number</label>
+                    <label class="visually-hidden" for="parts-menu-search">Search by sku, model or model number</label>
                     <div class="parts-menu-search">
-                        <input id="parts-menu-search" type="search" placeholder="Search by model or model number" autocomplete="off" data-parts-menu-search>
+                        <input id="parts-menu-search" type="search" placeholder="Search by sku, model or model number" autocomplete="off" data-parts-menu-search>
                         <button type="button" aria-label="Search parts" data-parts-menu-search-button>
                             <i class="bi bi-search" aria-hidden="true"></i>
                         </button>
@@ -53,7 +53,7 @@
                             <p class="parts-menu-count mb-0 d-none" data-parts-menu-count></p>
                         </div>
 
-                        <nav class="parts-breadcrumb-wrap d-none" aria-label="Parts category breadcrumb" data-parts-breadcrumb-wrap>
+                        <nav class="parts-breadcrumb-wrap d-none" aria-label="breadcrumb" data-parts-breadcrumb-wrap>
                             <ol class="parts-breadcrumb" data-parts-breadcrumb></ol>
                         </nav>
 
