@@ -67,14 +67,14 @@
                         @endif
 
                         <div class="ms-main-image-wrap">
-                            <img data-part-main-image src="{{ $mainImage }}" alt="{{ $part->name }}">
+                            <img data-part-main-image src="{{ $mainImage }}" alt="{{ $part->name }}" onerror="this.onerror=null;this.src='{{ \App\Support\CatalogImage::fallbackUrl() }}';">
                         </div>
 
                         @if ($galleryImages->count() > 1)
                             <div class="ms-gallery-strip" aria-label="Product images">
                                 @foreach ($galleryImages as $image)
                                     <button class="ms-gallery-thumb {{ $loop->first ? 'active' : '' }}" type="button" data-part-gallery-image="{{ $image->large_image_url ?: $image->image_url }}" data-part-gallery-alt="{{ $image->alt_text ?: $image->label ?: $part->name }}">
-                                        <img src="{{ $image->thumbnail_url ?: $image->image_url }}" alt="{{ $image->alt_text ?: $image->label ?: $part->name }}">
+                                        <img src="{{ $image->thumbnail_url ?: $image->image_url }}" alt="{{ $image->alt_text ?: $image->label ?: $part->name }}" onerror="this.onerror=null;this.src='{{ \App\Support\CatalogImage::fallbackUrl() }}';">
                                     </button>
                                 @endforeach
                             </div>
@@ -190,7 +190,7 @@
                                     </div>
                                 @endif
                                 <a class="ms-related-image" href="{{ route('parts.show', $related) }}">
-                                    <img src="{{ $related->main_image_url }}" alt="{{ $related->name }}">
+                                    <img src="{{ $related->main_image_url }}" alt="{{ $related->name }}" onerror="this.onerror=null;this.src='{{ \App\Support\CatalogImage::fallbackUrl() }}';">
                                 </a>
                                 @if ($relatedVariation)
                                     <div class="ms-related-variation">{{ $relatedVariation }}</div>

@@ -88,7 +88,7 @@
                                     <tbody>
                                         @foreach ($order->items as $item)
                                             <tr>
-                                                <td>{{ $item->product_name }}</td>
+                                                <td>{{ $item->display_name }}</td>
                                                 <td>{{ $item->quantity }}</td>
                                                 <td>${{ number_format($item->line_total, 2) }}</td>
                                             </tr>

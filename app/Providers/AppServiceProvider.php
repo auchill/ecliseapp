@@ -2,7 +2,6 @@
 
 namespace App\Providers;
 
-use App\Models\Cart;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -28,9 +27,8 @@ class AppServiceProvider extends ServiceProvider
             $count = 0;
 
             if (auth()->check() && auth()->user()?->isCustomer()) {
-                $cart = Cart::query()
-                    ->where('user_id', auth()->id())
-                    ->where('status', 'active')
+                $cart = auth()->user()
+                    ->customer?->activeCart()
                     ->with('items')
                     ->first();
 

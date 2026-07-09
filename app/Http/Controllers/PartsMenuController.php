@@ -6,6 +6,7 @@ use App\Models\Part;
 use App\Models\PartCategory;
 use App\Services\Parts\PartSearchService;
 use App\Services\Parts\PartsMenuService;
+use App\Support\CatalogImage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -113,6 +114,7 @@ class PartsMenuController extends Controller
         }
 
         return Part::query()
+            ->customerFacing()
             ->where('is_active', true)
             ->where('status', 'active')
             ->where(function (Builder $query) use ($keyword): void {
@@ -135,7 +137,7 @@ class PartsMenuController extends Controller
                 'brand' => $part->brandName(),
                 'price' => number_format($part->displayPrice(), 2),
                 'image_url' => $this->partMenuImageUrl($part),
-                'fallback_image_url' => asset('images/brand/logo_main.png'),
+                'fallback_image_url' => CatalogImage::fallbackUrl(),
                 'url' => route('parts.show', $part),
             ])
             ->values();
@@ -144,6 +146,7 @@ class PartsMenuController extends Controller
     private function brandOptions()
     {
         return Part::query()
+            ->customerFacing()
             ->where('is_active', true)
             ->where('status', 'active')
             ->whereNotNull('brand')
@@ -156,6 +159,7 @@ class PartsMenuController extends Controller
     private function deviceTypeOptions()
     {
         return Part::query()
+            ->customerFacing()
             ->where('is_active', true)
             ->where('status', 'active')
             ->whereNotNull('device_type')
@@ -167,14 +171,6 @@ class PartsMenuController extends Controller
 
     private function partMenuImageUrl(Part $part): string
     {
-        if ($part->local_image_path ?: $part->image_path) {
-            return asset('storage/'.($part->local_image_path ?: $part->image_path));
-        }
-
-        if ($part->default_image ?: $part->image_url) {
-            return $part->default_image ?: $part->image_url;
-        }
-
-        return asset('images/brand/logo_main.png');
+        return $part->imageUrl();
     }
 }

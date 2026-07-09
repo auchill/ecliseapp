@@ -5,11 +5,12 @@ namespace App\Http\Controllers;
 use App\Http\Requests\CheckoutRequest;
 use App\Models\Cart;
 use App\Models\CartItem;
+use App\Models\Customer;
 use App\Models\Order;
 use App\Services\PaymentGatewayService;
 use App\Services\ShippingCostService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Arr;
 use InvalidArgumentException;
 
 class CheckoutController extends Controller
@@ -36,14 +37,18 @@ class CheckoutController extends Controller
         return view('checkout.show', [
             'cart' => $cart,
             'cartItems' => $cartItems,
+            'customerProfile' => $request->user()->customer,
             'pickupQuote' => $shippingCosts->calculateForFulfillment('pickup', $subtotal, null),
             'shippingMethods' => $shippingMethods,
             'shippingQuotes' => $shippingQuotes,
         ]);
     }
 
-    public function store(CheckoutRequest $request, ShippingCostService $shippingCosts, PaymentGatewayService $paymentGateways)
-    {
+    public function store(
+        CheckoutRequest $request,
+        ShippingCostService $shippingCosts,
+        PaymentGatewayService $paymentGateways,
+    ) {
         abort_if($request->user()?->isAdmin(), 403);
 
         $cart = $this->activeCart($request)->load('items');
@@ -68,87 +73,42 @@ class CheckoutController extends Controller
         }
 
         $data = $this->normalizeFulfillmentData($data, $shippingQuote);
+        $subtotal = round((float) $cartItems->sum('line_total'), 2);
+        $tax = round($subtotal * 0.13, 2);
+        $total = round($subtotal + $tax + (float) $data['shipping_cost'], 2);
 
-        $order = DB::transaction(function () use ($cart, $cartItems, $data, $request): Order {
-            $subtotal = (float) $cartItems->sum('line_total');
-            $tax = round($subtotal * 0.13, 2);
-            $total = $subtotal + $tax + $data['shipping_cost'];
-
-            $order = Order::query()->create([
-                'user_id' => $request->user()->id,
-                'cart_id' => $cart->id,
-                'order_number' => $this->generateOrderNumber(),
-                'source' => 'shop',
-                'customer_name' => $data['customer_name'],
-                'email' => $data['email'],
-                'phone' => $data['phone'],
-                'address' => $this->legacyAddressValue($data),
-                'subtotal' => $subtotal,
-                'tax' => $tax,
-                'total' => $total,
-                'status' => 'Pending',
-                'payment_provider' => $data['payment_gateway'],
-                'payment_gateway' => $data['payment_gateway'],
-                'payment_reference' => null,
-                'fulfillment_method' => $data['fulfillment_method'],
-                'payment_status' => 'pending',
-                'payment_amount' => $total,
-                'currency' => 'cad',
-                'shipping_full_name' => $data['shipping_full_name'] ?? null,
-                'shipping_phone' => $data['shipping_phone'] ?? null,
-                'shipping_email' => $data['shipping_email'] ?? null,
-                'shipping_address_line1' => $data['shipping_address_line1'] ?? null,
-                'shipping_address_line2' => $data['shipping_address_line2'] ?? null,
-                'shipping_city' => $data['shipping_city'] ?? null,
-                'shipping_province' => $data['shipping_province'] ?? null,
-                'shipping_postal_code' => $data['shipping_postal_code'] ?? null,
-                'shipping_country' => $data['shipping_country'] ?? null,
-                'shipping_method_id' => $data['shipping_method_id'],
-                'shipping_method_name' => $data['shipping_method_name'],
-                'shipping_delivery_days' => $data['shipping_delivery_days'],
-                'shipping_base_cost' => $data['shipping_base_cost'],
-                'shipping_discount_amount' => $data['shipping_discount_amount'],
-                'shipping_cost' => $data['shipping_cost'],
-                'delivery_carrier' => $data['delivery_carrier'] ?? null,
-                'tracking_number' => $data['tracking_number'] ?? null,
-                'customer_notes' => $data['notes'] ?? null,
-                'notes' => $data['notes'] ?? null,
-            ]);
-
-            $order->statusUpdates()->create([
-                'status' => 'Pending',
-                'note' => $order->isShipping() && $order->shipping_method_name
-                    ? "Order placed for {$order->shipping_method_name}."
-                    : 'Order placed for store pickup.',
-                'is_customer_visible' => true,
-                'delivery_carrier' => $order->delivery_carrier,
-                'tracking_number' => $order->tracking_number,
-                'created_by' => $request->user()->id,
-            ]);
-
-            foreach ($cartItems as $item) {
-                $order->items()->create([
-                    'product_id' => $item['product_id'],
-                    'item_source' => $item['item_source'],
-                    'product_name' => $item['name'],
-                    'sku' => $item['sku'] ?: $item['product_id'],
-                    'quantity' => $item['quantity'],
-                    'unit_price' => $item['unit_price'],
-                    'line_total' => $item['line_total'],
-                ]);
-
-            }
-
-            return $order;
-        });
-
-        $payment = $order->payments()->create([
-            'order_id' => $order->id,
+        $payment = $cart->payments()->create([
             'source' => 'shop',
             'gateway' => $data['payment_gateway'],
-            'amount' => $order->total,
+            'amount' => $total,
             'currency' => 'cad',
             'status' => 'pending',
+            'checkout_data' => [
+                'user_id' => $request->user()->id,
+                'customer_id' => $cart->customer_id,
+                'cart_id' => $cart->id,
+                'customer' => [
+                    'full_name' => $data['customer_name'],
+                    'email' => $data['email'],
+                    'phone' => $data['phone'],
+                ],
+                'fulfillment' => $data,
+                'totals' => [
+                    'subtotal' => $subtotal,
+                    'tax' => $tax,
+                    'total' => $total,
+                ],
+                'items' => $cartItems
+                    ->map(fn (array $item): array => Arr::only($item, [
+                        'source_id',
+                        'source_sku',
+                        'source',
+                        'quantity',
+                        'unit_price',
+                        'line_total',
+                    ]))
+                    ->all(),
+            ],
         ]);
 
         return redirect()->away($paymentGateways->createCheckout($payment));
@@ -156,7 +116,11 @@ class CheckoutController extends Controller
 
     public function confirmation(Order $order)
     {
-        abort_unless(auth()->id() === $order->user_id && auth()->user()?->isCustomer(), 403);
+        abort_unless(
+            auth()->user()?->isCustomer()
+            && $order->customer?->user_id === auth()->id(),
+            403,
+        );
 
         return view('checkout.confirmation', [
             'order' => $order->load('items', 'latestPayment'),
@@ -188,66 +152,35 @@ class CheckoutController extends Controller
         return $data;
     }
 
-    private function legacyAddressValue(array $data): ?string
-    {
-        if ($data['fulfillment_method'] !== 'shipping') {
-            return null;
-        }
-
-        return implode("\n", array_filter([
-            $data['shipping_full_name'] ?? null,
-            $data['shipping_address_line1'] ?? null,
-            $data['shipping_address_line2'] ?? null,
-            trim(implode(', ', array_filter([
-                $data['shipping_city'] ?? null,
-                $data['shipping_province'] ?? null,
-                $data['shipping_postal_code'] ?? null,
-            ]))),
-            $data['shipping_country'] ?? null,
-        ]));
-    }
-
     private function activeCart(Request $request): Cart
     {
-        return Cart::query()->firstOrCreate([
-            'user_id' => $request->user()->id,
-            'status' => 'active',
-        ]);
-    }
-
-    private function generateOrderNumber(): string
-    {
-        $year = now()->year;
-        $next = Order::query()->whereYear('created_at', $year)->count() + 1;
-
-        do {
-            $orderNumber = sprintf('ECL-ORD-%s-%04d', $year, $next++);
-        } while (Order::query()->where('order_number', $orderNumber)->exists());
-
-        return $orderNumber;
+        return Customer::forUser($request->user())->getOrCreateActiveCart();
     }
 
     private function cartItems(Cart $cart)
     {
         return $cart->items
             ->map(function (CartItem $item): ?array {
-                $purchasable = $item->purchasable();
-
-                if (! $purchasable) {
+                if (! $item->purchasable()) {
                     return null;
                 }
 
                 $quantity = min($item->quantity, $item->maxQuantity());
                 $unitPrice = (float) $item->unit_price;
 
+                if ($quantity <= 0 || $unitPrice < 0) {
+                    return null;
+                }
+
                 return [
-                    'product_id' => (string) $item->product_id,
-                    'item_source' => $item->item_source ?: CartItem::SOURCE_ECLISE,
-                    'name' => $item->displayName(),
-                    'sku' => $item->displaySku(),
+                    'source_id' => (int) $item->source_id,
+                    'source_sku' => $item->source_sku,
+                    'source' => $item->source,
+                    'display_name' => $item->displayName(),
+                    'display_image_url' => $item->displayImageUrl(),
                     'quantity' => $quantity,
                     'unit_price' => $unitPrice,
-                    'line_total' => $unitPrice * $quantity,
+                    'line_total' => round($unitPrice * $quantity, 2),
                 ];
             })
             ->filter()

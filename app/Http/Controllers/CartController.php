@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Cart;
 use App\Models\CartItem;
+use App\Models\Customer;
 use App\Models\MobileSentrixDevice;
 use App\Models\Product;
 use Illuminate\Http\RedirectResponse;
@@ -37,14 +38,15 @@ class CartController extends Controller
             'quantity' => ['required', 'integer', 'min:1', 'max:'.$product->quantity],
         ]);
 
-        $cart = $this->activeCart($request);
-        $item = $cart->items()->firstOrNew([
-            'product_id' => $this->ecliseProductId($product),
-            'item_source' => CartItem::SOURCE_ECLISE,
-        ]);
-        $item->unit_price = $product->currentPrice();
-        $item->quantity = min($product->quantity, ($item->exists ? $item->quantity : 0) + $data['quantity']);
-        $item->save();
+        $this->addItem(
+            $this->activeCart($request),
+            CartItem::SOURCE_ECLISE,
+            (int) $product->id,
+            $product->sku,
+            (int) $data['quantity'],
+            $product->currentPrice(),
+            (int) $product->quantity,
+        );
 
         return back()->with('status', 'Product added to cart.');
     }
@@ -57,20 +59,21 @@ class CartController extends Controller
             return $this->authRequired($request);
         }
 
-        abort_unless($device->availableQuantity() > 0, 404);
+        abort_unless($device->entity_id && filled($device->sku) && $device->availableQuantity() > 0, 404);
 
         $data = $request->validate([
             'quantity' => ['required', 'integer', 'min:1', 'max:'.$device->availableQuantity()],
         ]);
 
-        $cart = $this->activeCart($request);
-        $item = $cart->items()->firstOrNew([
-            'product_id' => $device->cartProductId(),
-            'item_source' => CartItem::SOURCE_MOBILESENTRIX,
-        ]);
-        $item->unit_price = $device->displayPrice() ?? 0;
-        $item->quantity = min($device->availableQuantity(), ($item->exists ? $item->quantity : 0) + $data['quantity']);
-        $item->save();
+        $this->addItem(
+            $this->activeCart($request),
+            CartItem::SOURCE_MOBILESENTRIX,
+            (int) $device->entity_id,
+            $device->sku,
+            (int) $data['quantity'],
+            $device->displayPrice() ?? 0,
+            $device->availableQuantity(),
+        );
 
         return back()->with('status', 'Certified pre-owned device added to cart.');
     }
@@ -102,17 +105,19 @@ class CartController extends Controller
         foreach ($selected as $deviceId => $quantity) {
             $device = MobileSentrixDevice::query()->find($deviceId);
 
-            if (! $device || $device->availableQuantity() <= 0) {
+            if (! $device?->entity_id || blank($device->sku) || $device->availableQuantity() <= 0) {
                 continue;
             }
 
-            $item = $cart->items()->firstOrNew([
-                'product_id' => $device->cartProductId(),
-                'item_source' => CartItem::SOURCE_MOBILESENTRIX,
-            ]);
-            $item->unit_price = $device->displayPrice() ?? 0;
-            $item->quantity = min($device->availableQuantity(), ($item->exists ? $item->quantity : 0) + $quantity);
-            $item->save();
+            $this->addItem(
+                $cart,
+                CartItem::SOURCE_MOBILESENTRIX,
+                (int) $device->entity_id,
+                $device->sku,
+                $quantity,
+                $device->displayPrice() ?? 0,
+                $device->availableQuantity(),
+            );
             $added++;
         }
 
@@ -132,16 +137,14 @@ class CartController extends Controller
         ]);
 
         if ($request->user()) {
-            $cart = $this->activeCart($request);
-            $cart->items()
-                ->where('product_id', $this->ecliseProductId($product))
-                ->where('item_source', CartItem::SOURCE_ECLISE)
-                ->update([
-                    'quantity' => $data['quantity'],
-                ]);
+            $this->activeCart($request)->items()
+                ->where('source', CartItem::SOURCE_ECLISE)
+                ->where('source_id', $product->id)
+                ->where('source_sku', $product->sku)
+                ->update(['quantity' => $data['quantity']]);
         } else {
             $cart = $this->normalizedSessionCart($request);
-            $cart[$this->cartKey(CartItem::SOURCE_ECLISE, $this->ecliseProductId($product))] = $data['quantity'];
+            $cart[$this->cartKey(CartItem::SOURCE_ECLISE, $product->id, $product->sku)] = $data['quantity'];
             $request->session()->put('cart.items', $cart);
         }
 
@@ -157,8 +160,8 @@ class CartController extends Controller
             'quantity' => ['required', 'integer', 'min:1'],
         ]);
 
-        [$source, $productId] = $this->parseCartKey($data['item_key']);
-        $maxQuantity = $this->maxQuantityFor($source, $productId);
+        [$source, $sourceId, $sourceSku] = $this->parseCartKey($data['item_key']);
+        $maxQuantity = $this->maxQuantityFor($source, $sourceId, $sourceSku);
 
         abort_unless($maxQuantity > 0, 404);
 
@@ -166,12 +169,13 @@ class CartController extends Controller
 
         if ($request->user()) {
             $this->activeCart($request)->items()
-                ->where('product_id', $productId)
-                ->where('item_source', $source)
+                ->where('source', $source)
+                ->where('source_id', $sourceId)
+                ->where('source_sku', $sourceSku)
                 ->update(['quantity' => $quantity]);
         } else {
             $cart = $this->normalizedSessionCart($request);
-            $cart[$this->cartKey($source, $productId)] = $quantity;
+            $cart[$this->cartKey($source, $sourceId, $sourceSku)] = $quantity;
             $request->session()->put('cart.items', $cart);
         }
 
@@ -184,12 +188,13 @@ class CartController extends Controller
 
         if ($request->user()) {
             $this->activeCart($request)->items()
-                ->where('product_id', $this->ecliseProductId($product))
-                ->where('item_source', CartItem::SOURCE_ECLISE)
+                ->where('source', CartItem::SOURCE_ECLISE)
+                ->where('source_id', $product->id)
+                ->where('source_sku', $product->sku)
                 ->delete();
         } else {
             $cart = $this->normalizedSessionCart($request);
-            unset($cart[$this->cartKey(CartItem::SOURCE_ECLISE, $this->ecliseProductId($product))]);
+            unset($cart[$this->cartKey(CartItem::SOURCE_ECLISE, $product->id, $product->sku)]);
             $request->session()->put('cart.items', $cart);
         }
 
@@ -204,28 +209,45 @@ class CartController extends Controller
             'item_key' => ['required', 'string'],
         ]);
 
-        [$source, $productId] = $this->parseCartKey($data['item_key']);
+        [$source, $sourceId, $sourceSku] = $this->parseCartKey($data['item_key']);
 
         if ($request->user()) {
             $this->activeCart($request)->items()
-                ->where('product_id', $productId)
-                ->where('item_source', $source)
+                ->where('source', $source)
+                ->where('source_id', $sourceId)
+                ->where('source_sku', $sourceSku)
                 ->delete();
         } else {
             $cart = $this->normalizedSessionCart($request);
-            unset($cart[$this->cartKey($source, $productId)]);
+            unset($cart[$this->cartKey($source, $sourceId, $sourceSku)]);
             $request->session()->put('cart.items', $cart);
         }
 
         return redirect()->route('cart.index')->with('status', 'Item removed from cart.');
     }
 
+    private function addItem(
+        Cart $cart,
+        string $source,
+        int $sourceId,
+        string $sourceSku,
+        int $quantity,
+        float $unitPrice,
+        int $maxQuantity,
+    ): void {
+        $item = $cart->items()->firstOrNew([
+            'source' => $source,
+            'source_id' => $sourceId,
+            'source_sku' => $sourceSku,
+        ]);
+        $item->unit_price = max(0, $unitPrice);
+        $item->quantity = min($maxQuantity, ($item->exists ? $item->quantity : 0) + $quantity);
+        $item->save();
+    }
+
     private function activeCart(Request $request): Cart
     {
-        return Cart::query()->firstOrCreate([
-            'user_id' => $request->user()->id,
-            'status' => 'active',
-        ]);
+        return Customer::forUser($request->user())->getOrCreateActiveCart();
     }
 
     private function authRequired(Request $request): RedirectResponse
@@ -245,24 +267,18 @@ class CartController extends Controller
                 ->values();
         }
 
-        $sessionItems = collect($this->normalizedSessionCart($request))
-            ->filter(fn ($quantity) => (int) $quantity > 0);
-
-        if ($sessionItems->isEmpty()) {
-            return collect();
-        }
-
-        return $sessionItems
-            ->map(function ($quantity, $key) {
-                [$source, $productId] = $this->parseCartKey((string) $key);
-                $cartItem = new CartItem([
-                    'product_id' => $productId,
-                    'item_source' => $source,
+        return collect($this->normalizedSessionCart($request))
+            ->map(function ($quantity, $key): ?array {
+                [$source, $sourceId, $sourceSku] = $this->parseCartKey((string) $key);
+                $item = new CartItem([
+                    'source' => $source,
+                    'source_id' => $sourceId,
+                    'source_sku' => $sourceSku,
                     'quantity' => (int) $quantity,
-                    'unit_price' => $this->unitPriceFor($source, $productId),
+                    'unit_price' => $this->unitPriceFor($source, $sourceId, $sourceSku),
                 ]);
 
-                return $this->displayCartItem($cartItem);
+                return $this->displayCartItem($item);
             })
             ->filter()
             ->values();
@@ -270,9 +286,7 @@ class CartController extends Controller
 
     private function displayCartItem(CartItem $item): ?array
     {
-        $purchasable = $item->purchasable();
-
-        if (! $purchasable) {
+        if (! $item->purchasable()) {
             return null;
         }
 
@@ -281,8 +295,8 @@ class CartController extends Controller
         $unitPrice = (float) $item->unit_price;
 
         return [
-            'cart_key' => $this->cartKey($item->item_source ?: CartItem::SOURCE_ECLISE, (string) $item->product_id),
-            'source' => $item->item_source ?: CartItem::SOURCE_ECLISE,
+            'cart_key' => $this->cartKey($item->source, $item->source_id, $item->source_sku),
+            'source' => $item->source,
             'name' => $item->displayName(),
             'sku' => $item->displaySku(),
             'image_url' => $item->displayImageUrl(),
@@ -301,11 +315,9 @@ class CartController extends Controller
                     return [];
                 }
 
-                if (str_contains((string) $key, ':')) {
-                    return [(string) $key => (int) $quantity];
-                }
+                [$source, $sourceId, $sourceSku] = $this->parseCartKey((string) $key);
 
-                return [$this->cartKey(CartItem::SOURCE_ECLISE, $this->ecliseProductId((string) $key)) => (int) $quantity];
+                return [$this->cartKey($source, $sourceId, $sourceSku) => (int) $quantity];
             })
             ->all();
 
@@ -314,54 +326,56 @@ class CartController extends Controller
         return $items;
     }
 
-    private function cartKey(string $source, string $productId): string
+    private function cartKey(string $source, int $sourceId, string $sourceSku): string
     {
-        return $source.':'.$productId;
+        return implode(':', [$source, $sourceId, rawurlencode($sourceSku)]);
     }
 
     private function parseCartKey(string $key): array
     {
-        if (! str_contains($key, ':')) {
-            return [CartItem::SOURCE_ECLISE, $this->ecliseProductId($key)];
+        $parts = explode(':', $key, 3);
+
+        if (count($parts) === 3 && in_array($parts[0], CartItem::SOURCES, true) && is_numeric($parts[1])) {
+            return [$parts[0], (int) $parts[1], rawurldecode($parts[2])];
         }
 
-        [$source, $productId] = explode(':', $key, 2);
+        if (count($parts) === 2 && $parts[0] === CartItem::SOURCE_MOBILESENTRIX) {
+            $device = MobileSentrixDevice::query()
+                ->where('entity_id', $parts[1])
+                ->orWhere('sku', $parts[1])
+                ->firstOrFail();
 
-        return [$source ?: CartItem::SOURCE_ECLISE, $productId];
+            return [$parts[0], (int) $device->entity_id, $device->sku];
+        }
+
+        $legacyId = count($parts) === 2 ? $parts[1] : $parts[0];
+        $productId = preg_replace('/^ecl/i', '', $legacyId);
+        $product = is_numeric($productId) ? Product::query()->findOrFail((int) $productId) : abort(404);
+
+        return [CartItem::SOURCE_ECLISE, (int) $product->id, $product->sku];
     }
 
-    private function ecliseProductId(Product|string|int $product): string
-    {
-        $id = $product instanceof Product ? $product->id : $product;
-
-        return str_starts_with((string) $id, 'ecl') ? (string) $id : 'ecl'.$id;
-    }
-
-    private function maxQuantityFor(string $source, string $productId): int
+    private function maxQuantityFor(string $source, int $sourceId, string $sourceSku): int
     {
         if ($source === CartItem::SOURCE_MOBILESENTRIX) {
             return MobileSentrixDevice::query()
-                ->where('entity_id', $productId)
-                ->orWhere('sku', $productId)
+                ->where('entity_id', $sourceId)
+                ->where('sku', $sourceSku)
                 ->first()?->availableQuantity() ?? 0;
         }
 
-        $id = preg_replace('/^ecl/i', '', $productId);
-
-        return is_numeric($id) ? (int) (Product::query()->find((int) $id)?->quantity ?? 0) : 0;
+        return (int) (Product::query()->whereKey($sourceId)->where('sku', $sourceSku)->value('quantity') ?? 0);
     }
 
-    private function unitPriceFor(string $source, string $productId): float
+    private function unitPriceFor(string $source, int $sourceId, string $sourceSku): float
     {
         if ($source === CartItem::SOURCE_MOBILESENTRIX) {
             return (float) (MobileSentrixDevice::query()
-                ->where('entity_id', $productId)
-                ->orWhere('sku', $productId)
+                ->where('entity_id', $sourceId)
+                ->where('sku', $sourceSku)
                 ->first()?->displayPrice() ?? 0);
         }
 
-        $id = preg_replace('/^ecl/i', '', $productId);
-
-        return is_numeric($id) ? (float) (Product::query()->find((int) $id)?->currentPrice() ?? 0) : 0;
+        return (float) (Product::query()->whereKey($sourceId)->where('sku', $sourceSku)->first()?->currentPrice() ?? 0);
     }
 }

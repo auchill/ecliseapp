@@ -26,15 +26,15 @@
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label" for="customer_name">Name</label>
-                                <input class="form-control" id="customer_name" name="customer_name" value="{{ old('customer_name', auth()->user()->name) }}" required>
+                                <input class="form-control" id="customer_name" name="customer_name" value="{{ old('customer_name', $customerProfile?->full_name ?: auth()->user()->name) }}" required>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label" for="email">Email</label>
-                                <input class="form-control" id="email" name="email" type="email" value="{{ old('email', auth()->user()->email) }}" required>
+                                <input class="form-control" id="email" name="email" type="email" value="{{ old('email', $customerProfile?->email ?: auth()->user()->email) }}" required>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label" for="phone">Phone</label>
-                                <input class="form-control" id="phone" name="phone" value="{{ old('phone') }}" required>
+                                <input class="form-control" id="phone" name="phone" value="{{ old('phone', $customerProfile?->phone) }}" required>
                             </div>
 
                             <div class="col-12">
@@ -116,39 +116,39 @@
                                     <div class="row g-3">
                                         <div class="col-md-6">
                                             <label class="form-label" for="shipping_full_name">Full name</label>
-                                            <input class="form-control" id="shipping_full_name" name="shipping_full_name" value="{{ old('shipping_full_name', auth()->user()->name) }}" data-shipping-required>
+                                            <input class="form-control" id="shipping_full_name" name="shipping_full_name" value="{{ old('shipping_full_name', $customerProfile?->full_name ?: auth()->user()->name) }}" data-shipping-required>
                                         </div>
                                         <div class="col-md-6">
                                             <label class="form-label" for="shipping_phone">Phone number</label>
-                                            <input class="form-control" id="shipping_phone" name="shipping_phone" value="{{ old('shipping_phone') }}" data-shipping-required>
+                                            <input class="form-control" id="shipping_phone" name="shipping_phone" value="{{ old('shipping_phone', $customerProfile?->phone) }}" data-shipping-required>
                                         </div>
                                         <div class="col-md-6">
                                             <label class="form-label" for="shipping_email">Email</label>
-                                            <input class="form-control" id="shipping_email" name="shipping_email" type="email" value="{{ old('shipping_email', auth()->user()->email) }}" data-shipping-required>
+                                            <input class="form-control" id="shipping_email" name="shipping_email" type="email" value="{{ old('shipping_email', $customerProfile?->email ?: auth()->user()->email) }}" data-shipping-required>
                                         </div>
                                         <div class="col-md-6">
                                             <label class="form-label" for="shipping_country">Country</label>
-                                            <input class="form-control" id="shipping_country" name="shipping_country" value="{{ old('shipping_country', 'Canada') }}" data-shipping-required>
+                                            <input class="form-control" id="shipping_country" name="shipping_country" value="{{ old('shipping_country', $customerProfile?->country ?: 'Canada') }}" data-shipping-required>
                                         </div>
                                         <div class="col-md-8">
                                             <label class="form-label" for="shipping_address_line1">Street address</label>
-                                            <input class="form-control" id="shipping_address_line1" name="shipping_address_line1" value="{{ old('shipping_address_line1') }}" data-shipping-required>
+                                            <input class="form-control" id="shipping_address_line1" name="shipping_address_line1" value="{{ old('shipping_address_line1', $customerProfile?->street_address) }}" data-shipping-required>
                                         </div>
                                         <div class="col-md-4">
                                             <label class="form-label" for="shipping_address_line2">Apartment/unit</label>
-                                            <input class="form-control" id="shipping_address_line2" name="shipping_address_line2" value="{{ old('shipping_address_line2') }}">
+                                            <input class="form-control" id="shipping_address_line2" name="shipping_address_line2" value="{{ old('shipping_address_line2', $customerProfile?->address_line_2) }}">
                                         </div>
                                         <div class="col-md-4">
                                             <label class="form-label" for="shipping_city">City</label>
-                                            <input class="form-control" id="shipping_city" name="shipping_city" value="{{ old('shipping_city') }}" data-shipping-required>
+                                            <input class="form-control" id="shipping_city" name="shipping_city" value="{{ old('shipping_city', $customerProfile?->city) }}" data-shipping-required>
                                         </div>
                                         <div class="col-md-4">
                                             <label class="form-label" for="shipping_province">Province/state</label>
-                                            <input class="form-control" id="shipping_province" name="shipping_province" value="{{ old('shipping_province') }}" data-shipping-required>
+                                            <input class="form-control" id="shipping_province" name="shipping_province" value="{{ old('shipping_province', $customerProfile?->province) }}" data-shipping-required>
                                         </div>
                                         <div class="col-md-4">
                                             <label class="form-label" for="shipping_postal_code">Postal code</label>
-                                            <input class="form-control" id="shipping_postal_code" name="shipping_postal_code" value="{{ old('shipping_postal_code') }}" data-shipping-required>
+                                            <input class="form-control" id="shipping_postal_code" name="shipping_postal_code" value="{{ old('shipping_postal_code', $customerProfile?->postal_code) }}" data-shipping-required>
                                         </div>
                                     </div>
                                 </div>
@@ -179,8 +179,8 @@
                         @foreach ($cartItems as $item)
                             <div class="d-flex justify-content-between gap-3 py-3 border-bottom">
                                 <div>
-                                    <strong>{{ $item['name'] }}</strong>
-                                    <div class="small muted">{{ $item['item_source'] }} &middot; Qty {{ $item['quantity'] }}</div>
+                                    <strong>{{ $item['display_name'] }}</strong>
+                                    <div class="small muted">{{ $item['source'] }} &middot; Qty {{ $item['quantity'] }}</div>
                                 </div>
                                 <strong>${{ number_format($item['line_total'], 2) }}</strong>
                             </div>

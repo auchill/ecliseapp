@@ -2,7 +2,10 @@
 
 namespace App\Models;
 
+use App\Support\CatalogImage;
+use App\Support\CustomerFacingPartCategories;
 use App\Support\ProductDescriptionSanitizer;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -114,6 +117,16 @@ class Part extends Model
         return $this->categories();
     }
 
+    public function scopeCustomerFacing(Builder $query): Builder
+    {
+        $categoryIds = app(CustomerFacingPartCategories::class)->allowedIds();
+
+        return $query->whereHas(
+            'categories',
+            fn (Builder $query): Builder => $query->whereIn('part_categories.id', $categoryIds->all()),
+        );
+    }
+
     public function brandName(): ?string
     {
         return $this->brand ?: $this->brand_text ?: $this->manufacturer_text ?: $this->device_manufacturer_text;
@@ -147,18 +160,19 @@ class Part extends Model
     public function imageUrl(): string
     {
         if ($this->local_image_path ?: $this->image_path) {
-            return asset('storage/'.($this->local_image_path ?: $this->image_path));
+            return CatalogImage::storageUrl($this->local_image_path ?: $this->image_path);
         }
 
         if ($this->default_image ?: $this->image_url) {
-            return $this->default_image ?: $this->image_url;
+            return CatalogImage::remoteUrl($this->default_image ?: $this->image_url);
         }
 
-        if (file_exists(public_path('images/parts/part-placeholder.svg'))) {
-            return asset('images/parts/part-placeholder.svg');
-        }
+        return CatalogImage::fallbackUrl();
+    }
 
-        return asset('images/brand/logo.png');
+    public function getDisplayImageUrlAttribute(): string
+    {
+        return $this->imageUrl();
     }
 
     public function mainImageUrl(): string
@@ -176,7 +190,7 @@ class Part extends Model
         $images = collect();
 
         if (filled($this->default_image ?: $this->image_url)) {
-            $url = $this->default_image ?: $this->image_url;
+            $url = CatalogImage::remoteUrl($this->default_image ?: $this->image_url);
             $images->push((object) [
                 'image_url' => $url,
                 'thumbnail_url' => $url,
@@ -198,10 +212,12 @@ class Part extends Model
                 continue;
             }
 
+            $url = CatalogImage::remoteUrl((string) $url);
+
             $images->push((object) [
                 'image_url' => $url,
-                'thumbnail_url' => data_get($row, 'thumbnail_url') ?: data_get($row, 'small_image_url') ?: data_get($row, 'thumb_url') ?: $url,
-                'large_image_url' => data_get($row, 'large_image_url') ?: data_get($row, 'full_image_url') ?: $url,
+                'thumbnail_url' => CatalogImage::remoteUrl(data_get($row, 'thumbnail_url') ?: data_get($row, 'small_image_url') ?: data_get($row, 'thumb_url') ?: $url),
+                'large_image_url' => CatalogImage::remoteUrl(data_get($row, 'large_image_url') ?: data_get($row, 'full_image_url') ?: $url),
                 'label' => data_get($row, 'label'),
                 'alt_text' => data_get($row, 'alt_text') ?: data_get($row, 'alt') ?: data_get($row, 'label') ?: $this->name,
             ]);

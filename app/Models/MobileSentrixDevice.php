@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\CatalogImage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -81,7 +82,12 @@ class MobileSentrixDevice extends Model
 
     public function imageUrl(): string
     {
-        return $this->image_url ?: asset('images/brand/logo_main.png');
+        return CatalogImage::remoteUrl($this->image_url);
+    }
+
+    public function getDisplayImageUrlAttribute(): string
+    {
+        return $this->imageUrl();
     }
 
     public function displayName(): string

@@ -1,19 +1,23 @@
 <?php
 
-use App\Models\Cart;
 use App\Models\CartItem;
+use App\Models\Customer;
 use App\Models\MobileSentrixDevice;
 use App\Models\Order;
+use App\Models\Payment;
 use App\Models\Permission;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\PaymentFinalizer;
 use App\Support\MobileSentrixDeviceFilters;
 use Database\Seeders\ShippingSeeder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 
 beforeEach(function (): void {
+    Mail::fake();
     config([
         'mobilesentrix.env' => 'staging',
         'mobilesentrix.base_url' => 'https://preprod.mobilesentrix.ca',
@@ -318,19 +322,21 @@ test('cart stores eclise and mobile sentrix items with distinct source identifie
     $this->actingAs($customer)->post(route('cart.store', $product), ['quantity' => 1])->assertRedirect();
     $this->actingAs($customer)->post(route('cart.devices.bulk'), ['devices' => [$device->id => 2]])->assertRedirect();
 
-    $cart = Cart::query()->where('user_id', $customer->id)->where('status', 'active')->firstOrFail();
+    $cart = Customer::forUser($customer)->activeCart()->firstOrFail();
 
     $this->assertDatabaseHas('cart_items', [
         'cart_id' => $cart->id,
-        'product_id' => 'ecl'.$product->id,
-        'item_source' => CartItem::SOURCE_ECLISE,
+        'source_id' => $product->id,
+        'source_sku' => $product->sku,
+        'source' => CartItem::SOURCE_ECLISE,
         'quantity' => 1,
     ]);
 
     $this->assertDatabaseHas('cart_items', [
         'cart_id' => $cart->id,
-        'product_id' => '99001',
-        'item_source' => CartItem::SOURCE_MOBILESENTRIX,
+        'source_id' => 99001,
+        'source_sku' => $device->sku,
+        'source' => CartItem::SOURCE_MOBILESENTRIX,
         'quantity' => 2,
     ]);
 });
@@ -356,11 +362,18 @@ test('checkout creates mixed order items for retail and certified pre owned devi
         'price' => 250,
         'status' => 'active',
     ]);
-    $cart = Cart::query()->create(['user_id' => $customer->id, 'status' => 'active']);
-    $cart->items()->create(['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 100]);
+    $cart = Customer::forUser($customer)->carts()->create(['status' => 'active']);
     $cart->items()->create([
-        'product_id' => $device->cartProductId(),
-        'item_source' => CartItem::SOURCE_MOBILESENTRIX,
+        'source_id' => $product->id,
+        'source_sku' => $product->sku,
+        'source' => CartItem::SOURCE_ECLISE,
+        'quantity' => 1,
+        'unit_price' => 100,
+    ]);
+    $cart->items()->create([
+        'source_id' => $device->entity_id,
+        'source_sku' => $device->sku,
+        'source' => CartItem::SOURCE_MOBILESENTRIX,
         'quantity' => 1,
         'unit_price' => 250,
     ]);
@@ -375,23 +388,27 @@ test('checkout creates mixed order items for retail and certified pre owned devi
         ])
         ->assertRedirect();
 
+    expect(Order::query()->count())->toBe(0);
+    app(PaymentFinalizer::class)->markPaid(Payment::query()->firstOrFail());
     $order = Order::query()->with('items')->firstOrFail();
 
     expect((float) $order->subtotal)->toBe(350.0)
         ->and((float) $order->total)->toBe(395.5)
-        ->and($order->items)->toHaveCount(2);
+        ->and($order->items)->toHaveCount(2)
+        ->and($order->items->firstWhere('source', CartItem::SOURCE_ECLISE)->display_name)->toBe('Checkout Retail Phone')
+        ->and($order->items->firstWhere('source', CartItem::SOURCE_MOBILESENTRIX)->display_name)->toBe('Checkout CPO Device');
 
     $this->assertDatabaseHas('order_items', [
         'order_id' => $order->id,
-        'product_id' => 'ecl'.$product->id,
-        'item_source' => CartItem::SOURCE_ECLISE,
-        'sku' => 'CHECKOUT-RETAIL',
+        'source_id' => $product->id,
+        'source' => CartItem::SOURCE_ECLISE,
+        'source_sku' => 'CHECKOUT-RETAIL',
     ]);
 
     $this->assertDatabaseHas('order_items', [
         'order_id' => $order->id,
-        'product_id' => '99002',
-        'item_source' => CartItem::SOURCE_MOBILESENTRIX,
-        'sku' => 'CHECKOUT-CPO',
+        'source_id' => 99002,
+        'source' => CartItem::SOURCE_MOBILESENTRIX,
+        'source_sku' => 'CHECKOUT-CPO',
     ]);
 });

@@ -5,9 +5,12 @@ use App\Mail\QuoteBookingCreatedMail;
 use App\Mail\QuoteSubmittedCustomerMail;
 use App\Mail\RepairStatusUpdatedMail;
 use App\Models\Cart;
+use App\Models\CartItem;
+use App\Models\Customer;
 use App\Models\DeviceType;
 use App\Models\IssueCategory;
 use App\Models\Order;
+use App\Models\Payment;
 use App\Models\Product;
 use App\Models\ProductBrand;
 use App\Models\ProductModel;
@@ -22,9 +25,21 @@ use Database\Seeders\ShippingSeeder;
 use Illuminate\Support\Facades\Mail;
 
 beforeEach(function (): void {
+    Mail::fake();
     $this->seed(ShippingSeeder::class);
     $this->seed(ReferenceDataSeeder::class);
 });
+
+function addProductToCart(Cart $cart, Product $product, int $quantity = 1): void
+{
+    $cart->items()->create([
+        'source_id' => $product->id,
+        'source_sku' => $product->sku,
+        'source' => CartItem::SOURCE_ECLISE,
+        'quantity' => $quantity,
+        'unit_price' => $product->currentPrice(),
+    ]);
+}
 
 test('checkout pickup creates a pickup order with zero shipping', function () {
     $user = User::query()->create([
@@ -43,8 +58,8 @@ test('checkout pickup creates a pickup order with zero shipping', function () {
         'status' => 'Active',
     ]);
 
-    $cart = Cart::query()->create(['user_id' => $user->id, 'status' => 'active']);
-    $cart->items()->create(['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 100]);
+    $cart = Customer::forUser($user)->carts()->create(['status' => 'active']);
+    addProductToCart($cart, $product);
 
     $this->actingAs($user)
         ->post(route('checkout.store'), [
@@ -56,20 +71,23 @@ test('checkout pickup creates a pickup order with zero shipping', function () {
         ])
         ->assertRedirect();
 
+    expect(Order::query()->count())->toBe(0);
+    app(PaymentFinalizer::class)->markPaid(Payment::query()->firstOrFail());
     $order = Order::query()->firstOrFail();
 
     expect($order->fulfillment_method)->toBe('pickup')
-        ->and($order->source)->toBe('shop')
+        ->and($order->order_number)->toMatch('/^ECL-ORD-\d{4}-\d{7}$/')
         ->and($order->shipping_method_id)->toBeNull()
         ->and((float) $order->shipping_base_cost)->toBe(0.0)
         ->and((float) $order->shipping_discount_amount)->toBe(0.0)
         ->and((float) $order->shipping_cost)->toBe(0.0)
-        ->and($order->payment_status)->toBe('pending')
+        ->and($order->payment_status)->toBe('paid')
         ->and((float) $order->total)->toBe(113.0);
 
     expect($order->payments()->count())->toBe(1)
         ->and($order->payments()->first()->source)->toBe('shop')
-        ->and($product->fresh()->quantity)->toBe(2);
+        ->and($order->customer)->toBeInstanceOf(Customer::class)
+        ->and($product->fresh()->quantity)->toBe(1);
 });
 
 test('checkout normal shipping stores method snapshot and regular shipping cost', function () {
@@ -90,8 +108,8 @@ test('checkout normal shipping stores method snapshot and regular shipping cost'
         'status' => 'Active',
     ]);
 
-    $cart = Cart::query()->create(['user_id' => $user->id, 'status' => 'active']);
-    $cart->items()->create(['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 100]);
+    $cart = Customer::forUser($user)->carts()->create(['status' => 'active']);
+    addProductToCart($cart, $product);
 
     $this->actingAs($user)
         ->post(route('checkout.store'), [
@@ -112,6 +130,7 @@ test('checkout normal shipping stores method snapshot and regular shipping cost'
         ])
         ->assertRedirect();
 
+    app(PaymentFinalizer::class)->markPaid(Payment::query()->firstOrFail());
     $order = Order::query()->firstOrFail();
 
     expect($order->fulfillment_method)->toBe('shipping')
@@ -153,8 +172,8 @@ test('checkout applies the best matching shipping discount', function () {
         'status' => 'Active',
     ]);
 
-    $normalCart = Cart::query()->create(['user_id' => $normalCustomer->id, 'status' => 'active']);
-    $normalCart->items()->create(['product_id' => $normalProduct->id, 'quantity' => 1, 'unit_price' => 350]);
+    $normalCart = Customer::forUser($normalCustomer)->carts()->create(['status' => 'active']);
+    addProductToCart($normalCart, $normalProduct);
 
     $this->actingAs($normalCustomer)
         ->post(route('checkout.store'), [
@@ -175,6 +194,7 @@ test('checkout applies the best matching shipping discount', function () {
         ])
         ->assertRedirect();
 
+    app(PaymentFinalizer::class)->markPaid(Payment::query()->latest('id')->firstOrFail());
     $normalOrder = Order::query()->where('email', 'free-shipping@example.com')->firstOrFail();
 
     expect((float) $normalOrder->shipping_base_cost)->toBe(20.0)
@@ -198,8 +218,8 @@ test('checkout applies the best matching shipping discount', function () {
         'status' => 'Active',
     ]);
 
-    $overnightCart = Cart::query()->create(['user_id' => $overnightCustomer->id, 'status' => 'active']);
-    $overnightCart->items()->create(['product_id' => $overnightProduct->id, 'quantity' => 1, 'unit_price' => 600]);
+    $overnightCart = Customer::forUser($overnightCustomer)->carts()->create(['status' => 'active']);
+    addProductToCart($overnightCart, $overnightProduct);
 
     $this->actingAs($overnightCustomer)
         ->post(route('checkout.store'), [
@@ -220,6 +240,7 @@ test('checkout applies the best matching shipping discount', function () {
         ])
         ->assertRedirect();
 
+    app(PaymentFinalizer::class)->markPaid(Payment::query()->latest('id')->firstOrFail());
     $overnightOrder = Order::query()->where('email', 'overnight@example.com')->firstOrFail();
 
     expect($overnightOrder->shipping_method_name)->toBe('Overnight Shipping')
@@ -325,8 +346,8 @@ test('verified payment finalization marks order paid and commits inventory once'
         'status' => 'Active',
     ]);
 
-    $cart = Cart::query()->create(['user_id' => $user->id, 'status' => 'active']);
-    $cart->items()->create(['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 100]);
+    $cart = Customer::forUser($user)->carts()->create(['status' => 'active']);
+    addProductToCart($cart, $product);
 
     $this->actingAs($user)
         ->post(route('checkout.store'), [
@@ -338,10 +359,9 @@ test('verified payment finalization marks order paid and commits inventory once'
         ])
         ->assertRedirect();
 
-    $order = Order::query()->with('payments')->firstOrFail();
-    $payment = $order->payments->first();
+    $payment = Payment::query()->firstOrFail();
 
-    expect($order->payment_status)->toBe('pending')
+    expect(Order::query()->count())->toBe(0)
         ->and($product->fresh()->quantity)->toBe(2)
         ->and($cart->fresh()->status)->toBe('active');
 
@@ -350,12 +370,12 @@ test('verified payment finalization marks order paid and commits inventory once'
         'stripe_payment_intent_id' => 'pi_test_123',
     ]);
 
-    $order->refresh();
+    $order = Order::query()->firstOrFail();
 
     expect($order->payment_status)->toBe('paid')
         ->and($order->inventory_committed_at)->not->toBeNull()
         ->and($product->fresh()->quantity)->toBe(1)
-        ->and($cart->fresh()->status)->toBe('converted');
+        ->and($cart->fresh())->toBeNull();
 
     app(PaymentFinalizer::class)->markPaid($payment->fresh());
 
@@ -386,9 +406,9 @@ test('guest cart items merge into customer cart on login', function () {
         ])
         ->assertRedirect(route('dashboard'));
 
-    $cart = Cart::query()->where('user_id', $user->id)->where('status', 'active')->firstOrFail();
+    $cart = Customer::forUser($user)->activeCart()->firstOrFail();
 
-    expect($cart->items()->where('product_id', 'ecl'.$product->id)->where('item_source', 'Eclise')->value('quantity'))->toBe(2)
+    expect($cart->items()->where('source_id', $product->id)->where('source_sku', $product->sku)->where('source', 'Eclise')->value('quantity'))->toBe(2)
         ->and(session('cart.items'))->toBeNull();
 });
 

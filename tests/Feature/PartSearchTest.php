@@ -8,10 +8,29 @@ use Illuminate\Support\Facades\DB;
 
 function createSearchPart(array $overrides = []): Part
 {
-    $category = $overrides['partCategory'] ?? PartCategory::query()->firstOrCreate(
-        ['slug' => 'screens'],
-        ['name' => 'Screens', 'is_active' => true, 'status' => 'active'],
-    );
+    PartCategory::query()->firstOrCreate(['id' => 165], [
+        'name' => 'Replacement Parts',
+        'slug' => 'replacement-parts',
+        'is_part' => true,
+        'is_active' => true,
+        'status' => 'active',
+    ]);
+    PartCategory::query()->firstOrCreate(['id' => 756], [
+        'name' => 'Apple',
+        'slug' => 'apple',
+        'parent_id' => 165,
+        'is_part' => true,
+        'is_active' => true,
+        'status' => 'active',
+    ]);
+    $category = $overrides['partCategory'] ?? PartCategory::query()->firstOrCreate(['id' => 7001], [
+        'name' => 'Screens',
+        'slug' => 'screens',
+        'parent_id' => 756,
+        'is_part' => true,
+        'is_active' => true,
+        'status' => 'active',
+    ]);
 
     unset($overrides['partCategory']);
 
@@ -170,4 +189,64 @@ test('admin parts search can find mobilesentrix ids and show admin-only cost', f
         ->and($html)->toContain('$50.00')
         ->and($html)->toContain('$65.00')
         ->and($html)->not->toContain('should-never-render');
+});
+
+test('public parts search excludes accessory brand and pre owned categories', function () {
+    PartCategory::query()->create([
+        'id' => 165,
+        'name' => 'Replacement Parts',
+        'slug' => 'replacement-parts',
+        'is_part' => true,
+        'is_active' => true,
+        'status' => 'active',
+    ]);
+
+    $allowed = PartCategory::query()->create([
+        'id' => 756,
+        'name' => 'Apple',
+        'slug' => 'apple',
+        'parent_id' => 165,
+        'is_part' => true,
+        'is_active' => true,
+        'status' => 'active',
+    ]);
+
+    createSearchPart([
+        'id' => 8101,
+        'sku' => 'VALID-REPLACEMENT',
+        'name' => 'Valid Replacement Battery',
+        'slug' => 'valid-replacement-battery',
+        'partCategory' => $allowed,
+    ]);
+
+    foreach ([8363, 3958, 1505] as $index => $categoryId) {
+        $category = PartCategory::query()->create([
+            'id' => $categoryId,
+            'name' => 'Excluded '.$categoryId,
+            'slug' => 'excluded-'.$categoryId,
+            'is_part' => true,
+            'is_active' => true,
+            'status' => 'active',
+        ]);
+
+        createSearchPart([
+            'id' => 8200 + $index,
+            'sku' => $categoryId === 8363 ? '107085008855' : 'EXCLUDED-'.$categoryId,
+            'name' => 'Excluded Search Item '.$categoryId,
+            'slug' => 'excluded-search-item-'.$categoryId,
+            'partCategory' => $category,
+        ]);
+    }
+
+    $this->getJson(route('parts.search', ['q' => 'VALID-REPLACEMENT']))
+        ->assertOk()
+        ->assertJsonPath('count', 1);
+
+    $this->getJson(route('parts.search', ['q' => '107085008855']))
+        ->assertOk()
+        ->assertJsonPath('count', 0);
+
+    $this->getJson(route('parts.search', ['q' => 'Excluded Search Item']))
+        ->assertOk()
+        ->assertJsonPath('count', 0);
 });

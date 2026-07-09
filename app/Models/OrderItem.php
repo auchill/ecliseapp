@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use App\Support\CatalogImage;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use InvalidArgumentException;
 
 class OrderItem extends Model
 {
@@ -12,10 +14,9 @@ class OrderItem extends Model
 
     protected $fillable = [
         'order_id',
-        'product_id',
-        'item_source',
-        'product_name',
-        'sku',
+        'source_id',
+        'source_sku',
+        'source',
         'quantity',
         'unit_price',
         'line_total',
@@ -24,6 +25,8 @@ class OrderItem extends Model
     protected function casts(): array
     {
         return [
+            'source_id' => 'integer',
+            'quantity' => 'integer',
             'unit_price' => 'decimal:2',
             'line_total' => 'decimal:2',
         ];
@@ -32,10 +35,12 @@ class OrderItem extends Model
     protected static function booted(): void
     {
         static::saving(function (OrderItem $item): void {
-            $item->item_source = $item->item_source ?: CartItem::SOURCE_ECLISE;
+            if (! in_array($item->source, CartItem::SOURCES, true)) {
+                throw new InvalidArgumentException('Invalid order item source.');
+            }
 
-            if ($item->item_source === CartItem::SOURCE_ECLISE && is_numeric($item->product_id)) {
-                $item->product_id = 'ecl'.$item->product_id;
+            if ((int) $item->source_id <= 0 || blank($item->source_sku)) {
+                throw new InvalidArgumentException('Order item source identity is required.');
             }
         });
     }
@@ -45,26 +50,47 @@ class OrderItem extends Model
         return $this->belongsTo(Order::class);
     }
 
-    public function product(): BelongsTo
+    public function displayImageUrl(): string
     {
-        return $this->belongsTo(Product::class);
+        return $this->display_image_url;
     }
 
-    public function ecliseProductId(): ?int
+    public function getSourceItemAttribute(): Product|MobileSentrixDevice|null
     {
-        if ($this->item_source !== CartItem::SOURCE_ECLISE) {
-            return null;
+        if (array_key_exists('source_item', $this->relations)) {
+            return $this->relations['source_item'];
         }
 
-        $id = preg_replace('/^ecl/i', '', (string) $this->product_id);
+        $sourceItem = match ($this->source) {
+            CartItem::SOURCE_ECLISE => Product::query()
+                ->whereKey($this->source_id)
+                ->where('sku', $this->source_sku)
+                ->first(),
+            CartItem::SOURCE_MOBILESENTRIX => MobileSentrixDevice::query()
+                ->where('entity_id', $this->source_id)
+                ->where('sku', $this->source_sku)
+                ->first(),
+            default => null,
+        };
 
-        return is_numeric($id) ? (int) $id : null;
+        $this->setRelation('source_item', $sourceItem);
+
+        return $sourceItem;
     }
 
-    public function ecliseProduct(): ?Product
+    public function getDisplayNameAttribute(): string
     {
-        $id = $this->ecliseProductId();
+        $sourceItem = $this->source_item;
 
-        return $id ? Product::query()->find($id) : null;
+        if ($sourceItem instanceof MobileSentrixDevice) {
+            return $sourceItem->displayName();
+        }
+
+        return $sourceItem?->name ?: 'Item unavailable';
+    }
+
+    public function getDisplayImageUrlAttribute(): string
+    {
+        return $this->source_item?->display_image_url ?: CatalogImage::fallbackUrl();
     }
 }

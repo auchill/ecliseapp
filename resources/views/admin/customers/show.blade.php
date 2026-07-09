@@ -15,6 +15,22 @@
             </div>
 
             <div class="row g-4">
+                @if ($customer->customer)
+                    <div class="col-12">
+                        <div class="surface p-4">
+                            <h2 class="h4 fw-bold mb-3">Customer Profile</h2>
+                            <div class="row g-3">
+                                <div class="col-md-4"><strong>Phone</strong><div>{{ $customer->customer->phone ?: 'Not provided' }}</div></div>
+                                <div class="col-md-4"><strong>Status</strong><div>{{ ucfirst($customer->customer->status) }}</div></div>
+                                <div class="col-md-4"><strong>Customer since</strong><div>{{ $customer->customer->customer_since?->format('M j, Y') }}</div></div>
+                                <div class="col-12">
+                                    <strong>Address</strong>
+                                    <div>{{ collect([$customer->customer->street_address, $customer->customer->address_line_2, $customer->customer->city, $customer->customer->province, $customer->customer->postal_code, $customer->customer->country])->filter()->implode(', ') ?: 'Not provided' }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @endif
                 <div class="col-lg-6">
                     <div class="surface p-4 h-100">
                         <h2 class="h4 fw-bold mb-3">Repairs</h2>

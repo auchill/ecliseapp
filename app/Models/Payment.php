@@ -37,6 +37,7 @@ class Payment extends Model
         'order_id',
         'repair_order_id',
         'source',
+        'checkout_data',
         'gateway',
         'gateway_reference_id',
         'stripe_checkout_session_id',
@@ -64,6 +65,7 @@ class Payment extends Model
         return [
             'amount' => 'decimal:2',
             'raw_response' => 'array',
+            'checkout_data' => 'array',
             'paid_at' => 'datetime',
         ];
     }

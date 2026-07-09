@@ -95,7 +95,7 @@
                 @forelse ($featuredProducts as $product)
                     <div class="col-md-6 col-xl-3">
                         <div class="surface product-card h-100 overflow-hidden">
-                            <img src="{{ $product->imageUrl() }}" alt="{{ $product->name }}">
+                            <img src="{{ $product->imageUrl() }}" alt="{{ $product->name }}" onerror="this.onerror=null;this.src='{{ \App\Support\CatalogImage::fallbackUrl() }}';">
                             <div class="p-4">
                                 <p class="eyebrow mb-1">{{ $product->category?->name }}</p>
                                 <h3 class="h5 fw-bold">{{ $product->name }}</h3>

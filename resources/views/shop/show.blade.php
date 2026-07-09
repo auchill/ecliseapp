@@ -8,7 +8,7 @@
             <div class="row g-5">
                 <div class="col-lg-6">
                     <div class="surface product-card overflow-hidden">
-                        <img src="{{ $product->imageUrl() }}" alt="{{ $product->name }}" style="height: 420px;">
+                        <img src="{{ $product->imageUrl() }}" alt="{{ $product->name }}" style="height: 420px;" onerror="this.onerror=null;this.src='{{ \App\Support\CatalogImage::fallbackUrl() }}';">
                     </div>
                 </div>
                 <div class="col-lg-6">
@@ -59,7 +59,7 @@
                         @foreach ($relatedProducts as $related)
                             <div class="col-md-4">
                                 <div class="surface product-card h-100 overflow-hidden">
-                                    <img src="{{ $related->imageUrl() }}" alt="{{ $related->name }}">
+                                    <img src="{{ $related->imageUrl() }}" alt="{{ $related->name }}" onerror="this.onerror=null;this.src='{{ \App\Support\CatalogImage::fallbackUrl() }}';">
                                     <div class="p-4">
                                         <h3 class="h5 fw-bold">{{ $related->name }}</h3>
                                         <div class="d-flex justify-content-between align-items-center">

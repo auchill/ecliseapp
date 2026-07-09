@@ -1,9 +1,7 @@
 @forelse ($parts as $part)
     @php
-        $fallbackImage = asset('images/brand/logo_main.png');
-        $partImage = ($part->local_image_path ?: $part->image_path)
-            ? asset('storage/'.($part->local_image_path ?: $part->image_path))
-            : ($part->default_image ?: $part->image_url ?: $fallbackImage);
+        $fallbackImage = \App\Support\CatalogImage::fallbackUrl();
+        $partImage = $part->imageUrl();
     @endphp
     <article class="parts-menu-part-card">
         <a class="parts-card-image-wrap parts-menu-part-image" href="{{ route('parts.show', $part) }}">

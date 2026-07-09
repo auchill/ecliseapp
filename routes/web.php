@@ -148,7 +148,7 @@ Route::middleware('admin')->prefix('admin')->name('admin.')->group(function (): 
 
     Route::resource('shop/products', AdminProductController::class)->names('products')->except(['show']);
     Route::resource('shop/product-categories', AdminProductCategoryController::class)->names('product-categories')->except(['show']);
-    Route::get('/shop/orders', [AdminOrderController::class, 'index'])->defaults('source', 'shop')->name('orders.index');
+    Route::get('/shop/orders', [AdminOrderController::class, 'index'])->name('orders.index');
     Route::get('/shop/orders/{order}', [AdminOrderController::class, 'show'])->name('orders.show');
     Route::patch('/shop/orders/{order}', [AdminOrderController::class, 'update'])->name('orders.update');
     Route::get('/shop/payments', [AdminPaymentController::class, 'index'])->defaults('source', 'shop')->name('shop-payments.index');

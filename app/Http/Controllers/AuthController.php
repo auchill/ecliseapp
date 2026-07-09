@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Cart;
 use App\Models\CartItem;
+use App\Models\Customer;
 use App\Models\MobileSentrixDevice;
 use App\Models\Permission;
 use App\Models\Product;
@@ -155,10 +155,7 @@ class AuthController extends Controller
             return;
         }
 
-        $cart = Cart::query()->firstOrCreate([
-            'user_id' => $request->user()->id,
-            'status' => 'active',
-        ]);
+        $cart = Customer::forUser($request->user())->getOrCreateActiveCart();
 
         $sessionItems->each(function ($quantity, $key) use ($cart): void {
             [$source, $productId] = $this->parseCartKey((string) $key);
@@ -174,8 +171,9 @@ class AuthController extends Controller
                 }
 
                 $item = $cart->items()->firstOrNew([
-                    'product_id' => $device->cartProductId(),
-                    'item_source' => CartItem::SOURCE_MOBILESENTRIX,
+                    'source_id' => $device->entity_id,
+                    'source_sku' => $device->sku,
+                    'source' => CartItem::SOURCE_MOBILESENTRIX,
                 ]);
                 $item->unit_price = $device->displayPrice() ?? 0;
                 $item->quantity = min($device->availableQuantity(), ($item->exists ? $item->quantity : 0) + (int) $quantity);
@@ -192,8 +190,9 @@ class AuthController extends Controller
             }
 
             $item = $cart->items()->firstOrNew([
-                'product_id' => 'ecl'.$product->id,
-                'item_source' => CartItem::SOURCE_ECLISE,
+                'source_id' => $product->id,
+                'source_sku' => $product->sku,
+                'source' => CartItem::SOURCE_ECLISE,
             ]);
             $item->unit_price = $product->currentPrice();
             $item->quantity = min($product->quantity, ($item->exists ? $item->quantity : 0) + (int) $quantity);
@@ -231,12 +230,16 @@ class AuthController extends Controller
 
     private function parseCartKey(string $key): array
     {
-        if (! str_contains($key, ':')) {
-            return [CartItem::SOURCE_ECLISE, str_starts_with($key, 'ecl') ? $key : 'ecl'.$key];
+        $parts = explode(':', $key, 3);
+
+        if (count($parts) === 3) {
+            return [$parts[0], (int) $parts[1], rawurldecode($parts[2])];
         }
 
-        [$source, $productId] = explode(':', $key, 2);
+        if (count($parts) === 2) {
+            return [$parts[0], $parts[1]];
+        }
 
-        return [$source ?: CartItem::SOURCE_ECLISE, $productId];
+        return [CartItem::SOURCE_ECLISE, $key];
     }
 }

@@ -77,13 +77,16 @@ class PaymentGatewayService
         }
 
         $payable = $payment->payable;
+        $customerEmail = data_get($payment->checkout_data, 'customer.email')
+            ?: $payable->email
+            ?? $payable->customer?->email;
 
         $response = Http::asForm()
             ->withToken($secret)
             ->post('https://api.stripe.com/v1/checkout/sessions', [
                 'mode' => 'payment',
                 'client_reference_id' => (string) $payment->id,
-                'customer_email' => $payable->email ?? null,
+                'customer_email' => $customerEmail,
                 'success_url' => route('payments.stripe.success', $payment).'?session_id={CHECKOUT_SESSION_ID}',
                 'cancel_url' => route('payments.cancel', $payment),
                 'payment_method_types[0]' => 'card',
@@ -200,6 +203,10 @@ class PaymentGatewayService
 
     private function paymentDescription(Payment $payment): string
     {
+        if ($payment->source === 'shop' && $payment->checkout_data) {
+            return 'Eclise shop checkout';
+        }
+
         $payable = $payment->payable;
 
         if (method_exists($payable, 'fulfillmentLabel')) {

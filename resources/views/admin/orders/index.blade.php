@@ -8,28 +8,17 @@
             <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
                 <div>
                     <p class="eyebrow">Admin</p>
-                    <h1 class="display-6 fw-bold mb-0">{{ $source ? $sources[$source].' Orders' : 'Order Management' }}</h1>
+                    <h1 class="display-6 fw-bold mb-0">Shop Orders</h1>
                 </div>
             </div>
 
             <form class="surface p-4 mb-4" method="GET" action="{{ route('admin.orders.index') }}">
                 <div class="row g-3 align-items-end">
-                    @unless($source)
-                        <div class="col-lg-3">
-                            <label class="form-label" for="source">Source</label>
-                            <select class="form-select" id="source" name="source">
-                                <option value="">All sources</option>
-                                @foreach ($sources as $value => $label)
-                                    <option value="{{ $value }}" @selected(request('source') === $value)>{{ $label }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                    @endunless
-                    <div class="{{ $source ? 'col-lg-6' : 'col-lg-4' }}">
+                    <div class="col-lg-6">
                         <label class="form-label" for="q">Search</label>
                         <input class="form-control" id="q" name="q" value="{{ request('q') }}" placeholder="Order, customer, email">
                     </div>
-                    <div class="{{ $source ? 'col-lg-4' : 'col-lg-3' }}">
+                    <div class="col-lg-4">
                         <label class="form-label" for="status">Status</label>
                         <select class="form-select" id="status" name="status">
                             <option value="">All</option>
@@ -50,7 +39,6 @@
                         <thead>
                             <tr>
                                 <th>Order</th>
-                                <th>Source</th>
                                 <th>Customer</th>
                                 <th>Status</th>
                                 <th>Payment</th>
@@ -65,7 +53,6 @@
                             @forelse ($orders as $order)
                                 <tr>
                                     <td>{{ $order->order_number }}</td>
-                                    <td>{{ $order->sourceLabel() }}</td>
                                     <td>{{ $order->customer_name }}</td>
                                     <td><span class="status-pill">{{ $order->status }}</span></td>
                                     <td>{{ ucfirst($order->payment_status) }}</td>
@@ -76,7 +63,7 @@
                                     <td class="text-end"><a class="btn btn-outline-primary btn-sm" href="{{ route('admin.orders.show', $order) }}"><i class="bi bi-eye"></i><span class="visually-hidden">Open</span></a></td>
                                 </tr>
                             @empty
-                                <tr><td colspan="10">No orders found.</td></tr>
+                                <tr><td colspan="9">No orders found.</td></tr>
                             @endforelse
                         </tbody>
                     </table>

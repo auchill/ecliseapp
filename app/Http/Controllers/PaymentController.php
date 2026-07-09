@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Cart;
+use App\Models\Order;
 use App\Models\Payment;
+use App\Models\RepairBooking;
 use App\Services\PaymentFinalizer;
 use App\Services\PaymentGatewayService;
 use Illuminate\Http\Request;
@@ -79,8 +82,9 @@ class PaymentController extends Controller
 
         abort_unless(
             $user?->isAdmin()
-            || ($payable && isset($payable->user_id) && $payable->user_id === $user?->id)
-            || ($payable && ! isset($payable->user_id)),
+            || ($payable instanceof Cart && $payable->customer?->user_id === $user?->id)
+            || ($payable instanceof Order && $payable->customer?->user_id === $user?->id)
+            || ($payable instanceof RepairBooking && (! $payable->user_id || $payable->user_id === $user?->id)),
             403,
         );
     }

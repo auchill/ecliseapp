@@ -6,9 +6,9 @@
     <section class="section-pad bg-white">
         <div class="container">
             <div class="surface p-4 p-lg-5">
-                <p class="eyebrow">Order Created</p>
+                <p class="eyebrow">Payment Confirmed</p>
                 <h1 class="display-6 fw-bold">Order {{ $order->order_number }}</h1>
-                <p class="muted fs-5">Your order has been created. Payment status will update after the selected gateway confirms the transaction.</p>
+                <p class="muted fs-5">Your payment was confirmed and your order has been created.</p>
                 @if ($order->isShipping())
                     <div class="alert alert-info">Your order will be shipped after processing. Tracking details will appear here when available.</div>
                 @else
@@ -27,8 +27,13 @@
                         <tbody>
                             @foreach ($order->items as $item)
                                 <tr>
-                                    <td>{{ $item->product_name }}</td>
-                                    <td>{{ $item->sku }}</td>
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <img src="{{ $item->displayImageUrl() }}" alt="" width="48" height="48" style="object-fit: contain;" onerror="this.onerror=null;this.src='{{ \App\Support\CatalogImage::fallbackUrl() }}';">
+                                            <span>{{ $item->display_name }}</span>
+                                        </div>
+                                    </td>
+                                    <td>{{ $item->source_sku }}</td>
                                     <td>{{ $item->quantity }}</td>
                                     <td>${{ number_format($item->line_total, 2) }}</td>
                                 </tr>

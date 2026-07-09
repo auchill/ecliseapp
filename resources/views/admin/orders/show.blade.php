@@ -31,8 +31,13 @@
                                 <tbody>
                                     @foreach ($order->items as $item)
                                         <tr>
-                                            <td>{{ $item->product_name }}</td>
-                                            <td>{{ $item->sku }}</td>
+                                            <td>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <img src="{{ $item->displayImageUrl() }}" alt="" width="44" height="44" style="object-fit: contain;" onerror="this.onerror=null;this.src='{{ \App\Support\CatalogImage::fallbackUrl() }}';">
+                                                    <span>{{ $item->display_name }}</span>
+                                                </div>
+                                            </td>
+                                            <td>{{ $item->source_sku }}</td>
                                             <td>{{ $item->quantity }}</td>
                                             <td>${{ number_format($item->unit_price, 2) }}</td>
                                             <td>${{ number_format($item->line_total, 2) }}</td>
@@ -178,7 +183,6 @@
                         <h2 class="h5 fw-bold">Customer Details</h2>
                         <p class="mb-1"><strong>Email:</strong> {{ $order->email }}</p>
                         <p class="mb-1"><strong>Phone:</strong> {{ $order->phone }}</p>
-                        <p class="mb-1"><strong>Source:</strong> {{ $order->sourceLabel() }}</p>
                         <p class="mb-1"><strong>Fulfillment:</strong> {{ $order->fulfillmentLabel() }}</p>
                         <p class="mb-1"><strong>Payment gateway:</strong> {{ $order->latestPayment?->gatewayLabel() ?? ucfirst($order->payment_gateway ?? $order->payment_provider ?? 'Pending') }}</p>
                         <p class="mb-1"><strong>Payment status:</strong> {{ ucfirst($order->payment_status) }}</p>

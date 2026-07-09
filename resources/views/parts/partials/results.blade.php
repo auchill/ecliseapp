@@ -1,10 +1,8 @@
 <div class="row g-3 parts-card-grid">
     @forelse ($parts as $part)
         @php
-            $fallbackImage = asset('images/brand/logo_main.png');
-            $partImage = ($part->local_image_path ?: $part->image_path)
-                ? asset('storage/'.($part->local_image_path ?: $part->image_path))
-                : ($part->default_image ?: $part->image_url ?: $fallbackImage);
+            $fallbackImage = \App\Support\CatalogImage::fallbackUrl();
+            $partImage = $part->imageUrl();
         @endphp
         <div class="col-12 col-sm-6 col-lg-4 parts-card-column">
             <div class="surface part-card h-100 overflow-hidden">

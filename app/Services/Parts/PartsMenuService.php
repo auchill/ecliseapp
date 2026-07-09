@@ -3,33 +3,12 @@
 namespace App\Services\Parts;
 
 use App\Models\PartCategory;
+use App\Support\CustomerFacingPartCategories;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 class PartsMenuService
 {
-    private const REPLACEMENT_PARTS_CATEGORY_ID = 165;
-
-    private const REPLACEMENT_PART_CHILD_IDS = [
-        756,
-        757,
-        779,
-        570,
-        167,
-    ];
-
-    private const DIRECT_TOP_LEVEL_CATEGORY_IDS = [
-        630,
-        227,
-        587,
-    ];
-
-    private const EXCLUDED_CATEGORY_IDS = [
-        8363, // Accessories belongs under Shop later.
-        3958, // Brands is not a customer-facing parts category.
-        1505, // Pre-Owned Devices is handled by the certified pre-owned devices flow.
-    ];
-
     private const DISPLAY_NAME_OVERRIDES = [
         'Others' => 'Other Parts',
         'Game Console Parts' => 'Game Console',
@@ -45,6 +24,8 @@ class PartsMenuService
         'Refurbishing' => 70,
         'Board Components' => 80,
     ];
+
+    public function __construct(private readonly CustomerFacingPartCategories $customerFacingCategories) {}
 
     public function mainMenu(): Collection
     {
@@ -113,7 +94,7 @@ class PartsMenuService
         return (bool) $category->is_active
             && $category->status === 'active'
             && (bool) $category->is_part
-            && ! in_array((int) $category->id, self::EXCLUDED_CATEGORY_IDS, true);
+            && $this->customerFacingCategories->contains((int) $category->id);
     }
 
     public function categoryPayload(PartCategory $category): array
@@ -138,12 +119,12 @@ class PartsMenuService
     private function replacementPartChildren(): Collection
     {
         return $this->visibleCategoryQuery()
-            ->where('parent_id', self::REPLACEMENT_PARTS_CATEGORY_ID)
-            ->whereIn('id', self::REPLACEMENT_PART_CHILD_IDS)
+            ->where('parent_id', CustomerFacingPartCategories::REPLACEMENT_PARTS_CATEGORY_ID)
+            ->whereIn('id', CustomerFacingPartCategories::REPLACEMENT_PART_CHILD_IDS)
             ->withCount(['childCategories as active_children_count' => fn (Builder $query) => $this->applyVisibleCategoryConstraints($query)])
             ->get()
             ->sortBy(function (PartCategory $category): int {
-                $position = array_search((int) $category->id, self::REPLACEMENT_PART_CHILD_IDS, true);
+                $position = array_search((int) $category->id, CustomerFacingPartCategories::REPLACEMENT_PART_CHILD_IDS, true);
 
                 return $position === false ? 999 : $position;
             })
@@ -154,11 +135,11 @@ class PartsMenuService
     {
         return $this->visibleCategoryQuery()
             ->whereNull('parent_id')
-            ->whereIn('id', self::DIRECT_TOP_LEVEL_CATEGORY_IDS)
+            ->whereIn('id', CustomerFacingPartCategories::DIRECT_TOP_LEVEL_CATEGORY_IDS)
             ->withCount(['childCategories as active_children_count' => fn (Builder $query) => $this->applyVisibleCategoryConstraints($query)])
             ->get()
             ->sortBy(function (PartCategory $category): int {
-                $position = array_search((int) $category->id, self::DIRECT_TOP_LEVEL_CATEGORY_IDS, true);
+                $position = array_search((int) $category->id, CustomerFacingPartCategories::DIRECT_TOP_LEVEL_CATEGORY_IDS, true);
 
                 return $position === false ? 999 : $position;
             })
@@ -175,12 +156,12 @@ class PartsMenuService
         return $query
             ->active()
             ->where('is_part', true)
-            ->whereNotIn('id', self::EXCLUDED_CATEGORY_IDS);
+            ->whereIn('id', $this->customerFacingCategories->allowedIds()->all());
     }
 
     private function isBreadcrumbCategory(PartCategory $category): bool
     {
-        return (int) $category->id !== self::REPLACEMENT_PARTS_CATEGORY_ID
+        return (int) $category->id !== CustomerFacingPartCategories::REPLACEMENT_PARTS_CATEGORY_ID
             && $this->isVisible($category);
     }
 

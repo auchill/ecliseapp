@@ -17,6 +17,7 @@ class PartController extends Controller
         return view('parts.index', [
             'parts' => $partSearch->publicResults($request),
             'brands' => Part::query()
+                ->customerFacing()
                 ->where('is_active', true)
                 ->where('status', 'active')
                 ->whereNotNull('brand')
@@ -24,7 +25,7 @@ class PartController extends Controller
                 ->distinct()
                 ->orderBy('brand')
                 ->pluck('brand'),
-            'deviceTypes' => Part::query()->where('is_active', true)->where('status', 'active')->distinct()->orderBy('device_type')->pluck('device_type'),
+            'deviceTypes' => Part::query()->customerFacing()->where('is_active', true)->where('status', 'active')->distinct()->orderBy('device_type')->pluck('device_type'),
         ]);
     }
 

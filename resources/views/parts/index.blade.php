@@ -16,7 +16,7 @@
                 data-parts-menu-browser
                 data-menu-url="{{ route('parts.menu') }}"
                 data-search-url="{{ route('parts.search') }}"
-                data-fallback-image="{{ asset('images/brand/logo_main.png') }}">
+                data-fallback-image="{{ \App\Support\CatalogImage::fallbackUrl() }}">
                 <div class="parts-menu-search-wrap">
                     <label class="visually-hidden" for="parts-menu-search">Search by sku, model or model number</label>
                     <div class="parts-menu-search">

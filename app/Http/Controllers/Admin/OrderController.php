@@ -13,14 +13,8 @@ class OrderController extends Controller
 {
     public function index(Request $request)
     {
-        $routeSource = $request->route('source');
-        $source = $routeSource ?: ($request->filled('source') ? $request->string('source')->toString() : null);
-
-        abort_if($source && ! array_key_exists($source, Order::SOURCES), 404);
-
         $orders = Order::query()
-            ->with('latestPayment')
-            ->when($source, fn ($query) => $query->where('source', $source))
+            ->with('latestPayment', 'customer')
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
             ->when($request->filled('q'), function ($query) use ($request): void {
                 $search = $request->string('q');
@@ -37,15 +31,13 @@ class OrderController extends Controller
         return view('admin.orders.index', [
             'orders' => $orders,
             'statuses' => Order::STATUSES,
-            'sources' => Order::SOURCES,
-            'source' => $source,
         ]);
     }
 
     public function show(Order $order)
     {
         return view('admin.orders.show', [
-            'order' => $order->load('items', 'user', 'statusUpdates', 'latestPayment'),
+            'order' => $order->load('items', 'customer.user', 'statusUpdates', 'latestPayment'),
             'statuses' => Order::STATUSES,
             'fulfillmentMethods' => Order::FULFILLMENT_METHODS,
         ]);

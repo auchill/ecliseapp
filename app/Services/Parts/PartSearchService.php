@@ -29,6 +29,7 @@ class PartSearchService
     {
         return Part::query()
             ->with('categories')
+            ->customerFacing()
             ->where('is_active', true)
             ->where('status', 'active')
             ->when($request->filled('q'), fn (Builder $query) => $this->applyKeyword($query, $request->string('q')->toString()))
@@ -134,6 +135,7 @@ class PartSearchService
     private function partSuggestions(string $term, int $limit, bool $admin): array
     {
         return Part::query()
+            ->when(! $admin, fn (Builder $query) => $query->customerFacing())
             ->when(! $admin, fn (Builder $query) => $query->where('is_active', true)->where('status', 'active'))
             ->where(function (Builder $query) use ($term): void {
                 $query->where('name', 'like', "%{$term}%")
@@ -171,6 +173,7 @@ class PartSearchService
     private function brandSuggestions(string $term, int $limit, bool $admin): array
     {
         return Part::query()
+            ->when(! $admin, fn (Builder $query) => $query->customerFacing())
             ->when(! $admin, fn (Builder $query) => $query->where('is_active', true)->where('status', 'active'))
             ->whereNotNull('brand')
             ->whereRaw("TRIM(brand) != ''")
@@ -192,6 +195,7 @@ class PartSearchService
     private function modelSuggestions(string $term, int $limit, bool $admin): array
     {
         return Part::query()
+            ->when(! $admin, fn (Builder $query) => $query->customerFacing())
             ->when(! $admin, fn (Builder $query) => $query->where('is_active', true)->where('status', 'active'))
             ->whereNotNull('model_compatibility')
             ->whereRaw("TRIM(model_compatibility) != ''")

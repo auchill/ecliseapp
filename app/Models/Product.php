@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\CatalogImage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -128,9 +129,14 @@ class Product extends Model
     public function imageUrl(): string
     {
         if ($this->image_path) {
-            return asset('storage/'.$this->image_path);
+            return CatalogImage::storageUrl($this->image_path);
         }
 
-        return asset('images/brand/logo_main.png');
+        return CatalogImage::fallbackUrl();
+    }
+
+    public function getDisplayImageUrlAttribute(): string
+    {
+        return $this->imageUrl();
     }
 }

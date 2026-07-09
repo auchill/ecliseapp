@@ -33,7 +33,7 @@
                                     <tr>
                                         <td>
                                             <div class="d-flex align-items-center gap-3">
-                                                <img src="{{ $item['image_url'] }}" alt="{{ $item['name'] }}" width="72" height="72" style="object-fit: contain;">
+                                                <img src="{{ $item['image_url'] }}" alt="{{ $item['name'] }}" width="72" height="72" style="object-fit: contain;" onerror="this.onerror=null;this.src='{{ \App\Support\CatalogImage::fallbackUrl() }}';">
                                                 <div>
                                                     <strong>{{ $item['name'] }}</strong>
                                                     <div class="small muted">{{ $item['source'] }} &middot; {{ $item['sku'] ?: 'No SKU' }}</div>
