@@ -208,3 +208,19 @@ test('parts menu search returns matching categories and parts', function () {
         ->and($response->json('parts.0.fallback_image_url'))->toContain('images/brand/eclise-thumb-grey.png')
         ->and($response->json('html'))->toContain('iPhone 15 Battery');
 });
+
+test('parts verify category command reports deep category path and listing counts', function () {
+    $tree = seedPartsMenuTree();
+    $iphone = createPartsMenuCategory(['id' => 166, 'parent_id' => $tree['apple']->id, 'name' => 'iPhone', 'has_children' => true]);
+    $iphone17 = createPartsMenuCategory(['id' => 16490, 'parent_id' => $iphone->id, 'name' => 'iPhone 17 Pro Max']);
+    createPartsMenuPart($iphone17, ['id' => 226122, 'name' => 'OLED Assembly For iPhone 17 Pro Max', 'sku' => '107182113502']);
+
+    $this->artisan('parts:verify-category', ['categoryId' => 16490])
+        ->assertSuccessful()
+        ->expectsOutputToContain('Category found in part_categories: yes')
+        ->expectsOutputToContain('Path: Replacement Parts (#165) > Apple (#756) > iPhone (#166) > iPhone 17 Pro Max (#16490)')
+        ->expectsOutputToContain('Parts where parts.category_ids contains 16490: 1')
+        ->expectsOutputToContain('Pivot rows in part_category_part for category_id 16490: 1')
+        ->expectsOutputToContain('Frontend listing query count: 1')
+        ->expectsOutputToContain('107182113502');
+});

@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 beforeEach(function (): void {
     config([
@@ -395,7 +396,7 @@ test('mobile sentrix parts sync maps products into parts without exposing suppli
         ->and($part->category_ids)->toBe(['165'])
         ->and((float) $part->cost_price)->toBe(50.0)
         ->and((float) $part->selling_price)->toBe(60.0)
-        ->and($part->categories()->exists())->toBeFalse()
+        ->and($part->categories()->whereKey($category->id)->exists())->toBeTrue()
         ->and($part->gallery_images->pluck('image_url'))->toContain('https://cdn.example.test/part.jpg')
         ->and(Schema::hasColumn('parts', 'mobilesentrix_product_id'))->toBeFalse()
         ->and(Schema::hasColumn('parts', 'part_brand_id'))->toBeFalse()
@@ -445,6 +446,11 @@ test('mobile sentrix parts sync keeps missing category ids raw without creating 
         ->and($log->skipped_count)->toBe(0)
         ->and(json_encode($log->error_details))->not->toContain('missing category 999999');
 
+    $this->assertDatabaseHas('part_category_part', [
+        'part_id' => $part->id,
+        'category_id' => 999999,
+    ]);
+
     $this->artisan('mobilesentrix:generate-part-category-pivot')->assertSuccessful();
 
     $pivotLog = MobileSentrixSyncLog::query()->where('sync_type', 'part_category_pivot')->latest()->firstOrFail();
@@ -460,6 +466,69 @@ test('mobile sentrix parts sync keeps missing category ids raw without creating 
     $this->assertDatabaseMissing('part_categories', [
         'name' => 'MobileSentrix Category 999999',
     ]);
+});
+
+test('mobile sentrix category sync creates pivot rows and reports debug category stats', function () {
+    foreach ([
+        165 => ['name' => 'Replacement Parts', 'parent_id' => null],
+        756 => ['name' => 'Apple', 'parent_id' => 165],
+        166 => ['name' => 'iPhone', 'parent_id' => 756],
+        16490 => ['name' => 'iPhone 17 Pro Max', 'parent_id' => 166],
+    ] as $categoryId => $attributes) {
+        PartCategory::query()->create([
+            'id' => $categoryId,
+            'name' => $attributes['name'],
+            'slug' => Str::slug($attributes['name'].' '.$categoryId),
+            'parent_id' => $attributes['parent_id'],
+            'is_part' => true,
+            'is_active' => true,
+            'status' => 'active',
+        ]);
+    }
+
+    Http::fake([
+        'https://preprod.mobilesentrix.ca/api/rest/products*' => Http::response([
+            'data' => [
+                'items' => [[
+                    'entity_id' => '226122',
+                    'sku' => '107182113502',
+                    'status' => 1,
+                    'name' => 'OLED Assembly For iPhone 17 Pro Max',
+                    'description' => 'OLED assembly.',
+                    'price' => '399.00',
+                    'category_ids' => [1, 2, 165, 166, 756, 16490],
+                    'is_in_stock' => true,
+                    'in_stock_qty' => 3,
+                ]],
+                'page_info' => [
+                    'current_page' => 1,
+                    'total_pages' => 1,
+                    'page_size' => 1,
+                    'total_count' => 1,
+                ],
+            ],
+        ]),
+    ]);
+
+    $this->artisan('mobilesentrix:sync-parts', [
+        '--category' => '16490',
+        '--debug-category' => '16490',
+    ])
+        ->assertSuccessful()
+        ->expectsOutputToContain('Debug category 16490: API records containing category 1');
+
+    $part = Part::query()->findOrFail(226122);
+
+    expect($part->category_ids)->toContain('16490');
+
+    $this->assertDatabaseHas('part_category_part', [
+        'part_id' => 226122,
+        'category_id' => 16490,
+    ]);
+
+    $this->getJson(route('parts.category.parts', PartCategory::query()->findOrFail(16490)))
+        ->assertOk()
+        ->assertJsonPath('total', 1);
 });
 
 test('mobile sentrix parts sync enriches missing details without category table lookups or failed parts', function () {

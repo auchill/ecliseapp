@@ -5,6 +5,7 @@ namespace App\Services\MobileSentrix;
 use App\Models\MobileSentrixSyncLog;
 use App\Models\Part;
 use App\Models\PartCategory;
+use App\Support\MobileSentrixCategoryIds;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -12,7 +13,10 @@ use Illuminate\Support\Str;
 
 class MobileSentrixSyncService
 {
-    public function __construct(private readonly MobileSentrixClient $client) {}
+    public function __construct(
+        private readonly MobileSentrixClient $client,
+        private readonly PartCategoryPivotService $pivotService,
+    ) {}
 
     public function syncCategories(?string $categoryId = null, ?int $maxDepth = null): array
     {
@@ -75,7 +79,18 @@ class MobileSentrixSyncService
             'detail_lookup_failed_count' => 0,
             'empty_category_ids_count' => 0,
             'category_ids_remained_missing_count' => 0,
+            'with_category_ids_count' => 0,
+            'missing_category_ids_count' => 0,
+            'pivot_rows_created' => 0,
+            'pivot_rows_existing' => 0,
+            'pivot_rows_skipped_empty_category_ids' => 0,
+            'pivot_rows_failed' => 0,
             'dry_run' => $dryRun,
+            'debug_category' => filled($options['debug_category'] ?? null) ? (int) $options['debug_category'] : null,
+            'debug_api_records_containing_category' => 0,
+            'debug_parts_table_records_containing_category' => 0,
+            'debug_pivot_rows_for_category' => 0,
+            'debug_listing_query_count' => 0,
         ]);
 
         try {
@@ -140,11 +155,14 @@ class MobileSentrixSyncService
 
                         try {
                             $record = $this->enrichMissingPartDetails($record, $summary);
-                            $this->processPartRecord($record, $summary, [
+                            $this->trackCategoryIdsForSync($record, $summary);
+                            $part = $this->processPartRecord($record, $summary, [
                                 'dry_run' => $dryRun,
                                 'force' => $force,
                                 'sync_categories' => false,
+                                'sync_category_pivots' => true,
                             ]);
+                            $this->trackSavedPartForDebugCategory($part, $summary);
                         } catch (\Throwable $exception) {
                             $summary['failed_count']++;
                             $this->addError($summary, $this->safeError($exception, $record));
@@ -160,14 +178,22 @@ class MobileSentrixSyncService
                 $page++;
             } while ($hasNextPage);
 
+            $this->finalizeDebugCategoryStats($summary);
+
             return $this->finishLog($log, $summary, sprintf(
-                'MobileSentrix parts sync completed. Detail lookups: %d, records enriched: %d, descriptions updated: %d, category IDs updated: %d, detail failures: %d, category IDs still missing: %d.',
+                'MobileSentrix parts sync completed. Detail lookups: %d, records enriched: %d, descriptions updated: %d, category IDs updated: %d, detail failures: %d, category IDs still missing: %d. With category IDs: %d, missing category IDs: %d, pivot rows created: %d, pivot rows existing: %d, pivot rows skipped empty category IDs: %d, pivot row failures: %d.',
                 $summary['detail_lookup_count'],
                 $summary['detail_updated_count'],
                 $summary['description_updated_count'],
                 $summary['category_ids_updated_count'],
                 $summary['detail_lookup_failed_count'],
                 $summary['category_ids_remained_missing_count'],
+                $summary['with_category_ids_count'],
+                $summary['missing_category_ids_count'],
+                $summary['pivot_rows_created'],
+                $summary['pivot_rows_existing'],
+                $summary['pivot_rows_skipped_empty_category_ids'],
+                $summary['pivot_rows_failed'],
             ));
         } catch (\Throwable $exception) {
             $summary['failed_count']++;
@@ -234,10 +260,11 @@ class MobileSentrixSyncService
             $oldStock = $part->is_in_stock;
 
             $syncCategories = (bool) ($options['sync_categories'] ?? true);
-            $categories = $syncCategories
-                ? $this->categoriesFromProduct($record, $summary)
-                : collect();
-            $primaryCategory = $categories->first();
+            $syncCategoryPivots = (bool) ($options['sync_category_pivots'] ?? true);
+            $categoryIds = $this->categoryIdsValue($record['category_ids'] ?? []);
+            $primaryCategory = $syncCategories && $categoryIds !== []
+                ? PartCategory::query()->find((int) $categoryIds[0])
+                : null;
             $brandName = $this->stringValue($record, 'brand_text')
                 ?: $this->stringValue($record, 'manufacturer_text')
                 ?: $this->stringValue($record, 'manufacture_text')
@@ -377,8 +404,8 @@ class MobileSentrixSyncService
 
             $part->save();
 
-            if ($syncCategories) {
-                $this->syncPartCategories($part, $categories);
+            if ($syncCategoryPivots) {
+                $this->syncPartCategories($part, $summary);
             }
 
             $summary['processed_count']++;
@@ -641,36 +668,100 @@ class MobileSentrixSyncService
         return $category;
     }
 
-    private function categoriesFromProduct(array $record, array &$summary): Collection
+    private function syncPartCategories(Part $part, array &$summary): void
     {
-        return collect($this->arrayValue($record['category_ids'] ?? []))
-            ->map(function ($categoryId) use ($record, &$summary) {
-                $categoryId = (int) $categoryId;
-                $category = PartCategory::query()->find($categoryId);
+        try {
+            $result = $this->pivotService->syncPart($part);
 
-                if (! $category) {
-                    $summary['warning_count'] = ($summary['warning_count'] ?? 0) + 1;
-                    $this->addError($summary, [
-                        'message' => "MobileSentrix part references missing category {$categoryId}; keeping raw category_ids without creating a placeholder category.",
-                        'entity_id' => $record['entity_id'] ?? $record['product_id'] ?? null,
-                        'sku' => $record['sku'] ?? $record['new_sku'] ?? $record['product_code'] ?? null,
-                        'missing_category_id' => $categoryId,
-                    ]);
-                }
-
-                return $category;
-            })
-            ->filter()
-            ->values();
+            $summary['pivot_rows_created'] = ($summary['pivot_rows_created'] ?? 0) + ($result['created_count'] ?? 0);
+            $summary['pivot_rows_existing'] = ($summary['pivot_rows_existing'] ?? 0) + ($result['existing_count'] ?? 0);
+            $summary['pivot_rows_skipped_empty_category_ids'] = ($summary['pivot_rows_skipped_empty_category_ids'] ?? 0) + ($result['no_category_ids_count'] ?? 0);
+        } catch (\Throwable $exception) {
+            $summary['pivot_rows_failed'] = ($summary['pivot_rows_failed'] ?? 0) + 1;
+            $summary['warning_count'] = ($summary['warning_count'] ?? 0) + 1;
+            $this->addError($summary, [
+                'message' => Str::limit($exception->getMessage(), 500, '...'),
+                'entity_id' => $part->id,
+                'sku' => $part->sku ?: $part->new_sku,
+                'stage' => 'part_category_pivot',
+            ]);
+        }
     }
 
-    private function syncPartCategories(Part $part, Collection $categories): void
+    private function trackCategoryIdsForSync(array $record, array &$summary): void
     {
-        $sync = $categories->mapWithKeys(fn (PartCategory $category) => [
-            $category->id => [],
-        ])->all();
+        $categoryIds = $this->categoryIdsValue($record['category_ids'] ?? null);
 
-        $part->categories()->syncWithoutDetaching($sync);
+        if ($categoryIds === []) {
+            $summary['missing_category_ids_count']++;
+
+            return;
+        }
+
+        $summary['with_category_ids_count']++;
+
+        if ($this->categoryIdsContainDebugCategory($categoryIds, $summary)) {
+            $summary['debug_api_records_containing_category']++;
+        }
+    }
+
+    private function trackSavedPartForDebugCategory(?Part $part, array &$summary): void
+    {
+        if (! $part || blank($summary['debug_category'] ?? null)) {
+            return;
+        }
+
+        if ($this->categoryIdsContainDebugCategory($this->categoryIdsValue($part->category_ids), $summary)) {
+            Log::info('MobileSentrix sync saved part for debug category.', [
+                'debug_category' => $summary['debug_category'],
+                'part_id' => $part->id,
+                'sku' => $part->sku ?: $part->new_sku,
+            ]);
+        }
+    }
+
+    private function finalizeDebugCategoryStats(array &$summary): void
+    {
+        $debugCategory = $summary['debug_category'] ?? null;
+
+        if (! $debugCategory) {
+            return;
+        }
+
+        $debugCategory = (string) $debugCategory;
+        $partsContainingCategory = 0;
+
+        Part::query()
+            ->select(['id', 'category_ids'])
+            ->orderBy('id')
+            ->chunkById(500, function ($parts) use (&$partsContainingCategory, $debugCategory): void {
+                foreach ($parts as $part) {
+                    if (in_array($debugCategory, $this->categoryIdsValue($part->category_ids), true)) {
+                        $partsContainingCategory++;
+                    }
+                }
+            });
+
+        $summary['debug_parts_table_records_containing_category'] = $partsContainingCategory;
+        $summary['debug_pivot_rows_for_category'] = DB::table('part_category_part')
+            ->where('category_id', (int) $debugCategory)
+            ->count();
+
+        $category = PartCategory::query()->find((int) $debugCategory);
+        $summary['debug_listing_query_count'] = $category
+            ? $category->parts()
+                ->where('parts.is_active', true)
+                ->where('parts.status', 'active')
+                ->count()
+            : 0;
+    }
+
+    private function categoryIdsContainDebugCategory(array $categoryIds, array $summary): bool
+    {
+        $debugCategory = $summary['debug_category'] ?? null;
+
+        return $debugCategory
+            && in_array((string) $debugCategory, $categoryIds, true);
     }
 
     private function partIdentifiers(array $record): array
@@ -908,6 +999,17 @@ class MobileSentrixSyncService
             'detail_lookup_failed_count',
             'empty_category_ids_count',
             'category_ids_remained_missing_count',
+            'with_category_ids_count',
+            'missing_category_ids_count',
+            'pivot_rows_created',
+            'pivot_rows_existing',
+            'pivot_rows_skipped_empty_category_ids',
+            'pivot_rows_failed',
+            'debug_category',
+            'debug_api_records_containing_category',
+            'debug_parts_table_records_containing_category',
+            'debug_pivot_rows_for_category',
+            'debug_listing_query_count',
         ])->all();
 
         if ($detailMetrics !== []) {
@@ -1028,51 +1130,17 @@ class MobileSentrixSyncService
 
     private function categoryIdsValue(mixed $value): array
     {
-        if (is_string($value)) {
-            $decoded = json_decode($value, true);
-
-            if (json_last_error() === JSON_ERROR_NONE && $decoded !== $value) {
-                return $this->categoryIdsValue($decoded);
-            }
-        }
-
-        return $this->arrayValue($value);
+        return MobileSentrixCategoryIds::values($value);
     }
 
     private function categoryIdsMissing(mixed $value): bool
     {
-        if ($value === null || $value === '') {
-            return true;
-        }
-
-        if (is_array($value)) {
-            return collect($value)->flatten()->filter(fn ($id): bool => filled($id))->isEmpty();
-        }
-
-        if (is_string($value)) {
-            $decoded = json_decode(trim($value), true);
-
-            if (json_last_error() === JSON_ERROR_NONE) {
-                return $this->categoryIdsMissing($decoded);
-            }
-        }
-
-        return false;
+        return MobileSentrixCategoryIds::missing($value);
     }
 
     private function isExplicitEmptyCategoryIds(mixed $value): bool
     {
-        if (is_array($value)) {
-            return $value === [];
-        }
-
-        if (! is_string($value)) {
-            return false;
-        }
-
-        $decoded = json_decode(trim($value), true);
-
-        return json_last_error() === JSON_ERROR_NONE && $decoded === [];
+        return MobileSentrixCategoryIds::explicitEmpty($value);
     }
 
     private function recordValueMissing(mixed $value): bool

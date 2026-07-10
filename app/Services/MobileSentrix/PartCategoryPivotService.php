@@ -4,6 +4,7 @@ namespace App\Services\MobileSentrix;
 
 use App\Models\MobileSentrixSyncLog;
 use App\Models\Part;
+use App\Support\MobileSentrixCategoryIds;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -127,94 +128,58 @@ class PartCategoryPivotService
         }
     }
 
-    public function syncPart(Part $part): void
+    public function syncPart(Part $part): array
     {
-        [$ids] = $this->parseCategoryIds($part->category_ids);
+        [$ids, $invalidCount] = $this->parseCategoryIds($part->category_ids);
         $now = now();
+        $summary = [
+            'created_count' => 0,
+            'existing_count' => 0,
+            'invalid_id_count' => $invalidCount,
+            'no_category_ids_count' => 0,
+            'failed_count' => 0,
+        ];
 
         if ($ids === []) {
+            $summary['no_category_ids_count']++;
+
             if (! DB::table('part_category_part')->where('part_id', $part->id)->whereNull('category_id')->exists()) {
-                DB::table('part_category_part')->insert($this->pivotRow($part->id, null, $now));
+                DB::table('part_category_part')->insertOrIgnore($this->pivotRow($part->id, null, $now));
+                $summary['created_count']++;
+            } else {
+                $summary['existing_count']++;
             }
 
-            return;
+            return $summary;
         }
 
         DB::table('part_category_part')->where('part_id', $part->id)->whereNull('category_id')->delete();
-        DB::table('part_category_part')->insertOrIgnore(
-            collect($ids)
-                ->map(fn (string $categoryId): array => $this->pivotRow($part->id, (int) $categoryId, $now))
-                ->all()
-        );
+
+        $existing = DB::table('part_category_part')
+            ->where('part_id', $part->id)
+            ->whereIn('category_id', array_map('intval', $ids))
+            ->pluck('category_id')
+            ->map(fn ($id): string => (string) $id)
+            ->all();
+        $existing = array_fill_keys($existing, true);
+
+        $rows = collect($ids)
+            ->reject(fn (string $categoryId): bool => isset($existing[$categoryId]))
+            ->map(fn (string $categoryId): array => $this->pivotRow($part->id, (int) $categoryId, $now))
+            ->all();
+
+        foreach (array_chunk($rows, 1000) as $chunk) {
+            $summary['created_count'] += DB::table('part_category_part')->insertOrIgnore($chunk);
+        }
+
+        $summary['existing_count'] += count($ids) - $summary['created_count'];
+
+        return $summary;
     }
 
     public function parseCategoryIds(mixed $value): array
     {
-        $invalidCount = 0;
-        $ids = $this->parseValue($value, $invalidCount);
-
-        return [array_values(array_unique($ids)), $invalidCount];
-    }
-
-    private function parseValue(mixed $value, int &$invalidCount, int $depth = 0): array
-    {
-        if ($depth > 5 || $value === null || $value === '') {
-            return [];
-        }
-
-        if (is_array($value)) {
-            $ids = [];
-
-            foreach ($value as $item) {
-                array_push($ids, ...$this->parseValue($item, $invalidCount, $depth + 1));
-            }
-
-            return $ids;
-        }
-
-        if (is_int($value) || (is_string($value) && preg_match('/^\d+$/', trim($value)) === 1)) {
-            $id = ltrim(trim((string) $value), '0');
-            $id = $id === '' ? '0' : $id;
-
-            if ($id !== '0' && $this->fitsUnsignedBigInteger($id)) {
-                return [$id];
-            }
-
-            $invalidCount++;
-
-            return [];
-        }
-
-        if (is_string($value)) {
-            $value = trim($value);
-            $decoded = json_decode($value, true);
-
-            if (json_last_error() === JSON_ERROR_NONE && $decoded !== $value) {
-                return $this->parseValue($decoded, $invalidCount, $depth + 1);
-            }
-
-            if (str_contains($value, ',')) {
-                $ids = [];
-
-                foreach (explode(',', trim($value, "[] \t\n\r\0\x0B")) as $item) {
-                    array_push($ids, ...$this->parseValue(trim($item, " \"'"), $invalidCount, $depth + 1));
-                }
-
-                return $ids;
-            }
-        }
-
-        $invalidCount++;
-
-        return [];
-    }
-
-    private function fitsUnsignedBigInteger(string $id): bool
-    {
-        $maximum = (string) PHP_INT_MAX;
-
-        return strlen($id) < strlen($maximum)
-            || (strlen($id) === strlen($maximum) && strcmp($id, $maximum) <= 0);
+        return MobileSentrixCategoryIds::parse($value);
     }
 
     private function categoryKey(mixed $categoryId): string
