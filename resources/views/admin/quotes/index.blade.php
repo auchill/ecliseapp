@@ -16,7 +16,7 @@
                 <div class="row g-3 align-items-end">
                     <div class="col-lg-6">
                         <label class="form-label" for="q">Search</label>
-                        <input class="form-control" id="q" name="q" value="{{ request('q') }}" placeholder="Quote, customer, email, phone">
+                        <input class="form-control" id="q" name="q" value="{{ request('q') }}" placeholder="Quote ID, customer, email, phone">
                     </div>
                     <div class="col-lg-4">
                         <label class="form-label" for="status">Status</label>
@@ -50,7 +50,7 @@
                         <tbody>
                             @forelse ($quotes as $quote)
                                 <tr>
-                                    <td>{{ $quote->quote_number }}</td>
+                                    <td>#{{ $quote->id }}</td>
                                     <td>{{ $quote->customer_name }}<div class="small muted">{{ $quote->email }}</div></td>
                                     <td>{{ $quote->deviceLabel() }}</td>
                                     <td>{{ $quote->issueCategory?->name }}</td>

@@ -16,7 +16,7 @@ class AdminQuoteSubmittedMail extends Mailable
     public function build(): self
     {
         return $this
-            ->subject('New quote request '.$this->quote->quote_number)
+            ->subject('New quote request #'.$this->quote->id)
             ->view('emails.quotes.admin-submitted');
     }
 }

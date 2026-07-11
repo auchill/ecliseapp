@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Cart;
 use App\Models\Order;
 use App\Models\Payment;
-use App\Models\RepairBooking;
+use App\Models\Repair;
 use App\Services\PaymentFinalizer;
 use App\Services\PaymentGatewayService;
 use Illuminate\Http\Request;
@@ -84,7 +84,8 @@ class PaymentController extends Controller
             $user?->isAdmin()
             || ($payable instanceof Cart && $payable->customer?->user_id === $user?->id)
             || ($payable instanceof Order && $payable->customer?->user_id === $user?->id)
-            || ($payable instanceof RepairBooking && (! $payable->user_id || $payable->user_id === $user?->id)),
+            || ($payable instanceof Repair && $payable->customer?->user_id === $user?->id)
+            || ($payable instanceof Repair && ! $payable->customer_id && (! $payable->user_id || $payable->user_id === $user?->id)),
             403,
         );
     }

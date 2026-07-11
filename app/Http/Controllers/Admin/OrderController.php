@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Mail\OrderStatusUpdatedMail;
 use App\Models\Order;
+use App\Services\AddressSnapshotFormatter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
@@ -21,7 +22,12 @@ class OrderController extends Controller
                 $query->where(function ($query) use ($search): void {
                     $query->where('order_number', 'like', "%{$search}%")
                         ->orWhere('customer_name', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%");
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhereHas('customer', function ($query) use ($search): void {
+                            $query->where('full_name', 'like', "%{$search}%")
+                                ->orWhere('email', 'like', "%{$search}%")
+                                ->orWhere('phone', 'like', "%{$search}%");
+                        });
                 });
             })
             ->latest()
@@ -37,13 +43,13 @@ class OrderController extends Controller
     public function show(Order $order)
     {
         return view('admin.orders.show', [
-            'order' => $order->load('items', 'customer.user', 'statusUpdates', 'latestPayment'),
+            'order' => $order->load('items', 'customer.user', 'shipping', 'statusUpdates', 'latestPayment'),
             'statuses' => Order::STATUSES,
             'fulfillmentMethods' => Order::FULFILLMENT_METHODS,
         ]);
     }
 
-    public function update(Request $request, Order $order)
+    public function update(Request $request, Order $order, AddressSnapshotFormatter $addressFormatter)
     {
         $data = $request->validate([
             'status' => ['required', Rule::in(Order::STATUSES)],
@@ -75,6 +81,17 @@ class OrderController extends Controller
         $data['address'] = $this->legacyAddressValue($data);
 
         $order->update($data);
+
+        if ($order->isShipping()) {
+            $address = $addressFormatter->format($data);
+
+            if ($address !== '') {
+                $order->shipping()->updateOrCreate(
+                    ['order_id' => $order->id],
+                    ['shipping_address' => $address],
+                );
+            }
+        }
 
         if ($statusChanged || filled($data['status_note'] ?? null)) {
             $statusUpdate = $order->statusUpdates()->create([

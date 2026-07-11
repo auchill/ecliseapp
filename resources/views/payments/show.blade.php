@@ -33,7 +33,7 @@
                 <div class="d-flex flex-wrap gap-2">
                     @if ($payment->payable instanceof \App\Models\Order)
                         <a class="btn btn-primary" href="{{ route('checkout.confirmation', $payment->payable) }}">View Order</a>
-                    @elseif ($payment->payable instanceof \App\Models\RepairBooking)
+                    @elseif ($payment->payable instanceof \App\Models\Repair)
                         <a class="btn btn-primary" href="{{ route('repairs.confirmation', $payment->payable) }}">View Repair</a>
                     @endif
                     <a class="btn btn-outline-primary" href="{{ route('home') }}">Home</a>

@@ -16,7 +16,7 @@
                 <div class="row g-3 align-items-end">
                     <div class="col-lg-6">
                         <label class="form-label" for="q">Search</label>
-                        <input class="form-control" id="q" name="q" value="{{ request('q') }}" placeholder="Tracking, customer, device">
+                        <input class="form-control" id="q" name="q" value="{{ request('q') }}" placeholder="Repair number, customer, device">
                     </div>
                     <div class="col-lg-3">
                         <label class="form-label" for="status">Status</label>
@@ -47,7 +47,7 @@
                     <table class="table align-middle">
                         <thead>
                             <tr>
-                                <th>Tracking</th>
+                                <th>Repair number</th>
                                 <th>Customer</th>
                                 <th>Device</th>
                                 <th>Status</th>
@@ -61,7 +61,7 @@
                         <tbody>
                             @forelse ($repairs as $repair)
                                 <tr>
-                                    <td>{{ $repair->tracking_number }}</td>
+                                    <td>{{ $repair->repair_number }}</td>
                                     <td>{{ $repair->customer_name }}</td>
                                     <td>{{ $repair->deviceLabel() }}</td>
                                     <td><span class="status-pill">{{ $repair->statusLabel() }}</span></td>

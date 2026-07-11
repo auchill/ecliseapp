@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\TrackRepairRequest;
-use App\Models\RepairBooking;
+use App\Models\Customer;
+use App\Models\Repair;
+use App\Services\AddressSnapshotFormatter;
 use App\Services\PaymentGatewayService;
 use App\Services\ShippingCostService;
 use Illuminate\Http\Request;
@@ -26,19 +28,22 @@ class RepairBookingController extends Controller
             'tracking_number' => ['required', 'string', 'max:40'],
         ]);
 
-        $booking = RepairBooking::query()
-            ->where('tracking_number', $data['tracking_number'])
+        $booking = Repair::query()
+            ->where(function ($query) use ($data): void {
+                $query->where('repair_number', $data['tracking_number'])
+                    ->orWhere('tracking_number', $data['tracking_number']);
+            })
             ->first();
 
         if (! $booking) {
-            return back()->withErrors(['tracking_number' => 'No repair booking was found for that tracking number.'])->withInput();
+            return back()->withErrors(['tracking_number' => 'No repair was found for that repair number.'])->withInput();
         }
 
         if (! $booking->canCustomerPay() && $booking->repair_status !== 'awaiting_device') {
-            return back()->withErrors(['tracking_number' => 'This repair booking is not available for customer booking or payment.'])->withInput();
+            return back()->withErrors(['tracking_number' => 'This repair is not available for customer completion or payment.'])->withInput();
         }
 
-        return redirect()->route('repairs.complete', $booking->tracking_number);
+        return redirect()->route('repairs.complete', $booking->repair_number);
     }
 
     public function complete(string $trackingNumber, Request $request, ShippingCostService $shippingCosts)
@@ -55,20 +60,25 @@ class RepairBookingController extends Controller
             ->all();
 
         return view('repairs.complete', [
-            'booking' => $booking->load('deviceType', 'deviceBrand', 'deviceModel', 'issueCategory', 'latestPayment'),
+            'booking' => $booking->load('customer', 'shipping', 'deviceType', 'deviceBrand', 'deviceModel', 'issueCategory', 'latestPayment'),
             'pickupQuote' => $shippingCosts->calculateForFulfillment('pickup', $baseSubtotal, null),
             'shippingMethods' => $shippingMethods,
             'shippingQuotes' => $shippingQuotes,
         ]);
     }
 
-    public function completeStore(string $trackingNumber, Request $request, ShippingCostService $shippingCosts, PaymentGatewayService $paymentGateways)
-    {
+    public function completeStore(
+        string $trackingNumber,
+        Request $request,
+        ShippingCostService $shippingCosts,
+        PaymentGatewayService $paymentGateways,
+        AddressSnapshotFormatter $addressFormatter,
+    ) {
         abort_if($request->user()?->isAdmin(), 403);
 
         $booking = $this->bookingForCustomer($trackingNumber, $request);
 
-        abort_unless($booking->canCustomerPay(), 422, 'This repair booking is not available for payment.');
+        abort_unless($booking->canCustomerPay(), 422, 'This repair is not available for payment.');
 
         $data = $request->validate([
             'fulfillment_method' => ['required', 'in:pickup,shipping'],
@@ -121,7 +131,10 @@ class RepairBookingController extends Controller
             return back()->withErrors(['payment_amount_option' => 'Payment must cover at least the required minimum amount.'])->withInput();
         }
 
+        $customer = Customer::forUser($request->user());
+
         $booking->update([
+            'customer_id' => $booking->customer_id ?: $customer->id,
             'user_id' => $booking->user_id ?: $request->user()->id,
             'terms_accepted' => true,
             'fulfillment_method' => $data['fulfillment_method'],
@@ -153,22 +166,37 @@ class RepairBookingController extends Controller
             'status' => 'awaiting_customer_payment',
         ]);
 
+        if ($booking->isShipping()) {
+            $address = $addressFormatter->format($data);
+
+            if ($address !== '') {
+                $booking->shipping()->updateOrCreate(
+                    ['repair_id' => $booking->id],
+                    ['shipping_address' => $address],
+                );
+            }
+        }
+
         $payment = $booking->payments()->create([
-            'repair_order_id' => $booking->id,
+            'repair_id' => $booking->id,
             'source' => 'repair',
             'gateway' => $data['payment_gateway'],
             'amount' => $paymentAmount,
             'currency' => 'cad',
             'status' => 'pending',
+            'checkout_data' => [
+                'customer_id' => $customer->id,
+                'fulfillment' => $data,
+            ],
         ]);
 
         return redirect()->away($paymentGateways->createCheckout($payment));
     }
 
-    public function confirmation(RepairBooking $repairBooking)
+    public function confirmation(Repair $repairBooking)
     {
         return view('repairs.confirmation', [
-            'booking' => $repairBooking->load('publicStatusUpdates', 'latestPayment', 'deviceType', 'deviceBrand', 'deviceModel', 'issueCategory'),
+            'booking' => $repairBooking->load('customer', 'shipping', 'publicStatusUpdates', 'latestPayment', 'deviceType', 'deviceBrand', 'deviceModel', 'issueCategory'),
         ]);
     }
 
@@ -181,15 +209,22 @@ class RepairBookingController extends Controller
     {
         $data = $request->validated();
 
-        $booking = RepairBooking::query()
-            ->where('tracking_number', $data['tracking_number'])
+        $booking = Repair::query()
+            ->where(function ($query) use ($data): void {
+                $query->where('repair_number', $data['tracking_number'])
+                    ->orWhere('tracking_number', $data['tracking_number']);
+            })
             ->when(filled($data['contact'] ?? null), function ($query) use ($data): void {
                 $contact = trim($data['contact']);
                 $query->where(function ($query) use ($contact): void {
-                    $query->where('email', $contact)->orWhere('phone', $contact);
+                    $query->where('email', $contact)
+                        ->orWhere('phone', $contact)
+                        ->orWhereHas('customer', function ($query) use ($contact): void {
+                            $query->where('email', $contact)->orWhere('phone', $contact);
+                        });
                 });
             })
-            ->with('publicStatusUpdates', 'latestPayment', 'deviceType', 'deviceBrand', 'deviceModel', 'issueCategory')
+            ->with('customer', 'shipping', 'publicStatusUpdates', 'latestPayment', 'deviceType', 'deviceBrand', 'deviceModel', 'issueCategory')
             ->first();
 
         if (! $booking) {
@@ -203,13 +238,19 @@ class RepairBookingController extends Controller
         ]);
     }
 
-    private function bookingForCustomer(string $trackingNumber, Request $request): RepairBooking
+    private function bookingForCustomer(string $trackingNumber, Request $request): Repair
     {
-        $booking = RepairBooking::query()
-            ->where('tracking_number', $trackingNumber)
+        $customer = Customer::forUser($request->user());
+
+        $booking = Repair::query()
+            ->where(function ($query) use ($trackingNumber): void {
+                $query->where('repair_number', $trackingNumber)
+                    ->orWhere('tracking_number', $trackingNumber);
+            })
             ->firstOrFail();
 
-        abort_if($booking->user_id && $booking->user_id !== $request->user()->id, 403);
+        abort_if($booking->customer_id && $booking->customer_id !== $customer->id, 403);
+        abort_if(! $booking->customer_id && $booking->user_id && $booking->user_id !== $request->user()->id, 403);
 
         return $booking;
     }

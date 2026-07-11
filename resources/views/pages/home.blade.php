@@ -50,9 +50,9 @@
         <div class="container">
             <div class="row g-4 align-items-center">
                 <div class="col-lg-6">
-                    <p class="eyebrow">Repair Booking</p>
+                    <p class="eyebrow">Repair</p>
                     <h2 class="display-6 fw-bold">Start with the device, issue, and appointment window.</h2>
-                    <p class="muted fs-5">Each booking gets a unique tracking number so customers can follow diagnosis, parts status, repair progress, and pickup readiness.</p>
+                    <p class="muted fs-5">Each repair gets a unique repair number so customers can follow diagnosis, parts status, repair progress, and pickup readiness.</p>
                     <a class="btn btn-primary" href="{{ route('repairs.create') }}"><i class="bi bi-calendar-check me-2"></i>Book a Repair</a>
                 </div>
                 <div class="col-lg-6">

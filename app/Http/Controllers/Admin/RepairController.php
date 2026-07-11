@@ -4,7 +4,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Mail\RepairStatusUpdatedMail;
-use App\Models\RepairBooking;
+use App\Models\Repair;
+use App\Services\AddressSnapshotFormatter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
@@ -13,19 +14,25 @@ class RepairController extends Controller
 {
     public function index(Request $request)
     {
-        $repairs = RepairBooking::query()
-            ->with('latestPayment', 'deviceType', 'deviceBrand', 'deviceModel', 'issueCategory')
+        $repairs = Repair::query()
+            ->with('customer', 'latestPayment', 'deviceType', 'deviceBrand', 'deviceModel', 'issueCategory')
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
             ->when($request->filled('payment_status'), fn ($query) => $query->where('payment_status', $request->string('payment_status')))
             ->when($request->filled('q'), function ($query) use ($request): void {
                 $search = $request->string('q');
                 $query->where(function ($query) use ($search): void {
-                    $query->where('tracking_number', 'like', "%{$search}%")
+                    $query->where('repair_number', 'like', "%{$search}%")
+                        ->orWhere('tracking_number', 'like', "%{$search}%")
                         ->orWhere('customer_name', 'like', "%{$search}%")
                         ->orWhere('email', 'like', "%{$search}%")
                         ->orWhere('phone', 'like', "%{$search}%")
                         ->orWhere('device_brand', 'like', "%{$search}%")
-                        ->orWhere('device_model', 'like', "%{$search}%");
+                        ->orWhere('device_model', 'like', "%{$search}%")
+                        ->orWhereHas('customer', function ($query) use ($search): void {
+                            $query->where('full_name', 'like', "%{$search}%")
+                                ->orWhere('email', 'like', "%{$search}%")
+                                ->orWhere('phone', 'like', "%{$search}%");
+                        });
                 });
             })
             ->latest()
@@ -34,27 +41,27 @@ class RepairController extends Controller
 
         return view('admin.repairs.index', [
             'repairs' => $repairs,
-            'statuses' => RepairBooking::STATUS_LABELS,
-            'paymentStatuses' => RepairBooking::PAYMENT_STATUSES,
+            'statuses' => Repair::STATUS_LABELS,
+            'paymentStatuses' => Repair::PAYMENT_STATUSES,
         ]);
     }
 
-    public function show(RepairBooking $repair)
+    public function show(Repair $repair)
     {
         return view('admin.repairs.show', [
-            'repair' => $repair->load('statusUpdates', 'user', 'latestPayment', 'quote', 'deviceType', 'deviceBrand', 'deviceModel', 'issueCategory'),
-            'statuses' => RepairBooking::STATUS_LABELS,
-            'paymentStatuses' => RepairBooking::PAYMENT_STATUSES,
-            'fulfillmentMethods' => RepairBooking::FULFILLMENT_METHODS,
+            'repair' => $repair->load('customer', 'shipping', 'statusUpdates', 'user', 'latestPayment', 'quote', 'deviceType', 'deviceBrand', 'deviceModel', 'issueCategory'),
+            'statuses' => Repair::STATUS_LABELS,
+            'paymentStatuses' => Repair::PAYMENT_STATUSES,
+            'fulfillmentMethods' => Repair::FULFILLMENT_METHODS,
         ]);
     }
 
-    public function update(Request $request, RepairBooking $repair)
+    public function update(Request $request, Repair $repair, AddressSnapshotFormatter $addressFormatter)
     {
         $data = $request->validate([
-            'status' => ['required', Rule::in(array_keys(RepairBooking::STATUS_LABELS))],
-            'payment_status' => ['required', Rule::in(array_keys(RepairBooking::PAYMENT_STATUSES))],
-            'fulfillment_method' => ['required', Rule::in(array_keys(RepairBooking::FULFILLMENT_METHODS))],
+            'status' => ['required', Rule::in(array_keys(Repair::STATUS_LABELS))],
+            'payment_status' => ['required', Rule::in(array_keys(Repair::PAYMENT_STATUSES))],
+            'fulfillment_method' => ['required', Rule::in(array_keys(Repair::FULFILLMENT_METHODS))],
             'shipping_cost' => ['required', 'numeric', 'min:0'],
             'shipping_full_name' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:255'],
             'shipping_phone' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:40'],
@@ -121,6 +128,17 @@ class RepairController extends Controller
             'customer_notes' => $data['customer_notes'] ?? null,
         ]);
 
+        if ($repair->isShipping()) {
+            $address = $addressFormatter->format($data);
+
+            if ($address !== '') {
+                $repair->shipping()->updateOrCreate(
+                    ['repair_id' => $repair->id],
+                    ['shipping_address' => $address],
+                );
+            }
+        }
+
         if ($statusChanged || filled($data['status_note'] ?? null)) {
             $statusUpdate = $repair->statusUpdates()->create([
                 'status' => $data['status'],
@@ -131,7 +149,7 @@ class RepairController extends Controller
                 'created_by' => $request->user()->id,
             ]);
 
-            Mail::to($repair->email)->send(new RepairStatusUpdatedMail($repair->fresh(), $statusUpdate));
+            Mail::to($repair->email)->send(new RepairStatusUpdatedMail($repair->fresh('customer', 'shipping'), $statusUpdate));
         }
 
         return redirect()->route('admin.repairs.show', $repair)->with('status', 'Repair updated.');

@@ -1,18 +1,18 @@
 @extends('layouts.admin')
 
-@section('title', 'Quote '.$quote->quote_number)
+@section('title', 'Quote #'.$quote->id)
 
 @section('content')
     <section class="section-pad bg-white">
         <div class="container">
             <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
                 <div>
-                    <p class="eyebrow">Quote {{ $quote->quote_number }}</p>
+                    <p class="eyebrow">Quote #{{ $quote->id }}</p>
                     <h1 class="display-6 fw-bold mb-0">{{ $quote->customer_name }} &middot; {{ $quote->deviceLabel() }}</h1>
                 </div>
                 <div class="d-flex gap-2">
-                    @unless ($quote->converted_to_booking || $quote->status === 'rejected')
-                        <a class="btn btn-primary" href="{{ route('admin.quotes.convert.create', $quote) }}"><i class="bi bi-tools me-2"></i>Create Repair Booking</a>
+                    @unless ($quote->converted_to_repair || $quote->status === 'rejected')
+                        <a class="btn btn-primary" href="{{ route('admin.quotes.convert.create', $quote) }}"><i class="bi bi-tools me-2"></i>Create Repair</a>
                     @endunless
                     <a class="btn btn-outline-primary" href="{{ route('admin.quotes.index') }}"><i class="bi bi-arrow-left me-2"></i>Quotes</a>
                 </div>
@@ -33,8 +33,8 @@
                                     <tr><th scope="row">Issue</th><td>{{ $quote->issueCategory?->name }}</td></tr>
                                     <tr><th scope="row">Preferred date</th><td>{{ $quote->preferred_date?->format('M j, Y') ?? 'Not set' }} {{ $quote->preferred_time }}</td></tr>
                                     <tr><th scope="row">Description</th><td>{{ $quote->issue_description }}</td></tr>
-                                    @if ($quote->repairBooking)
-                                        <tr><th scope="row">Repair booking</th><td><a href="{{ route('admin.repairs.show', $quote->repairBooking) }}">{{ $quote->repairBooking->tracking_number }}</a></td></tr>
+                                    @if ($quote->repair)
+                                        <tr><th scope="row">Repair</th><td><a href="{{ route('admin.repairs.show', $quote->repair) }}">{{ $quote->repair->repair_number }}</a></td></tr>
                                     @endif
                                 </tbody>
                             </table>

@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Order extends Model
@@ -31,7 +32,6 @@ class Order extends Model
 
     protected $fillable = [
         'customer_id',
-        'cart_id',
         'order_number',
         'customer_name',
         'email',
@@ -108,6 +108,11 @@ class Order extends Model
         return $this->belongsTo(ShippingMethod::class);
     }
 
+    public function shipping(): HasOne
+    {
+        return $this->hasOne(OrderShipping::class);
+    }
+
     public function cart(): BelongsTo
     {
         return $this->belongsTo(Cart::class);
@@ -146,6 +151,10 @@ class Order extends Model
             return [];
         }
 
+        if ($this->shipping?->shipping_address) {
+            return preg_split('/\R/', $this->shipping->shipping_address) ?: [];
+        }
+
         return array_values(array_filter([
             $this->shipping_full_name,
             $this->shipping_address_line1,
@@ -155,5 +164,20 @@ class Order extends Model
             $this->shipping_phone ? 'Phone: '.$this->shipping_phone : null,
             $this->shipping_email ? 'Email: '.$this->shipping_email : null,
         ]));
+    }
+
+    public function getCustomerNameAttribute(?string $value): ?string
+    {
+        return $value ?? $this->customer?->full_name;
+    }
+
+    public function getEmailAttribute(?string $value): ?string
+    {
+        return $value ?? $this->customer?->email;
+    }
+
+    public function getPhoneAttribute(?string $value): ?string
+    {
+        return $value ?? $this->customer?->phone;
     }
 }

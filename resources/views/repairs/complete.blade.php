@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Complete Repair Booking')
+@section('title', 'Complete Repair')
 
 @section('content')
     @php
@@ -11,15 +11,15 @@
 
     <section class="page-header">
         <div class="container">
-            <p class="eyebrow mb-2">Repair {{ $booking->tracking_number }}</p>
-            <h1 class="display-5 fw-bold mb-3">Review and complete booking.</h1>
+            <p class="eyebrow mb-2">Repair {{ $booking->repair_number }}</p>
+            <h1 class="display-5 fw-bold mb-3">Review and complete repair.</h1>
             <p class="fs-5 mb-0">Choose pickup or shipping, add any customer remark, and pay the minimum required amount or the full balance.</p>
         </div>
     </section>
 
     <section class="section-pad bg-white">
         <div class="container">
-            <form class="surface p-4 p-lg-5" method="POST" action="{{ route('repairs.complete.store', $booking->tracking_number) }}" data-repair-complete-form>
+            <form class="surface p-4 p-lg-5" method="POST" action="{{ route('repairs.complete.store', $booking->repair_number) }}" data-repair-complete-form>
                 @csrf
                 <div class="row g-4">
                     <div class="col-lg-7">
@@ -169,7 +169,7 @@
 
                         <div class="form-check mt-3">
                             <input class="form-check-input" id="terms_accepted" name="terms_accepted" type="checkbox" value="1" required>
-                            <label class="form-check-label" for="terms_accepted">I agree to proceed with this repair booking and payment.</label>
+                            <label class="form-check-label" for="terms_accepted">I agree to proceed with this repair and payment.</label>
                         </div>
                         <button class="btn btn-primary btn-lg w-100 mt-3" type="submit"><i class="bi bi-credit-card me-2"></i>Continue to Payment</button>
                     </div>

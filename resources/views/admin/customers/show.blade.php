@@ -37,7 +37,7 @@
                         @forelse ($customer->repairBookings as $repair)
                             <div class="d-flex justify-content-between gap-3 py-3 border-bottom">
                                 <div>
-                                    <strong>{{ $repair->tracking_number }}</strong>
+                                    <strong>{{ $repair->repair_number }}</strong>
                                     <div class="small muted">{{ $repair->deviceLabel() }}</div>
                                 </div>
                                 <span class="status-pill">{{ $repair->statusLabel() }}</span>

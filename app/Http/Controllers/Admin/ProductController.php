@@ -14,6 +14,7 @@ use App\Models\ProductCondition;
 use App\Models\ProductGrade;
 use App\Models\ProductModel;
 use App\Models\ProductSize;
+use App\Services\ProductSkuGenerator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -63,10 +64,13 @@ class ProductController extends Controller
         ]);
     }
 
-    public function store(StoreProductRequest $request)
+    public function store(StoreProductRequest $request, ProductSkuGenerator $skuGenerator)
     {
         $data = $this->validatedData($request);
         $data['slug'] = $this->uniqueSlug($data['name']);
+        $data['sku'] = filled($data['sku'] ?? null)
+            ? $data['sku']
+            : $skuGenerator->next(! empty($data['product_category_id']) ? ProductCategory::query()->find($data['product_category_id']) : null);
 
         Product::query()->create($data);
 
@@ -94,6 +98,10 @@ class ProductController extends Controller
     {
         $data = $this->validatedData($request);
         $data['slug'] = $this->uniqueSlug($data['name'], $product);
+
+        if (blank($data['sku'] ?? null)) {
+            unset($data['sku']);
+        }
 
         $product->update($data);
 

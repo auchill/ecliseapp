@@ -7,8 +7,8 @@
         <div class="container">
             <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
                 <div>
-                    <p class="eyebrow">Quote {{ $quote->quote_number }}</p>
-                    <h1 class="display-6 fw-bold mb-0">Create Repair Booking</h1>
+                    <p class="eyebrow">Quote #{{ $quote->id }}</p>
+                    <h1 class="display-6 fw-bold mb-0">Create Repair</h1>
                 </div>
                 <a class="btn btn-outline-primary" href="{{ route('admin.quotes.show', $quote) }}"><i class="bi bi-arrow-left me-2"></i>Quote</a>
             </div>
@@ -95,7 +95,7 @@
                         <textarea class="form-control" id="internal_notes" name="internal_notes" rows="4">{{ old('internal_notes', $quote->admin_note) }}</textarea>
                     </div>
                     <div class="col-12">
-                        <button class="btn btn-primary" type="submit"><i class="bi bi-check2-circle me-2"></i>Convert to Booking</button>
+                        <button class="btn btn-primary" type="submit"><i class="bi bi-check2-circle me-2"></i>Convert to Repair</button>
                     </div>
                 </div>
             </form>

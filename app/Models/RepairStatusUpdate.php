@@ -11,7 +11,7 @@ class RepairStatusUpdate extends Model
     use HasFactory;
 
     protected $fillable = [
-        'repair_booking_id',
+        'repair_id',
         'status',
         'note',
         'is_customer_visible',
@@ -27,9 +27,14 @@ class RepairStatusUpdate extends Model
         ];
     }
 
+    public function repair(): BelongsTo
+    {
+        return $this->belongsTo(Repair::class);
+    }
+
     public function repairBooking(): BelongsTo
     {
-        return $this->belongsTo(RepairBooking::class);
+        return $this->repair();
     }
 
     public function creator(): BelongsTo

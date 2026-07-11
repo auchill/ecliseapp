@@ -43,7 +43,7 @@
                         <p class="mb-1"><strong>Payment status:</strong> {{ $payment->payable?->payment_status }}</p>
                         @if ($payment->payable instanceof \App\Models\Order)
                             <a class="btn btn-outline-primary mt-3" href="{{ route('admin.orders.show', $payment->payable) }}">View Order</a>
-                        @elseif ($payment->payable instanceof \App\Models\RepairBooking)
+                        @elseif ($payment->payable instanceof \App\Models\Repair)
                             <a class="btn btn-outline-primary mt-3" href="{{ route('admin.repairs.show', $payment->payable) }}">View Repair</a>
                         @endif
                     </div>

@@ -3,13 +3,14 @@
 namespace Database\Seeders;
 
 use App\Models\Category;
+use App\Models\Customer;
 use App\Models\DeviceType;
 use App\Models\IssueCategory;
 use App\Models\Permission;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\ProductCondition;
-use App\Models\RepairBooking;
+use App\Models\Repair;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -120,8 +121,8 @@ class DatabaseSeeder extends Seeder
                 [
                     'category_id' => $categories[$product['category']]->id,
                     'product_category_id' => ProductCategory::query()->where('slug', Str::slug(match ($product['category']) {
-                        'Used Phones', 'New Phones' => 'Phones',
-                        'Used Computers', 'New Computers' => 'Laptops',
+                        'Used Phones', 'New Phones' => 'Phone',
+                        'Used Computers', 'New Computers' => 'Laptop',
                         'Phone Accessories', 'Computer Accessories' => 'Accessories',
                         default => $product['category'],
                     }))->value('id'),
@@ -140,10 +141,14 @@ class DatabaseSeeder extends Seeder
             );
         }
 
-        $booking = RepairBooking::query()->updateOrCreate(
-            ['tracking_number' => 'ECL-REP-2026-0001'],
+        $customerProfile = Customer::forUser($customer);
+
+        $booking = Repair::query()->updateOrCreate(
+            ['repair_number' => 'ECL-REP-2026-0000001'],
             [
+                'customer_id' => $customerProfile->id,
                 'user_id' => $customer->id,
+                'tracking_number' => 'ECL-REP-2026-0000001',
                 'customer_name' => $customer->name,
                 'email' => $customer->email,
                 'phone' => '416-555-0199',

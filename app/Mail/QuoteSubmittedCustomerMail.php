@@ -16,7 +16,7 @@ class QuoteSubmittedCustomerMail extends Mailable
     public function build(): self
     {
         return $this
-            ->subject('We received your quote request '.$this->quote->quote_number)
+            ->subject('We received your quote request #'.$this->quote->id)
             ->view('emails.quotes.customer-submitted');
     }
 }

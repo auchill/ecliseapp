@@ -11,7 +11,7 @@ use App\Models\Part;
 use App\Models\Payment;
 use App\Models\Product;
 use App\Models\Quote;
-use App\Models\RepairBooking;
+use App\Models\Repair;
 
 class DashboardController extends Controller
 {
@@ -22,8 +22,8 @@ class DashboardController extends Controller
                 'Total quotes' => ['value' => Quote::query()->count(), 'route' => route('admin.quotes.index'), 'icon' => 'bi-chat-square-text'],
                 'Pending quotes' => ['value' => Quote::query()->where('status', 'pending')->count(), 'route' => route('admin.quotes.index', ['status' => 'pending']), 'icon' => 'bi-hourglass-split'],
                 'Approved quotes' => ['value' => Quote::query()->where('status', 'approved')->count(), 'route' => route('admin.quotes.index', ['status' => 'approved']), 'icon' => 'bi-check2-circle'],
-                'Repair bookings' => ['value' => RepairBooking::query()->count(), 'route' => route('admin.repairs.index'), 'icon' => 'bi-tools'],
-                'Awaiting payment repairs' => ['value' => RepairBooking::query()->whereIn('payment_status', ['unpaid', 'pending', 'partially_paid'])->count(), 'route' => route('admin.repairs.index'), 'icon' => 'bi-wallet2'],
+                'Repairs' => ['value' => Repair::query()->count(), 'route' => route('admin.repairs.index'), 'icon' => 'bi-tools'],
+                'Awaiting payment repairs' => ['value' => Repair::query()->whereIn('payment_status', ['unpaid', 'pending', 'partially_paid'])->count(), 'route' => route('admin.repairs.index'), 'icon' => 'bi-wallet2'],
                 'Shop orders' => ['value' => Order::query()->count(), 'route' => route('admin.orders.index'), 'icon' => 'bi-receipt'],
                 'Shop payments' => ['value' => Payment::query()->where('source', 'shop')->count(), 'route' => route('admin.shop-payments.index'), 'icon' => 'bi-credit-card'],
                 'Repair payments' => ['value' => Payment::query()->where('source', 'repair')->count(), 'route' => route('admin.repair-payments.index'), 'icon' => 'bi-cash-stack'],
@@ -33,8 +33,8 @@ class DashboardController extends Controller
                 'Pre-owned devices' => ['value' => MobileSentrixDevice::query()->count(), 'route' => route('admin.devices.index'), 'icon' => 'bi-phone-fill'],
                 'Listed parts' => ['value' => Part::query()->count(), 'route' => route('admin.parts.index'), 'icon' => 'bi-cpu'],
             ],
-            'repairs' => RepairBooking::query()->latest()->take(5)->get(),
-            'orders' => Order::query()->latest()->take(5)->get(),
+            'repairs' => Repair::query()->with('customer')->latest()->take(5)->get(),
+            'orders' => Order::query()->with('customer')->latest()->take(5)->get(),
         ]);
     }
 }

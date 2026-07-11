@@ -7,7 +7,7 @@
         <div class="container">
             <p class="eyebrow mb-2">Repair Tracking</p>
             <h1 class="display-5 fw-bold mb-3">Check current repair progress.</h1>
-            <p class="fs-5 mb-0">Enter the repair tracking number. Add email or phone if you want to narrow the lookup.</p>
+            <p class="fs-5 mb-0">Enter the repair number. Add email or phone if you want to narrow the lookup.</p>
         </div>
     </section>
 
@@ -17,8 +17,8 @@
                 @csrf
                 <div class="row g-3 align-items-end">
                     <div class="col-lg-5">
-                        <label class="form-label" for="tracking_number">Tracking number</label>
-                        <input class="form-control" id="tracking_number" name="tracking_number" value="{{ old('tracking_number', $booking->tracking_number ?? '') }}" placeholder="ECL-REP-2026-0001" required>
+                        <label class="form-label" for="tracking_number">Repair number</label>
+                        <input class="form-control" id="tracking_number" name="tracking_number" value="{{ old('tracking_number', $booking->repair_number ?? '') }}" placeholder="ECL-REP-2026-0000001" required>
                     </div>
                     <div class="col-lg-5">
                         <label class="form-label" for="contact">Email or phone</label>
@@ -34,7 +34,7 @@
                 <div class="surface p-4 p-lg-5">
                     <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
                         <div>
-                            <p class="eyebrow">Repair {{ $booking->tracking_number }}</p>
+                            <p class="eyebrow">Repair {{ $booking->repair_number }}</p>
                             <h2 class="display-6 fw-bold mb-0">{{ $booking->deviceLabel() }}</h2>
                         </div>
                         <span class="status-pill">{{ $booking->statusLabel() }}</span>
@@ -67,7 +67,7 @@
                                             <tr><th scope="row">Shipping discount</th><td>${{ number_format($booking->shipping_discount_amount, 2) }}</td></tr>
                                             <tr><th scope="row">Final shipping</th><td>${{ number_format($booking->shipping_cost, 2) }}</td></tr>
                                             <tr><th scope="row">Delivery carrier</th><td>{{ $booking->delivery_carrier ?: 'Not available yet' }}</td></tr>
-                                            <tr><th scope="row">Delivery tracking</th><td>{{ $booking->delivery_tracking_number ?: 'Not available yet' }}</td></tr>
+                                            <tr><th scope="row">Carrier tracking</th><td>{{ $booking->delivery_tracking_number ?: 'Not available yet' }}</td></tr>
                                         @else
                                             <tr><th scope="row">Shipping</th><td>No charge for store pickup.</td></tr>
                                         @endif

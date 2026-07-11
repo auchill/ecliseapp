@@ -38,9 +38,6 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', [PublicPageController::class, 'home'])->name('home');
 Route::get('/about', [PublicPageController::class, 'about'])->name('about');
 Route::get('/services', [PublicPageController::class, 'services'])->name('services');
-Route::get('/repairs/quote', [QuoteController::class, 'create'])->name('quotes.create');
-Route::post('/repairs/quote', [QuoteController::class, 'store'])->name('quotes.store');
-
 Route::get('/repairs/confirmation/{repairBooking}', [RepairBookingController::class, 'confirmation'])->name('repairs.confirmation');
 Route::get('/repairs/track', [RepairBookingController::class, 'trackForm'])->name('repairs.track');
 Route::post('/repairs/track', [RepairBookingController::class, 'track'])->name('repairs.track.submit');
@@ -97,6 +94,9 @@ Route::middleware(['auth', 'customer'])->group(function (): void {
 });
 
 Route::middleware(['auth', 'customer', 'no_admin_cart'])->group(function (): void {
+    Route::get('/repairs/quote', [QuoteController::class, 'create'])->name('quotes.create');
+    Route::post('/repairs/quote', [QuoteController::class, 'store'])->name('quotes.store');
+
     Route::get('/repairs/book/{trackingNumber}', [RepairBookingController::class, 'complete'])->name('repairs.complete');
     Route::post('/repairs/book/{trackingNumber}', [RepairBookingController::class, 'completeStore'])->name('repairs.complete.store');
 

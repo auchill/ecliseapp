@@ -28,7 +28,7 @@ class StoreProductRequest extends FormRequest
             'product_color_id' => ['nullable', 'exists:product_colors,id'],
             'product_carrier_id' => ['nullable', 'exists:product_carriers,id'],
             'name' => ['required', 'string', 'max:255'],
-            'sku' => ['required', 'string', 'max:120', Rule::unique('products', 'sku')->ignore($productId)],
+            'sku' => ['nullable', 'string', 'max:120', Rule::unique('products', 'sku')->ignore($productId)],
             'brand' => ['nullable', 'string', 'max:120'],
             'model' => ['nullable', 'string', 'max:120'],
             'description' => ['nullable', 'string'],

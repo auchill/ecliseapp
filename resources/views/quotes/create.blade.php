@@ -7,7 +7,7 @@
         <div class="container">
             <p class="eyebrow mb-2">Repair Quote</p>
             <h1 class="display-5 fw-bold mb-3">Request a repair quote.</h1>
-            <p class="fs-5 mb-0">Send the device details first. We will review the request and contact you before creating a repair booking.</p>
+            <p class="fs-5 mb-0">Send the device details first. We will review the request and contact you before creating a repair.</p>
         </div>
     </section>
 
@@ -16,17 +16,11 @@
             <form class="surface p-4 p-lg-5" method="POST" action="{{ route('quotes.store') }}" enctype="multipart/form-data">
                 @csrf
                 <div class="row g-4">
-                    <div class="col-md-6">
-                        <label class="form-label" for="customer_name">Customer name</label>
-                        <input class="form-control" id="customer_name" name="customer_name" value="{{ old('customer_name', auth()->user()?->name) }}" required>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label" for="email">Email</label>
-                        <input class="form-control" id="email" name="email" type="email" value="{{ old('email', auth()->user()?->email) }}" required>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label" for="phone_number">Phone number</label>
-                        <input class="form-control" id="phone_number" name="phone_number" value="{{ old('phone_number') }}" required>
+                    <div class="col-12">
+                        <div class="alert alert-light border mb-0">
+                            <strong>{{ auth()->user()?->customer?->full_name ?: auth()->user()?->name }}</strong>
+                            <div class="small text-muted">{{ auth()->user()?->customer?->email ?: auth()->user()?->email }}</div>
+                        </div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label" for="device_type_id">Device type</label>

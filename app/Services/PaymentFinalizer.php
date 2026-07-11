@@ -11,7 +11,7 @@ use App\Models\MobileSentrixDevice;
 use App\Models\Order;
 use App\Models\Payment;
 use App\Models\Product;
-use App\Models\RepairBooking;
+use App\Models\Repair;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -19,7 +19,10 @@ use RuntimeException;
 
 class PaymentFinalizer
 {
-    public function __construct(private readonly OrderNumberGenerator $orderNumbers) {}
+    public function __construct(
+        private readonly OrderNumberGenerator $orderNumbers,
+        private readonly AddressSnapshotFormatter $addressFormatter,
+    ) {}
 
     public function markPaid(Payment $payment, array $attributes = []): Payment
     {
@@ -29,6 +32,14 @@ class PaymentFinalizer
             $payment = Payment::query()->lockForUpdate()->findOrFail($payment->id);
 
             if ($payment->status === 'paid') {
+                $payable = $payment->payable()->lockForUpdate()->first();
+
+                if ($payable instanceof Order) {
+                    $this->persistOrderShippingSnapshot($payable, (array) data_get($payment->checkout_data, 'fulfillment', []));
+                } elseif ($payable instanceof Repair) {
+                    $this->persistRepairShippingSnapshot($payable, $payment);
+                }
+
                 return $payment;
             }
 
@@ -51,7 +62,7 @@ class PaymentFinalizer
             } elseif ($payable instanceof Order) {
                 $payment->save();
                 $this->markExistingOrderPaid($payable, $payment);
-            } elseif ($payable instanceof RepairBooking) {
+            } elseif ($payable instanceof Repair) {
                 $payment->save();
                 $this->markRepairPaid($payable, $payment);
             } else {
@@ -93,7 +104,7 @@ class PaymentFinalizer
 
         $payable = $payment->payable;
 
-        if ($payable instanceof RepairBooking) {
+        if ($payable instanceof Repair) {
             $payable->update(['payment_status' => $payable->amount_paid > 0 ? 'partially_paid' : 'unpaid']);
         } elseif ($payable instanceof Order) {
             $payable->update(['payment_status' => $status]);
@@ -128,7 +139,6 @@ class PaymentFinalizer
 
         $order = Order::query()->create([
             'customer_id' => $customer->id,
-            'cart_id' => $cart?->id,
             'order_number' => $this->orderNumbers->next(),
             'customer_name' => $customerData['full_name'],
             'email' => $customerData['email'],
@@ -187,6 +197,12 @@ class PaymentFinalizer
             'status' => 'Paid',
             'note' => 'Payment successful. Order created from shop checkout.',
             'is_customer_visible' => true,
+        ]);
+
+        $this->persistOrderShippingSnapshot($order, $fulfillment + [
+            'full_name' => $customerData['full_name'] ?? null,
+            'email' => $customerData['email'] ?? null,
+            'phone' => $customerData['phone'] ?? null,
         ]);
 
         $cartId = (int) (data_get($snapshot, 'cart_id') ?: $cart?->id);
@@ -324,13 +340,10 @@ class PaymentFinalizer
             'is_customer_visible' => true,
         ]);
 
-        if ($order->cart) {
-            $order->cart->items()->delete();
-            $order->cart->delete();
-        }
+        $this->persistOrderShippingSnapshot($order, $this->snapshotFromOrder($order));
     }
 
-    private function markRepairPaid(RepairBooking $repair, Payment $payment): void
+    private function markRepairPaid(Repair $repair, Payment $payment): void
     {
         $amountPaid = round((float) $repair->amount_paid + (float) $payment->amount, 2);
         $total = (float) ($repair->total_amount ?: $repair->repair_total);
@@ -352,6 +365,8 @@ class PaymentFinalizer
             'note' => 'Payment confirmed through '.$payment->gatewayLabel().'.',
             'is_customer_visible' => true,
         ]);
+
+        $this->persistRepairShippingSnapshot($repair, $payment);
     }
 
     private function legacyAddressValue(array $data): ?string
@@ -371,5 +386,77 @@ class PaymentFinalizer
             ]))),
             $data['shipping_country'] ?? null,
         ]));
+    }
+
+    private function persistOrderShippingSnapshot(Order $order, array $addressData): void
+    {
+        if (! $order->isShipping()) {
+            return;
+        }
+
+        $address = $this->addressFormatter->format($addressData);
+
+        if ($address === '') {
+            return;
+        }
+
+        $order->shipping()->updateOrCreate(
+            ['order_id' => $order->id],
+            ['shipping_address' => $address],
+        );
+    }
+
+    private function persistRepairShippingSnapshot(Repair $repair, Payment $payment): void
+    {
+        if (! $repair->isShipping()) {
+            return;
+        }
+
+        $addressData = (array) data_get($payment->checkout_data, 'fulfillment', []);
+
+        if ($addressData === []) {
+            $addressData = $this->snapshotFromRepair($repair);
+        }
+
+        $address = $this->addressFormatter->format($addressData);
+
+        if ($address === '') {
+            return;
+        }
+
+        $repair->shipping()->updateOrCreate(
+            ['repair_id' => $repair->id],
+            ['shipping_address' => $address],
+        );
+    }
+
+    private function snapshotFromOrder(Order $order): array
+    {
+        return [
+            'shipping_full_name' => $order->shipping_full_name ?: $order->customer?->full_name,
+            'shipping_phone' => $order->shipping_phone ?: $order->customer?->phone,
+            'shipping_email' => $order->shipping_email ?: $order->customer?->email,
+            'shipping_address_line1' => $order->shipping_address_line1,
+            'shipping_address_line2' => $order->shipping_address_line2,
+            'shipping_city' => $order->shipping_city,
+            'shipping_province' => $order->shipping_province,
+            'shipping_postal_code' => $order->shipping_postal_code,
+            'shipping_country' => $order->shipping_country,
+        ];
+    }
+
+    private function snapshotFromRepair(Repair $repair): array
+    {
+        return [
+            'shipping_full_name' => $repair->shipping_full_name ?: $repair->customer?->full_name,
+            'shipping_phone' => $repair->shipping_phone ?: $repair->customer?->phone,
+            'shipping_email' => $repair->shipping_email ?: $repair->customer?->email,
+            'shipping_address_line1' => $repair->shipping_address_line1,
+            'shipping_address_line2' => $repair->shipping_address_line2,
+            'shipping_city' => $repair->shipping_city,
+            'shipping_province' => $repair->shipping_province,
+            'shipping_postal_code' => $repair->shipping_postal_code,
+            'shipping_country' => $repair->shipping_country,
+        ];
     }
 }

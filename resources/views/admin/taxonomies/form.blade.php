@@ -27,6 +27,12 @@
                         <label class="form-label" for="slug">Slug</label>
                         <input class="form-control" id="slug" name="slug" value="{{ old('slug', $item->slug) }}">
                     </div>
+                    @if($usesSkuCode ?? false)
+                        <div class="col-md-6">
+                            <label class="form-label" for="code">SKU code</label>
+                            <input class="form-control" id="code" name="code" value="{{ old('code', $item->code) }}" maxlength="3" pattern="[A-Za-z]{3}">
+                        </div>
+                    @endif
                     @if($usesCodeSource ?? false)
                         <div class="col-md-6">
                             <label class="form-label" for="code">Code</label>

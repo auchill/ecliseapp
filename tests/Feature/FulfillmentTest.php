@@ -434,11 +434,14 @@ test('customer quote submission can be converted to a priced repair booking', fu
         'status' => 'active',
     ]);
     $issueCategory = IssueCategory::query()->where('slug', 'screen-replacement')->firstOrFail();
-
-    $this->post(route('quotes.store'), [
-        'customer_name' => 'Quote Customer',
+    $quoteUser = User::query()->create([
+        'name' => 'Quote Customer',
         'email' => 'quote@example.com',
-        'phone_number' => '416-555-7777',
+        'password' => 'password',
+    ]);
+    $quoteCustomer = Customer::forUser($quoteUser);
+
+    $this->actingAs($quoteUser)->post(route('quotes.store'), [
         'device_type_id' => $deviceType->id,
         'product_brand_id' => $productBrand->id,
         'product_model_id' => $productModel->id,
@@ -451,6 +454,7 @@ test('customer quote submission can be converted to a priced repair booking', fu
     $quote = Quote::query()->firstOrFail();
 
     expect($quote->status)->toBe('pending')
+        ->and($quote->customer_id)->toBe($quoteCustomer->id)
         ->and(str_starts_with($quote->quote_number, 'ECL-QTE-'))->toBeTrue();
 
     Mail::assertSent(QuoteSubmittedCustomerMail::class);
@@ -474,8 +478,10 @@ test('customer quote submission can be converted to a priced repair booking', fu
 
     $booking = RepairBooking::query()->where('quote_id', $quote->id)->firstOrFail();
 
-    expect($quote->fresh()->status)->toBe('converted_to_booking')
-        ->and(str_starts_with($booking->tracking_number, 'ECL-REP-'))->toBeTrue()
+    expect($quote->fresh()->status)->toBe('converted_to_repair')
+        ->and($quote->fresh()->converted_to_repair)->toBeTrue()
+        ->and($booking->customer_id)->toBe($quoteCustomer->id)
+        ->and($booking->repair_number)->toMatch('/^ECL-REP-\d{4}-\d{7}$/')
         ->and($booking->payment_status)->toBe('unpaid')
         ->and($booking->repair_status)->toBe('awaiting_customer_payment')
         ->and((float) $booking->subtotal)->toBe(200.0)

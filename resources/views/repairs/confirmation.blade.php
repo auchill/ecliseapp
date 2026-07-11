@@ -6,8 +6,8 @@
     <section class="section-pad bg-white">
         <div class="container">
             <div class="surface p-4 p-lg-5">
-                <p class="eyebrow">Repair Booking</p>
-                <h1 class="display-6 fw-bold">Tracking number: {{ $booking->tracking_number }}</h1>
+                <p class="eyebrow">Repair</p>
+                <h1 class="display-6 fw-bold">Repair number: {{ $booking->repair_number }}</h1>
                 <p class="muted fs-5">Use this number to track your repair status.</p>
                 @if ($booking->isShipping())
                     <div class="alert alert-info">Your repaired device will be shipped after service. Tracking details will appear when available.</div>
@@ -36,7 +36,7 @@
                                         <tr><th scope="row">Shipping discount</th><td>${{ number_format($booking->shipping_discount_amount, 2) }}</td></tr>
                                         <tr><th scope="row">Final shipping</th><td>${{ number_format($booking->shipping_cost, 2) }}</td></tr>
                                         <tr><th scope="row">Delivery carrier</th><td>{{ $booking->delivery_carrier ?: 'Not available yet' }}</td></tr>
-                                        <tr><th scope="row">Delivery tracking</th><td>{{ $booking->delivery_tracking_number ?: 'Not available yet' }}</td></tr>
+                                        <tr><th scope="row">Carrier tracking</th><td>{{ $booking->delivery_tracking_number ?: 'Not available yet' }}</td></tr>
                                     @else
                                         <tr><th scope="row">Shipping</th><td>No charge for store pickup.</td></tr>
                                     @endif

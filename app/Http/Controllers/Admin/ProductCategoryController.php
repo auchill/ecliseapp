@@ -25,6 +25,7 @@ class ProductCategoryController extends Controller
             'title' => 'Add Product Category',
             'item' => new ProductCategory(['is_active' => true, 'sort_order' => 0]),
             'routePrefix' => 'admin.product-categories',
+            'usesSkuCode' => true,
         ]);
     }
 
@@ -41,6 +42,7 @@ class ProductCategoryController extends Controller
             'title' => 'Edit Product Category',
             'item' => $productCategory,
             'routePrefix' => 'admin.product-categories',
+            'usesSkuCode' => true,
         ]);
     }
 
@@ -63,12 +65,14 @@ class ProductCategoryController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'slug' => ['nullable', 'string', 'max:255', Rule::unique('product_categories', 'slug')->ignore($ignoreId)],
+            'code' => ['nullable', 'string', 'size:3', 'regex:/^[A-Za-z]+$/', Rule::unique('product_categories', 'code')->ignore($ignoreId)],
             'description' => ['nullable', 'string'],
             'is_active' => ['nullable', 'boolean'],
             'sort_order' => ['required', 'integer', 'min:0'],
         ]);
 
         $data['slug'] = Str::slug($data['slug'] ?: $data['name']);
+        $data['code'] = filled($data['code'] ?? null) ? Str::upper($data['code']) : null;
         $data['is_active'] = $request->boolean('is_active');
 
         return $data;

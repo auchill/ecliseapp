@@ -17,7 +17,7 @@
                 <div class="col-lg-5">
                     <div class="surface p-4 h-100">
                         <h2 class="h4 fw-bold">Service Desk</h2>
-                        <p class="muted">Use the form for general questions. For repair tracking, use the tracking page with your Eclise tracking number.</p>
+                        <p class="muted">Use the form for general questions. For repair tracking, use the tracking page with your Eclise repair number.</p>
                         <div class="d-grid gap-2">
                             <a class="btn btn-outline-primary" href="{{ route('repairs.track') }}"><i class="bi bi-search me-2"></i>Track Repair</a>
                             <a class="btn btn-primary" href="{{ route('repairs.create') }}"><i class="bi bi-tools me-2"></i>Book Repair</a>

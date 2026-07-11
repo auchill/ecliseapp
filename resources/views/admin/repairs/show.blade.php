@@ -1,13 +1,13 @@
 @extends('layouts.admin')
 
-@section('title', 'Repair '.$repair->tracking_number)
+@section('title', 'Repair '.$repair->repair_number)
 
 @section('content')
     <section class="section-pad bg-white">
         <div class="container">
             <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
                 <div>
-                    <p class="eyebrow">Repair {{ $repair->tracking_number }}</p>
+                    <p class="eyebrow">Repair {{ $repair->repair_number }}</p>
                     <h1 class="display-6 fw-bold mb-0">{{ $repair->customer_name }} &middot; {{ $repair->deviceLabel() }}</h1>
                 </div>
                 <a class="btn btn-outline-primary" href="{{ route('admin.repairs.index') }}"><i class="bi bi-arrow-left me-2"></i>Repairs</a>
@@ -95,7 +95,7 @@
                                 <input class="form-control" id="delivery_carrier" name="delivery_carrier" value="{{ old('delivery_carrier', $repair->delivery_carrier) }}">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label" for="delivery_tracking_number">Tracking number</label>
+                                <label class="form-label" for="delivery_tracking_number">Carrier tracking number</label>
                                 <input class="form-control" id="delivery_tracking_number" name="delivery_tracking_number" value="{{ old('delivery_tracking_number', $repair->delivery_tracking_number) }}">
                             </div>
                             <div class="col-12">
@@ -135,7 +135,7 @@
                                     <tr><th scope="row">Email</th><td>{{ $repair->email }}</td></tr>
                                     <tr><th scope="row">Phone</th><td>{{ $repair->phone }}</td></tr>
                                     @if ($repair->quote)
-                                        <tr><th scope="row">Quote</th><td><a href="{{ route('admin.quotes.show', $repair->quote) }}">{{ $repair->quote->quote_number }}</a></td></tr>
+                                        <tr><th scope="row">Quote</th><td><a href="{{ route('admin.quotes.show', $repair->quote) }}">#{{ $repair->quote->id }}</a></td></tr>
                                     @endif
                                     <tr><th scope="row">Issue</th><td>{{ $repair->issueCategoryName() }}</td></tr>
                                     <tr><th scope="row">Description</th><td>{{ $repair->issue_description }}</td></tr>

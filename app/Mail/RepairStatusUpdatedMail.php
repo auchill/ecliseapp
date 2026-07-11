@@ -2,7 +2,7 @@
 
 namespace App\Mail;
 
-use App\Models\RepairBooking;
+use App\Models\Repair;
 use App\Models\RepairStatusUpdate;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
@@ -15,14 +15,14 @@ class RepairStatusUpdatedMail extends Mailable
     use Queueable, SerializesModels;
 
     public function __construct(
-        public RepairBooking $repair,
+        public Repair $repair,
         public ?RepairStatusUpdate $statusUpdate = null,
     ) {}
 
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Repair '.$this->repair->tracking_number.' status update',
+            subject: 'Repair '.$this->repair->repair_number.' status update',
         );
     }
 

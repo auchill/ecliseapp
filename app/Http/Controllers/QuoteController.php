@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreQuoteRequest;
 use App\Mail\AdminQuoteSubmittedMail;
 use App\Mail\QuoteSubmittedCustomerMail;
+use App\Models\Customer;
 use App\Models\DeviceType;
 use App\Models\IssueCategory;
 use App\Models\ProductBrand;
@@ -28,17 +29,24 @@ class QuoteController extends Controller
     public function store(StoreQuoteRequest $request)
     {
         $data = $request->validated();
+        $customer = Customer::forUser($request->user());
 
         if ($request->hasFile('device_image')) {
             $data['device_image'] = $request->file('device_image')->store('quote-images', 'public');
         }
 
+        $data['customer_id'] = $customer->id;
         $data['quote_number'] = $this->generateQuoteNumber();
+        $data['customer_name'] = $customer->full_name;
+        $data['email'] = $customer->email;
+        $data['phone_number'] = $customer->phone ?: '';
         $data['status'] = 'pending';
+        $data['converted_to_repair'] = false;
+        $data['converted_to_booking'] = false;
 
         $quote = Quote::query()->create($data);
 
-        Mail::to($quote->email)->send(new QuoteSubmittedCustomerMail($quote));
+        Mail::to($customer->email)->send(new QuoteSubmittedCustomerMail($quote->load('customer')));
 
         User::query()
             ->admins()

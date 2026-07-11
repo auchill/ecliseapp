@@ -11,23 +11,24 @@ class CatalogTaxonomySeeder extends Seeder
     public function run(): void
     {
         foreach ([
-            'Phone',
-            'Laptop',
-            'Tablet',
-            'Desktop',
-            'Game Console',
-            'Smart Watch',
-            'Accessories',
-            'Parts',
-            // 'Phones',
-            // 'Laptops',
-            // 'Chargers',
-        ] as $index => $name) {
+            ['name' => 'Phone', 'code' => 'PHN'],
+            ['name' => 'Laptop', 'code' => 'LAP'],
+            ['name' => 'Tablet', 'code' => 'TAB'],
+            ['name' => 'Desktop', 'code' => 'DES'],
+            ['name' => 'Game Console', 'code' => 'GAM'],
+            ['name' => 'Smart Watch', 'code' => 'WAT'],
+            ['name' => 'Accessories', 'code' => 'ACC'],
+            ['name' => 'Parts', 'code' => 'OTH'],
+        ] as $index => $category) {
             ProductCategory::query()->updateOrCreate(
-                ['slug' => Str::slug($name)],
-                ['name' => $name, 'is_active' => true, 'sort_order' => ($index + 1) * 10],
+                ['slug' => Str::slug($category['name'])],
+                [
+                    'name' => $category['name'],
+                    'code' => $category['code'],
+                    'is_active' => true,
+                    'sort_order' => ($index + 1) * 10,
+                ],
             );
         }
-
     }
 }

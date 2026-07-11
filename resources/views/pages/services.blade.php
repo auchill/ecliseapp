@@ -20,7 +20,7 @@
                     ['icon' => 'bi-bag-check', 'title' => 'Device Sales', 'items' => ['New phones', 'Used phones', 'New computers', 'Used and refurbished computers']],
                     ['icon' => 'bi-plug', 'title' => 'Accessories', 'items' => ['Chargers and cables', 'Cases and protection', 'Computer accessories', 'Everyday replacement essentials']],
                     ['icon' => 'bi-cpu', 'title' => 'Parts Price Verification', 'items' => ['Screens', 'Batteries', 'Charging ports', 'Laptop parts and boards']],
-                    ['icon' => 'bi-clipboard2-check', 'title' => 'Repair Tracking', 'items' => ['Tracking number lookup', 'Status timeline', 'Customer-visible notes', 'Estimated completion dates']],
+                    ['icon' => 'bi-clipboard2-check', 'title' => 'Repair Tracking', 'items' => ['Repair number lookup', 'Status timeline', 'Customer-visible notes', 'Estimated completion dates']],
                 ] as $service)
                     <div class="col-md-6 col-xl-4">
                         <div class="surface h-100 p-4">
@@ -44,7 +44,7 @@
                 <div>
                     <p class="eyebrow">Next Step</p>
                     <h2 class="h1 fw-bold mb-2">Ready to start a repair?</h2>
-                    <p class="muted fs-5 mb-lg-0">Submit the device details and preferred appointment window to get a tracking number.</p>
+                    <p class="muted fs-5 mb-lg-0">Submit the device details and preferred appointment window to get a repair number.</p>
                 </div>
                 <a class="btn btn-primary btn-lg mt-3 mt-lg-0" href="{{ route('repairs.create') }}"><i class="bi bi-calendar-check me-2"></i>Book a Repair</a>
             </div>
