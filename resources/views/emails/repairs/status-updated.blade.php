@@ -3,7 +3,7 @@
 <html>
     <body style="font-family: Arial, sans-serif; color: #111827; line-height: 1.5;">
         <h1 style="color: #0D1321;">Repair status update</h1>
-        <p>Hello {{ $repair->customer_name }},</p>
+        <p>Hello {{ $repair->customer?->full_name ?? 'Customer' }},</p>
         <p>Your repair <strong>{{ $repair->repair_number }}</strong> for {{ $repair->deviceLabel() }} is now <strong>{{ $repair->statusLabel() }}</strong>.</p>
 
         <table cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%; max-width: 640px;">
@@ -32,9 +32,11 @@
 
         @if ($repair->isShipping())
             <h2 style="color: #0D1321;">Shipping address</h2>
-            @foreach ($repair->shippingAddressLines() as $line)
+            @forelse ($repair->shippingAddressLines() as $line)
                 <div>{{ $line }}</div>
-            @endforeach
+            @empty
+                <div>Shipping address unavailable.</div>
+            @endforelse
         @else
             <p><strong>Pickup instructions:</strong> We will notify you when your repaired device is ready for pickup.</p>
         @endif

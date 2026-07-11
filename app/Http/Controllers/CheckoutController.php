@@ -86,9 +86,9 @@ class CheckoutController extends Controller
             'checkout_data' => [
                 'user_id' => $request->user()->id,
                 'customer_id' => $cart->customer_id,
-                'cart_id' => $cart->id,
+                'cart_reference' => $cart->id,
                 'customer' => [
-                    'full_name' => $data['customer_name'],
+                    'full_name' => $data['full_name'],
                     'email' => $data['email'],
                     'phone' => $data['phone'],
                 ],
@@ -133,17 +133,17 @@ class CheckoutController extends Controller
 
         if ($data['fulfillment_method'] === 'pickup') {
             foreach ([
-                'shipping_full_name',
-                'shipping_phone',
-                'shipping_email',
-                'shipping_address_line1',
-                'shipping_address_line2',
-                'shipping_city',
-                'shipping_province',
-                'shipping_postal_code',
-                'shipping_country',
+                'recipient_name',
+                'recipient_phone',
+                'recipient_email',
+                'address_line1',
+                'address_line2',
+                'city',
+                'province',
+                'postal_code',
+                'country',
                 'delivery_carrier',
-                'tracking_number',
+                'carrier_tracking_number',
             ] as $field) {
                 $data[$field] = null;
             }

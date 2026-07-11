@@ -38,8 +38,8 @@
                 <div class="col-lg-6">
                     <div class="surface p-4">
                         <h2 class="h5 fw-bold">Payable</h2>
-                        <p class="mb-1"><strong>Customer:</strong> {{ $payment->payable?->customer_name }}</p>
-                        <p class="mb-1"><strong>Email:</strong> {{ $payment->payable?->email }}</p>
+                        <p class="mb-1"><strong>Customer:</strong> {{ $payment->payable?->customer?->full_name ?? 'Customer unavailable' }}</p>
+                        <p class="mb-1"><strong>Email:</strong> {{ $payment->payable?->customer?->email ?? 'Unavailable' }}</p>
                         <p class="mb-1"><strong>Payment status:</strong> {{ $payment->payable?->payment_status }}</p>
                         @if ($payment->payable instanceof \App\Models\Order)
                             <a class="btn btn-outline-primary mt-3" href="{{ route('admin.orders.show', $payment->payable) }}">View Order</a>

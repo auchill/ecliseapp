@@ -142,16 +142,12 @@ class DatabaseSeeder extends Seeder
         }
 
         $customerProfile = Customer::forUser($customer);
+        $customerProfile->update(['phone' => $customerProfile->phone ?: '416-555-0199']);
 
         $booking = Repair::query()->updateOrCreate(
             ['repair_number' => 'ECL-REP-2026-0000001'],
             [
                 'customer_id' => $customerProfile->id,
-                'user_id' => $customer->id,
-                'tracking_number' => 'ECL-REP-2026-0000001',
-                'customer_name' => $customer->name,
-                'email' => $customer->email,
-                'phone' => '416-555-0199',
                 'device_type' => 'Phone',
                 'device_type_id' => DeviceType::query()->where('slug', 'phone')->value('id'),
                 'device_brand' => 'Apple',

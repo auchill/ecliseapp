@@ -35,7 +35,7 @@
                     <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
                         <div>
                             <p class="eyebrow">Order {{ $order->order_number }}</p>
-                            <h2 class="display-6 fw-bold mb-0">{{ $order->customer_name }}</h2>
+                            <h2 class="display-6 fw-bold mb-0">{{ $order->customer?->full_name ?? 'Customer unavailable' }}</h2>
                         </div>
                         <span class="status-pill">{{ $order->status }}</span>
                     </div>
@@ -56,7 +56,7 @@
                                             <tr><th scope="row">Shipping discount</th><td>${{ number_format($order->shipping_discount_amount, 2) }}</td></tr>
                                             <tr><th scope="row">Final shipping</th><td>${{ number_format($order->shipping_cost, 2) }}</td></tr>
                                             <tr><th scope="row">Delivery carrier</th><td>{{ $order->delivery_carrier ?: 'Not available yet' }}</td></tr>
-                                            <tr><th scope="row">Tracking number</th><td>{{ $order->tracking_number ?: 'Not available yet' }}</td></tr>
+                                            <tr><th scope="row">Carrier tracking number</th><td>{{ $order->tracking_number ?: 'Not available yet' }}</td></tr>
                                         @else
                                             <tr><th scope="row">Shipping</th><td>No charge for store pickup.</td></tr>
                                         @endif
@@ -67,9 +67,11 @@
                             </div>
                             @if ($order->isShipping())
                                 <h3 class="h5 fw-bold mt-4">Shipping Address</h3>
-                                @foreach ($order->shippingAddressLines() as $line)
+                                @forelse ($order->shippingAddressLines() as $line)
                                     <div>{{ $line }}</div>
-                                @endforeach
+                                @empty
+                                    <div class="muted">Shipping address unavailable.</div>
+                                @endforelse
                             @else
                                 <div class="alert alert-info mt-4">Your order will be prepared for store pickup. You will receive an email when it is ready.</div>
                             @endif

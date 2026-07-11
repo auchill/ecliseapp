@@ -69,15 +69,17 @@
                             <p class="mb-1"><strong>Delivery carrier:</strong> {{ $order->delivery_carrier }}</p>
                         @endif
                         @if ($order->tracking_number)
-                            <p class="mb-1"><strong>Tracking number:</strong> {{ $order->tracking_number }}</p>
+                            <p class="mb-1"><strong>Carrier tracking number:</strong> {{ $order->tracking_number }}</p>
                         @endif
                     </div>
                     @if ($order->isShipping())
                         <div class="col-lg-6">
                             <h2 class="h5 fw-bold">Shipping Address</h2>
-                            @foreach ($order->shippingAddressLines() as $line)
+                            @forelse ($order->shippingAddressLines() as $line)
                                 <div>{{ $line }}</div>
-                            @endforeach
+                            @empty
+                                <div class="muted">Shipping address unavailable.</div>
+                            @endforelse
                         </div>
                     @endif
                 </div>

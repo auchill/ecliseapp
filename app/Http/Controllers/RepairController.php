@@ -11,7 +11,7 @@ use App\Services\ShippingCostService;
 use Illuminate\Http\Request;
 use InvalidArgumentException;
 
-class RepairBookingController extends Controller
+class RepairController extends Controller
 {
     public function create()
     {
@@ -25,32 +25,29 @@ class RepairBookingController extends Controller
         abort_if($request->user()?->isAdmin(), 403);
 
         $data = $request->validate([
-            'tracking_number' => ['required', 'string', 'max:40'],
+            'repair_number' => ['required', 'string', 'max:40'],
         ]);
 
         $booking = Repair::query()
-            ->where(function ($query) use ($data): void {
-                $query->where('repair_number', $data['tracking_number'])
-                    ->orWhere('tracking_number', $data['tracking_number']);
-            })
+            ->where('repair_number', $data['repair_number'])
             ->first();
 
         if (! $booking) {
-            return back()->withErrors(['tracking_number' => 'No repair was found for that repair number.'])->withInput();
+            return back()->withErrors(['repair_number' => 'No repair was found for that repair number.'])->withInput();
         }
 
         if (! $booking->canCustomerPay() && $booking->repair_status !== 'awaiting_device') {
-            return back()->withErrors(['tracking_number' => 'This repair is not available for customer completion or payment.'])->withInput();
+            return back()->withErrors(['repair_number' => 'This repair is not available for customer completion or payment.'])->withInput();
         }
 
         return redirect()->route('repairs.complete', $booking->repair_number);
     }
 
-    public function complete(string $trackingNumber, Request $request, ShippingCostService $shippingCosts)
+    public function complete(string $repairNumber, Request $request, ShippingCostService $shippingCosts)
     {
         abort_if($request->user()?->isAdmin(), 403);
 
-        $booking = $this->bookingForCustomer($trackingNumber, $request);
+        $booking = $this->bookingForCustomer($repairNumber, $request);
         $baseSubtotal = (float) $booking->subtotal + (float) $booking->tax_amount;
         $shippingMethods = $shippingCosts->getAvailableShippingMethods();
         $shippingQuotes = $shippingMethods
@@ -68,7 +65,7 @@ class RepairBookingController extends Controller
     }
 
     public function completeStore(
-        string $trackingNumber,
+        string $repairNumber,
         Request $request,
         ShippingCostService $shippingCosts,
         PaymentGatewayService $paymentGateways,
@@ -76,22 +73,22 @@ class RepairBookingController extends Controller
     ) {
         abort_if($request->user()?->isAdmin(), 403);
 
-        $booking = $this->bookingForCustomer($trackingNumber, $request);
+        $booking = $this->bookingForCustomer($repairNumber, $request);
 
         abort_unless($booking->canCustomerPay(), 422, 'This repair is not available for payment.');
 
         $data = $request->validate([
             'fulfillment_method' => ['required', 'in:pickup,shipping'],
             'shipping_method_id' => ['required_if:fulfillment_method,shipping', 'nullable', 'exists:shipping_methods,id'],
-            'shipping_full_name' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:255'],
-            'shipping_phone' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:40'],
-            'shipping_email' => ['required_if:fulfillment_method,shipping', 'nullable', 'email', 'max:255'],
-            'shipping_address_line1' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:255'],
-            'shipping_address_line2' => ['nullable', 'string', 'max:255'],
-            'shipping_city' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:120'],
-            'shipping_province' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:120'],
-            'shipping_postal_code' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:40'],
-            'shipping_country' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:120'],
+            'recipient_name' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:255'],
+            'recipient_phone' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:40'],
+            'recipient_email' => ['required_if:fulfillment_method,shipping', 'nullable', 'email', 'max:255'],
+            'address_line1' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:255'],
+            'address_line2' => ['nullable', 'string', 'max:255'],
+            'city' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:120'],
+            'province' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:120'],
+            'postal_code' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:40'],
+            'country' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:120'],
             'customer_remark' => ['nullable', 'string', 'max:3000'],
             'payment_gateway' => ['required', 'in:stripe,paypal'],
             'payment_amount_option' => ['required', 'in:minimum,full'],
@@ -135,7 +132,6 @@ class RepairBookingController extends Controller
 
         $booking->update([
             'customer_id' => $booking->customer_id ?: $customer->id,
-            'user_id' => $booking->user_id ?: $request->user()->id,
             'terms_accepted' => true,
             'fulfillment_method' => $data['fulfillment_method'],
             'pickup_or_shipping_option' => $data['fulfillment_method'],
@@ -146,15 +142,6 @@ class RepairBookingController extends Controller
             'shipping_discount_amount' => $data['shipping_discount_amount'] ?? 0,
             'shipping_cost' => $shippingAmount,
             'shipping_amount' => $shippingAmount,
-            'shipping_full_name' => $data['shipping_full_name'] ?? null,
-            'shipping_phone' => $data['shipping_phone'] ?? null,
-            'shipping_email' => $data['shipping_email'] ?? null,
-            'shipping_address_line1' => $data['shipping_address_line1'] ?? null,
-            'shipping_address_line2' => $data['shipping_address_line2'] ?? null,
-            'shipping_city' => $data['shipping_city'] ?? null,
-            'shipping_province' => $data['shipping_province'] ?? null,
-            'shipping_postal_code' => $data['shipping_postal_code'] ?? null,
-            'shipping_country' => $data['shipping_country'] ?? null,
             'customer_remark' => $data['customer_remark'] ?? null,
             'total_amount' => $totalAmount,
             'repair_total' => $totalAmount,
@@ -193,10 +180,10 @@ class RepairBookingController extends Controller
         return redirect()->away($paymentGateways->createCheckout($payment));
     }
 
-    public function confirmation(Repair $repairBooking)
+    public function confirmation(Repair $repair)
     {
         return view('repairs.confirmation', [
-            'booking' => $repairBooking->load('customer', 'shipping', 'publicStatusUpdates', 'latestPayment', 'deviceType', 'deviceBrand', 'deviceModel', 'issueCategory'),
+            'booking' => $repair->load('customer', 'shipping', 'publicStatusUpdates', 'latestPayment', 'deviceType', 'deviceBrand', 'deviceModel', 'issueCategory'),
         ]);
     }
 
@@ -210,18 +197,11 @@ class RepairBookingController extends Controller
         $data = $request->validated();
 
         $booking = Repair::query()
-            ->where(function ($query) use ($data): void {
-                $query->where('repair_number', $data['tracking_number'])
-                    ->orWhere('tracking_number', $data['tracking_number']);
-            })
+            ->where('repair_number', $data['repair_number'])
             ->when(filled($data['contact'] ?? null), function ($query) use ($data): void {
                 $contact = trim($data['contact']);
-                $query->where(function ($query) use ($contact): void {
-                    $query->where('email', $contact)
-                        ->orWhere('phone', $contact)
-                        ->orWhereHas('customer', function ($query) use ($contact): void {
-                            $query->where('email', $contact)->orWhere('phone', $contact);
-                        });
+                $query->whereHas('customer', function ($query) use ($contact): void {
+                    $query->where('email', $contact)->orWhere('phone', $contact);
                 });
             })
             ->with('customer', 'shipping', 'publicStatusUpdates', 'latestPayment', 'deviceType', 'deviceBrand', 'deviceModel', 'issueCategory')
@@ -229,7 +209,7 @@ class RepairBookingController extends Controller
 
         if (! $booking) {
             return back()
-                ->withErrors(['tracking_number' => 'No repair was found for that tracking number.'])
+                ->withErrors(['repair_number' => 'No repair was found for that repair number.'])
                 ->withInput();
         }
 
@@ -238,19 +218,16 @@ class RepairBookingController extends Controller
         ]);
     }
 
-    private function bookingForCustomer(string $trackingNumber, Request $request): Repair
+    private function bookingForCustomer(string $repairNumber, Request $request): Repair
     {
         $customer = Customer::forUser($request->user());
 
         $booking = Repair::query()
-            ->where(function ($query) use ($trackingNumber): void {
-                $query->where('repair_number', $trackingNumber)
-                    ->orWhere('tracking_number', $trackingNumber);
-            })
+            ->where('repair_number', $repairNumber)
             ->firstOrFail();
 
         abort_if($booking->customer_id && $booking->customer_id !== $customer->id, 403);
-        abort_if(! $booking->customer_id && $booking->user_id && $booking->user_id !== $request->user()->id, 403);
+        abort_if(! $booking->customer_id, 403);
 
         return $booking;
     }
@@ -261,15 +238,15 @@ class RepairBookingController extends Controller
 
         if ($data['fulfillment_method'] === 'pickup') {
             foreach ([
-                'shipping_full_name',
-                'shipping_phone',
-                'shipping_email',
-                'shipping_address_line1',
-                'shipping_address_line2',
-                'shipping_city',
-                'shipping_province',
-                'shipping_postal_code',
-                'shipping_country',
+                'recipient_name',
+                'recipient_phone',
+                'recipient_email',
+                'address_line1',
+                'address_line2',
+                'city',
+                'province',
+                'postal_code',
+                'country',
             ] as $field) {
                 $data[$field] = null;
             }

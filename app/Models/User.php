@@ -127,11 +127,6 @@ class User extends Authenticatable
         );
     }
 
-    public function repairBookings(): HasManyThrough
-    {
-        return $this->repairs();
-    }
-
     public function customer(): HasOne
     {
         return $this->hasOne(Customer::class);

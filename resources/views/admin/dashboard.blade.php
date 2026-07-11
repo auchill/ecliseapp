@@ -35,7 +35,7 @@
                             <div class="d-flex justify-content-between gap-3 py-3 border-bottom">
                                 <div>
                                     <strong>{{ $repair->repair_number }}</strong>
-                                    <div class="small muted">{{ $repair->customer_name }} &middot; {{ $repair->deviceLabel() }}</div>
+                                    <div class="small muted">{{ $repair->customer?->full_name ?? 'Customer unavailable' }} &middot; {{ $repair->deviceLabel() }}</div>
                                 </div>
                                 <span class="status-pill">{{ $repair->statusLabel() }}</span>
                             </div>
@@ -54,7 +54,7 @@
                             <div class="d-flex justify-content-between gap-3 py-3 border-bottom">
                                 <div>
                                     <strong>{{ $order->order_number }}</strong>
-                                    <div class="small muted">{{ $order->customer_name }}</div>
+                                    <div class="small muted">{{ $order->customer?->full_name ?? 'Customer unavailable' }}</div>
                                 </div>
                                 <div class="text-end">
                                     <span class="status-pill">{{ $order->status }}</span>

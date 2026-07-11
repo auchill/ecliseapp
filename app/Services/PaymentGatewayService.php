@@ -78,8 +78,7 @@ class PaymentGatewayService
 
         $payable = $payment->payable;
         $customerEmail = data_get($payment->checkout_data, 'customer.email')
-            ?: $payable->email
-            ?? $payable->customer?->email;
+            ?: $payable?->customer?->email;
 
         $response = Http::asForm()
             ->withToken($secret)

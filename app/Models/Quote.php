@@ -22,10 +22,6 @@ class Quote extends Model
 
     protected $fillable = [
         'customer_id',
-        'quote_number',
-        'customer_name',
-        'email',
-        'phone_number',
         'device_type_id',
         'product_brand_id',
         'product_model_id',
@@ -37,7 +33,6 @@ class Quote extends Model
         'issue_description',
         'status',
         'admin_note',
-        'converted_to_booking',
         'converted_to_repair',
     ];
 
@@ -45,7 +40,6 @@ class Quote extends Model
     {
         return [
             'preferred_date' => 'date',
-            'converted_to_booking' => 'boolean',
             'converted_to_repair' => 'boolean',
         ];
     }
@@ -80,11 +74,6 @@ class Quote extends Model
         return $this->hasOne(Repair::class);
     }
 
-    public function repairBooking(): HasOne
-    {
-        return $this->repair();
-    }
-
     public function scopeOpen(Builder $query): Builder
     {
         return $query->whereNotIn('status', ['rejected', 'converted_to_repair']);
@@ -93,31 +82,6 @@ class Quote extends Model
     public function statusLabel(): string
     {
         return self::STATUSES[$this->status] ?? ucfirst((string) $this->status);
-    }
-
-    public function getQuoteNumberAttribute(?string $value): string
-    {
-        return $value ?: 'Quote #'.$this->getKey();
-    }
-
-    public function getCustomerNameAttribute(?string $value): ?string
-    {
-        return $value ?? $this->customer?->full_name;
-    }
-
-    public function getEmailAttribute(?string $value): ?string
-    {
-        return $value ?? $this->customer?->email;
-    }
-
-    public function getPhoneNumberAttribute(?string $value): ?string
-    {
-        return $value ?? $this->customer?->phone;
-    }
-
-    public function getConvertedToBookingAttribute(mixed $value): bool
-    {
-        return (bool) ($this->converted_to_repair ?: $value);
     }
 
     public function deviceModelName(): ?string

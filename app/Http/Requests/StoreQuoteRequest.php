@@ -24,9 +24,7 @@ class StoreQuoteRequest extends FormRequest
             'device_image' => ['nullable', 'image', 'max:4096'],
             'issue_description' => ['required', 'string', 'max:5000'],
             'customer_id' => ['prohibited'],
-            'customer_name' => ['prohibited'],
             'email' => ['prohibited'],
-            'phone_number' => ['prohibited'],
         ];
     }
 }

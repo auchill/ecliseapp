@@ -72,7 +72,7 @@
                                     <td>{{ $payment->gatewayLabel() }}</td>
                                     <td><span class="status-pill">{{ $payment->statusLabel() }}</span></td>
                                     <td>{{ strtoupper($payment->currency) }} ${{ number_format($payment->amount, 2) }}</td>
-                                    <td>{{ $payment->payable?->customer_name }}</td>
+                                    <td>{{ $payment->payable?->customer?->full_name ?? 'Customer unavailable' }}</td>
                                     <td>{{ $payment->gateway_reference_id ?: 'Pending' }}</td>
                                     <td class="text-end">
                                         <a class="btn btn-outline-primary btn-sm" href="{{ route('admin.payments.show', $payment) }}"><i class="bi bi-eye"></i><span class="visually-hidden">View</span></a>

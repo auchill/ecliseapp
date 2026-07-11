@@ -36,13 +36,8 @@ class QuoteController extends Controller
         }
 
         $data['customer_id'] = $customer->id;
-        $data['quote_number'] = $this->generateQuoteNumber();
-        $data['customer_name'] = $customer->full_name;
-        $data['email'] = $customer->email;
-        $data['phone_number'] = $customer->phone ?: '';
         $data['status'] = 'pending';
         $data['converted_to_repair'] = false;
-        $data['converted_to_booking'] = false;
 
         $quote = Quote::query()->create($data);
 
@@ -54,17 +49,5 @@ class QuoteController extends Controller
             ->each(fn (User $admin) => Mail::to($admin->email)->send(new AdminQuoteSubmittedMail($quote)));
 
         return redirect()->route('quotes.create')->with('status', 'Quote request submitted. We will contact you after reviewing the details.');
-    }
-
-    private function generateQuoteNumber(): string
-    {
-        $year = now()->year;
-        $next = Quote::query()->whereYear('created_at', $year)->count() + 1;
-
-        do {
-            $quoteNumber = sprintf('ECL-QTE-%s-%04d', $year, $next++);
-        } while (Quote::query()->where('quote_number', $quoteNumber)->exists());
-
-        return $quoteNumber;
     }
 }

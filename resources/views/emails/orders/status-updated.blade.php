@@ -3,7 +3,7 @@
 <html>
     <body style="font-family: Arial, sans-serif; color: #111827; line-height: 1.5;">
         <h1 style="color: #0D1321;">Order status update</h1>
-        <p>Hello {{ $order->customer_name }},</p>
+        <p>Hello {{ $order->customer?->full_name ?? 'Customer' }},</p>
         <p>Your order <strong>{{ $order->order_number }}</strong> is now <strong>{{ $order->status }}</strong>.</p>
 
         <table cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%; max-width: 640px;">
@@ -23,15 +23,17 @@
                 <tr><td><strong>Delivery carrier</strong></td><td>{{ $order->delivery_carrier }}</td></tr>
             @endif
             @if ($order->tracking_number)
-                <tr><td><strong>Tracking number</strong></td><td>{{ $order->tracking_number }}</td></tr>
+                <tr><td><strong>Carrier tracking number</strong></td><td>{{ $order->tracking_number }}</td></tr>
             @endif
         </table>
 
         @if ($order->isShipping())
             <h2 style="color: #0D1321;">Shipping address</h2>
-            @foreach ($order->shippingAddressLines() as $line)
+            @forelse ($order->shippingAddressLines() as $line)
                 <div>{{ $line }}</div>
-            @endforeach
+            @empty
+                <div>Shipping address unavailable.</div>
+            @endforelse
         @else
             <p><strong>Pickup instructions:</strong> Your order will be prepared for store pickup. You will receive an email when it is ready.</p>
         @endif

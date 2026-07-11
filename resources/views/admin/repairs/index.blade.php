@@ -62,7 +62,7 @@
                             @forelse ($repairs as $repair)
                                 <tr>
                                     <td>{{ $repair->repair_number }}</td>
-                                    <td>{{ $repair->customer_name }}</td>
+                                    <td>{{ $repair->customer?->full_name ?? 'Customer unavailable' }}</td>
                                     <td>{{ $repair->deviceLabel() }}</td>
                                     <td><span class="status-pill">{{ $repair->statusLabel() }}</span></td>
                                     <td>{{ $repair->paymentStatusLabel() }}</td>

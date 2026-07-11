@@ -17,8 +17,8 @@
                 @csrf
                 <div class="row g-3 align-items-end">
                     <div class="col-lg-5">
-                        <label class="form-label" for="tracking_number">Repair number</label>
-                        <input class="form-control" id="tracking_number" name="tracking_number" value="{{ old('tracking_number', $booking->repair_number ?? '') }}" placeholder="ECL-REP-2026-0000001" required>
+                        <label class="form-label" for="repair_number">Repair number</label>
+                        <input class="form-control" id="repair_number" name="repair_number" value="{{ old('repair_number', $booking->repair_number ?? '') }}" placeholder="ECL-REP-2026-0000001" required>
                     </div>
                     <div class="col-lg-5">
                         <label class="form-label" for="contact">Email or phone</label>
@@ -45,13 +45,13 @@
                             <div class="table-responsive">
                                 <table class="table">
                                     <tbody>
-                                        <tr><th scope="row">Customer</th><td>{{ $booking->customer_name }}</td></tr>
+                                        <tr><th scope="row">Customer</th><td>{{ $booking->customer?->full_name ?? 'Customer unavailable' }}</td></tr>
                                         <tr><th scope="row">Device type</th><td>{{ $booking->deviceTypeName() }}</td></tr>
                                         <tr><th scope="row">Device brand</th><td>{{ $booking->deviceBrandName() }}</td></tr>
                                         <tr><th scope="row">Device model</th><td>{{ $booking->deviceModelName() }}</td></tr>
                                         <tr><th scope="row">Issue</th><td>{{ $booking->issueCategoryName() }}</td></tr>
                                         @auth
-                                            @if ($booking->user_id === auth()->id())
+                                            @if ($booking->customer?->user_id === auth()->id())
                                                 <tr><th scope="row">Description</th><td>{{ $booking->issue_description }}</td></tr>
                                             @endif
                                         @endauth

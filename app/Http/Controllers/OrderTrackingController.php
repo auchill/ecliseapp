@@ -23,13 +23,11 @@ class OrderTrackingController extends Controller
 
         $order = Order::query()
             ->where('order_number', $data['order_number'])
-            ->where(function ($query) use ($contact): void {
+            ->whereHas('customer', function ($query) use ($contact): void {
                 $query->where('email', $contact)
-                    ->orWhere('phone', $contact)
-                    ->orWhere('shipping_email', $contact)
-                    ->orWhere('shipping_phone', $contact);
+                    ->orWhere('phone', $contact);
             })
-            ->with(['items', 'publicStatusUpdates', 'latestPayment'])
+            ->with(['items', 'customer', 'shipping', 'publicStatusUpdates', 'latestPayment'])
             ->first();
 
         if (! $order) {

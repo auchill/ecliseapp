@@ -27,7 +27,7 @@
                         <div class="table-responsive">
                             <table class="table">
                                 <tbody>
-                                    <tr><th scope="row">Customer</th><td>{{ $booking->customer_name }}</td></tr>
+                                    <tr><th scope="row">Customer</th><td>{{ $booking->customer?->full_name ?? 'Customer unavailable' }}</td></tr>
                                     <tr><th scope="row">Device type</th><td>{{ $booking->deviceTypeName() }}</td></tr>
                                     <tr><th scope="row">Brand</th><td>{{ $booking->deviceBrandName() }}</td></tr>
                                     <tr><th scope="row">Model</th><td>{{ $booking->deviceModelName() }}</td></tr>
@@ -105,40 +105,40 @@
 
                             <div class="row g-3 mt-1">
                                 <div class="col-md-6">
-                                    <label class="form-label" for="shipping_full_name">Full name</label>
-                                    <input class="form-control" id="shipping_full_name" name="shipping_full_name" value="{{ old('shipping_full_name', $booking->shipping_full_name ?: auth()->user()?->name) }}" data-shipping-required>
+                                    <label class="form-label" for="recipient_name">Full name</label>
+                                    <input class="form-control" id="recipient_name" name="recipient_name" value="{{ old('recipient_name', $booking->customer?->full_name ?: auth()->user()?->name) }}" data-shipping-required>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label" for="shipping_phone">Phone</label>
-                                    <input class="form-control" id="shipping_phone" name="shipping_phone" value="{{ old('shipping_phone', $booking->shipping_phone ?: $booking->phone) }}" data-shipping-required>
+                                    <label class="form-label" for="recipient_phone">Phone</label>
+                                    <input class="form-control" id="recipient_phone" name="recipient_phone" value="{{ old('recipient_phone', $booking->customer?->phone) }}" data-shipping-required>
                                 </div>
                                 <div class="col-12">
-                                    <label class="form-label" for="shipping_email">Email</label>
-                                    <input class="form-control" id="shipping_email" name="shipping_email" type="email" value="{{ old('shipping_email', $booking->shipping_email ?: $booking->email) }}" data-shipping-required>
+                                    <label class="form-label" for="recipient_email">Email</label>
+                                    <input class="form-control" id="recipient_email" name="recipient_email" type="email" value="{{ old('recipient_email', $booking->customer?->email) }}" data-shipping-required>
                                 </div>
                                 <div class="col-12">
-                                    <label class="form-label" for="shipping_address_line1">Street address</label>
-                                    <input class="form-control" id="shipping_address_line1" name="shipping_address_line1" value="{{ old('shipping_address_line1', $booking->shipping_address_line1) }}" data-shipping-required>
+                                    <label class="form-label" for="address_line1">Street address</label>
+                                    <input class="form-control" id="address_line1" name="address_line1" value="{{ old('address_line1', $booking->customer?->street_address) }}" data-shipping-required>
                                 </div>
                                 <div class="col-12">
-                                    <label class="form-label" for="shipping_address_line2">Apartment/unit</label>
-                                    <input class="form-control" id="shipping_address_line2" name="shipping_address_line2" value="{{ old('shipping_address_line2', $booking->shipping_address_line2) }}">
+                                    <label class="form-label" for="address_line2">Apartment/unit</label>
+                                    <input class="form-control" id="address_line2" name="address_line2" value="{{ old('address_line2', $booking->customer?->address_line_2) }}">
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label" for="shipping_city">City</label>
-                                    <input class="form-control" id="shipping_city" name="shipping_city" value="{{ old('shipping_city', $booking->shipping_city) }}" data-shipping-required>
+                                    <label class="form-label" for="city">City</label>
+                                    <input class="form-control" id="city" name="city" value="{{ old('city', $booking->customer?->city) }}" data-shipping-required>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label" for="shipping_province">Province/state</label>
-                                    <input class="form-control" id="shipping_province" name="shipping_province" value="{{ old('shipping_province', $booking->shipping_province) }}" data-shipping-required>
+                                    <label class="form-label" for="province">Province/state</label>
+                                    <input class="form-control" id="province" name="province" value="{{ old('province', $booking->customer?->province) }}" data-shipping-required>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label" for="shipping_postal_code">Postal code</label>
-                                    <input class="form-control" id="shipping_postal_code" name="shipping_postal_code" value="{{ old('shipping_postal_code', $booking->shipping_postal_code) }}" data-shipping-required>
+                                    <label class="form-label" for="postal_code">Postal code</label>
+                                    <input class="form-control" id="postal_code" name="postal_code" value="{{ old('postal_code', $booking->customer?->postal_code) }}" data-shipping-required>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label" for="shipping_country">Country</label>
-                                    <input class="form-control" id="shipping_country" name="shipping_country" value="{{ old('shipping_country', $booking->shipping_country ?: 'Canada') }}" data-shipping-required>
+                                    <label class="form-label" for="country">Country</label>
+                                    <input class="form-control" id="country" name="country" value="{{ old('country', $booking->customer?->country ?: 'Canada') }}" data-shipping-required>
                                 </div>
                             </div>
                         </div>

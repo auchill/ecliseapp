@@ -8,7 +8,7 @@
             <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
                 <div>
                     <p class="eyebrow">Order {{ $order->order_number }}</p>
-                    <h1 class="display-6 fw-bold mb-0">{{ $order->customer_name }}</h1>
+                    <h1 class="display-6 fw-bold mb-0">{{ $order->customer?->full_name ?? 'Customer unavailable' }}</h1>
                 </div>
                 <a class="btn btn-outline-primary" href="{{ route('admin.orders.index') }}"><i class="bi bi-arrow-left me-2"></i>Orders</a>
             </div>
@@ -107,40 +107,40 @@
 
                             <div class="col-12"><hr><h3 class="h6 fw-bold">Shipping Address</h3></div>
                             <div class="col-md-6">
-                                <label class="form-label" for="shipping_full_name">Full name</label>
-                                <input class="form-control" id="shipping_full_name" name="shipping_full_name" value="{{ old('shipping_full_name', $order->shipping_full_name) }}">
+                                <label class="form-label" for="recipient_name">Full name</label>
+                                <input class="form-control" id="recipient_name" name="recipient_name" value="{{ old('recipient_name', $order->customer?->full_name) }}">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label" for="shipping_phone">Phone</label>
-                                <input class="form-control" id="shipping_phone" name="shipping_phone" value="{{ old('shipping_phone', $order->shipping_phone) }}">
+                                <label class="form-label" for="recipient_phone">Phone</label>
+                                <input class="form-control" id="recipient_phone" name="recipient_phone" value="{{ old('recipient_phone', $order->customer?->phone) }}">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label" for="shipping_email">Email</label>
-                                <input class="form-control" id="shipping_email" name="shipping_email" type="email" value="{{ old('shipping_email', $order->shipping_email) }}">
+                                <label class="form-label" for="recipient_email">Email</label>
+                                <input class="form-control" id="recipient_email" name="recipient_email" type="email" value="{{ old('recipient_email', $order->customer?->email) }}">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label" for="shipping_country">Country</label>
-                                <input class="form-control" id="shipping_country" name="shipping_country" value="{{ old('shipping_country', $order->shipping_country) }}">
+                                <label class="form-label" for="country">Country</label>
+                                <input class="form-control" id="country" name="country" value="{{ old('country', $order->customer?->country) }}">
                             </div>
                             <div class="col-12">
-                                <label class="form-label" for="shipping_address_line1">Street address</label>
-                                <input class="form-control" id="shipping_address_line1" name="shipping_address_line1" value="{{ old('shipping_address_line1', $order->shipping_address_line1) }}">
+                                <label class="form-label" for="address_line1">Street address</label>
+                                <input class="form-control" id="address_line1" name="address_line1" value="{{ old('address_line1', $order->customer?->street_address) }}">
                             </div>
                             <div class="col-12">
-                                <label class="form-label" for="shipping_address_line2">Apartment/unit</label>
-                                <input class="form-control" id="shipping_address_line2" name="shipping_address_line2" value="{{ old('shipping_address_line2', $order->shipping_address_line2) }}">
+                                <label class="form-label" for="address_line2">Apartment/unit</label>
+                                <input class="form-control" id="address_line2" name="address_line2" value="{{ old('address_line2', $order->customer?->address_line_2) }}">
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label" for="shipping_city">City</label>
-                                <input class="form-control" id="shipping_city" name="shipping_city" value="{{ old('shipping_city', $order->shipping_city) }}">
+                                <label class="form-label" for="city">City</label>
+                                <input class="form-control" id="city" name="city" value="{{ old('city', $order->customer?->city) }}">
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label" for="shipping_province">Province/state</label>
-                                <input class="form-control" id="shipping_province" name="shipping_province" value="{{ old('shipping_province', $order->shipping_province) }}">
+                                <label class="form-label" for="province">Province/state</label>
+                                <input class="form-control" id="province" name="province" value="{{ old('province', $order->customer?->province) }}">
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label" for="shipping_postal_code">Postal code</label>
-                                <input class="form-control" id="shipping_postal_code" name="shipping_postal_code" value="{{ old('shipping_postal_code', $order->shipping_postal_code) }}">
+                                <label class="form-label" for="postal_code">Postal code</label>
+                                <input class="form-control" id="postal_code" name="postal_code" value="{{ old('postal_code', $order->customer?->postal_code) }}">
                             </div>
 
                             <div class="col-md-6">
@@ -148,8 +148,8 @@
                                 <input class="form-control" id="delivery_carrier" name="delivery_carrier" value="{{ old('delivery_carrier', $order->delivery_carrier) }}">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label" for="tracking_number">Tracking number</label>
-                                <input class="form-control" id="tracking_number" name="tracking_number" value="{{ old('tracking_number', $order->tracking_number) }}">
+                                <label class="form-label" for="carrier_tracking_number">Carrier tracking number</label>
+                                <input class="form-control" id="carrier_tracking_number" name="carrier_tracking_number" value="{{ old('carrier_tracking_number', $order->tracking_number) }}">
                             </div>
                             <div class="col-12">
                                 <label class="form-label" for="tracking_notes">Tracking notes</label>
@@ -181,8 +181,8 @@
 
                     <div class="surface p-4">
                         <h2 class="h5 fw-bold">Customer Details</h2>
-                        <p class="mb-1"><strong>Email:</strong> {{ $order->email }}</p>
-                        <p class="mb-1"><strong>Phone:</strong> {{ $order->phone }}</p>
+                        <p class="mb-1"><strong>Email:</strong> {{ $order->customer?->email ?? 'Unavailable' }}</p>
+                        <p class="mb-1"><strong>Phone:</strong> {{ $order->customer?->phone ?? 'Unavailable' }}</p>
                         <p class="mb-1"><strong>Fulfillment:</strong> {{ $order->fulfillmentLabel() }}</p>
                         <p class="mb-1"><strong>Payment gateway:</strong> {{ $order->latestPayment?->gatewayLabel() ?? ucfirst($order->payment_gateway ?? $order->payment_provider ?? 'Pending') }}</p>
                         <p class="mb-1"><strong>Payment status:</strong> {{ ucfirst($order->payment_status) }}</p>

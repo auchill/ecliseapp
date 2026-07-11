@@ -53,7 +53,7 @@
                             @forelse ($orders as $order)
                                 <tr>
                                     <td>{{ $order->order_number }}</td>
-                                    <td>{{ $order->customer_name }}</td>
+                                    <td>{{ $order->customer?->full_name ?? 'Customer unavailable' }}</td>
                                     <td><span class="status-pill">{{ $order->status }}</span></td>
                                     <td>{{ ucfirst($order->payment_status) }}</td>
                                     <td>{{ $order->latestPayment?->gatewayLabel() ?? ucfirst($order->payment_gateway ?? 'Pending') }}</td>

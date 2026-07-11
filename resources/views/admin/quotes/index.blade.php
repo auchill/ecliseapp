@@ -51,7 +51,7 @@
                             @forelse ($quotes as $quote)
                                 <tr>
                                     <td>#{{ $quote->id }}</td>
-                                    <td>{{ $quote->customer_name }}<div class="small muted">{{ $quote->email }}</div></td>
+                                    <td>{{ $quote->customer?->full_name ?? 'Customer unavailable' }}<div class="small muted">{{ $quote->customer?->email }}</div></td>
                                     <td>{{ $quote->deviceLabel() }}</td>
                                     <td>{{ $quote->issueCategory?->name }}</td>
                                     <td><span class="status-pill">{{ $quote->statusLabel() }}</span></td>

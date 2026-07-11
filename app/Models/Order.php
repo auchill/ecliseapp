@@ -33,10 +33,6 @@ class Order extends Model
     protected $fillable = [
         'customer_id',
         'order_number',
-        'customer_name',
-        'email',
-        'phone',
-        'address',
         'subtotal',
         'tax',
         'total',
@@ -50,15 +46,6 @@ class Order extends Model
         'currency',
         'paid_at',
         'inventory_committed_at',
-        'shipping_full_name',
-        'shipping_phone',
-        'shipping_email',
-        'shipping_address_line1',
-        'shipping_address_line2',
-        'shipping_city',
-        'shipping_province',
-        'shipping_postal_code',
-        'shipping_country',
         'shipping_method_id',
         'shipping_method_name',
         'shipping_delivery_days',
@@ -113,11 +100,6 @@ class Order extends Model
         return $this->hasOne(OrderShipping::class);
     }
 
-    public function cart(): BelongsTo
-    {
-        return $this->belongsTo(Cart::class);
-    }
-
     public function payments(): MorphMany
     {
         return $this->morphMany(Payment::class, 'payable');
@@ -155,29 +137,6 @@ class Order extends Model
             return preg_split('/\R/', $this->shipping->shipping_address) ?: [];
         }
 
-        return array_values(array_filter([
-            $this->shipping_full_name,
-            $this->shipping_address_line1,
-            $this->shipping_address_line2,
-            trim(implode(', ', array_filter([$this->shipping_city, $this->shipping_province, $this->shipping_postal_code]))),
-            $this->shipping_country,
-            $this->shipping_phone ? 'Phone: '.$this->shipping_phone : null,
-            $this->shipping_email ? 'Email: '.$this->shipping_email : null,
-        ]));
-    }
-
-    public function getCustomerNameAttribute(?string $value): ?string
-    {
-        return $value ?? $this->customer?->full_name;
-    }
-
-    public function getEmailAttribute(?string $value): ?string
-    {
-        return $value ?? $this->customer?->email;
-    }
-
-    public function getPhoneAttribute(?string $value): ?string
-    {
-        return $value ?? $this->customer?->phone;
+        return [];
     }
 }

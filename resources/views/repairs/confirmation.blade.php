@@ -20,7 +20,7 @@
                         <div class="table-responsive">
                             <table class="table">
                                 <tbody>
-                                    <tr><th scope="row">Customer</th><td>{{ $booking->customer_name }}</td></tr>
+                                    <tr><th scope="row">Customer</th><td>{{ $booking->customer?->full_name ?? 'Customer unavailable' }}</td></tr>
                                     <tr><th scope="row">Device</th><td>{{ $booking->deviceLabel() }}</td></tr>
                                     <tr><th scope="row">Issue</th><td>{{ $booking->issueCategoryName() }}</td></tr>
                                     <tr><th scope="row">Status</th><td><span class="status-pill">{{ $booking->statusLabel() }}</span></td></tr>

@@ -34,7 +34,7 @@
                 <div class="col-lg-6">
                     <div class="surface p-4 h-100">
                         <h2 class="h4 fw-bold mb-3">Repairs</h2>
-                        @forelse ($customer->repairBookings as $repair)
+                        @forelse ($customer->repairs as $repair)
                             <div class="d-flex justify-content-between gap-3 py-3 border-bottom">
                                 <div>
                                     <strong>{{ $repair->repair_number }}</strong>

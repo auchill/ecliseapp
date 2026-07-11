@@ -21,8 +21,6 @@ class OrderController extends Controller
                 $search = $request->string('q');
                 $query->where(function ($query) use ($search): void {
                     $query->where('order_number', 'like', "%{$search}%")
-                        ->orWhere('customer_name', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%")
                         ->orWhereHas('customer', function ($query) use ($search): void {
                             $query->where('full_name', 'like', "%{$search}%")
                                 ->orWhere('email', 'like', "%{$search}%")
@@ -56,17 +54,17 @@ class OrderController extends Controller
             'payment_status' => ['required', 'string', 'max:80'],
             'fulfillment_method' => ['required', Rule::in(array_keys(Order::FULFILLMENT_METHODS))],
             'shipping_cost' => ['required', 'numeric', 'min:0'],
-            'shipping_full_name' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:255'],
-            'shipping_phone' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:40'],
-            'shipping_email' => ['required_if:fulfillment_method,shipping', 'nullable', 'email', 'max:255'],
-            'shipping_address_line1' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:255'],
-            'shipping_address_line2' => ['nullable', 'string', 'max:255'],
-            'shipping_city' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:120'],
-            'shipping_province' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:120'],
-            'shipping_postal_code' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:40'],
-            'shipping_country' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:120'],
+            'recipient_name' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:255'],
+            'recipient_phone' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:40'],
+            'recipient_email' => ['required_if:fulfillment_method,shipping', 'nullable', 'email', 'max:255'],
+            'address_line1' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:255'],
+            'address_line2' => ['nullable', 'string', 'max:255'],
+            'city' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:120'],
+            'province' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:120'],
+            'postal_code' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:40'],
+            'country' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:120'],
             'delivery_carrier' => ['nullable', 'string', 'max:120'],
-            'tracking_number' => ['nullable', 'string', 'max:120'],
+            'carrier_tracking_number' => ['nullable', 'string', 'max:120'],
             'tracking_notes' => ['nullable', 'string'],
             'admin_notes' => ['nullable', 'string'],
             'customer_notes' => ['nullable', 'string'],
@@ -78,9 +76,20 @@ class OrderController extends Controller
         $statusChanged = $order->status !== $data['status'];
         $data = $this->normalizeFulfillmentData($data);
         $data['total'] = (float) $order->subtotal + (float) $order->tax + (float) $data['shipping_cost'];
-        $data['address'] = $this->legacyAddressValue($data);
 
-        $order->update($data);
+        $order->update([
+            'status' => $data['status'],
+            'payment_status' => $data['payment_status'],
+            'fulfillment_method' => $data['fulfillment_method'],
+            'shipping_cost' => $data['shipping_cost'],
+            'total' => $data['total'],
+            'delivery_carrier' => $data['delivery_carrier'] ?? null,
+            'tracking_number' => $data['carrier_tracking_number'] ?? null,
+            'tracking_notes' => $data['tracking_notes'] ?? null,
+            'admin_notes' => $data['admin_notes'] ?? null,
+            'customer_notes' => $data['customer_notes'] ?? null,
+            'notes' => $data['notes'] ?? null,
+        ]);
 
         if ($order->isShipping()) {
             $address = $addressFormatter->format($data);
@@ -103,7 +112,7 @@ class OrderController extends Controller
                 'created_by' => $request->user()->id,
             ]);
 
-            Mail::to($order->email)->send(new OrderStatusUpdatedMail($order->fresh(), $statusUpdate));
+            Mail::to($order->customer?->email)->send(new OrderStatusUpdatedMail($order->fresh('customer', 'shipping'), $statusUpdate));
         }
 
         return redirect()->route('admin.orders.show', $order)->with('status', 'Order updated.');
@@ -117,20 +126,20 @@ class OrderController extends Controller
             $data['shipping_discount_amount'] = 0;
 
             foreach ([
-                'shipping_full_name',
-                'shipping_phone',
-                'shipping_email',
-                'shipping_address_line1',
-                'shipping_address_line2',
-                'shipping_city',
-                'shipping_province',
-                'shipping_postal_code',
-                'shipping_country',
+                'recipient_name',
+                'recipient_phone',
+                'recipient_email',
+                'address_line1',
+                'address_line2',
+                'city',
+                'province',
+                'postal_code',
+                'country',
                 'shipping_method_id',
                 'shipping_method_name',
                 'shipping_delivery_days',
                 'delivery_carrier',
-                'tracking_number',
+                'carrier_tracking_number',
                 'tracking_notes',
             ] as $field) {
                 $data[$field] = null;
@@ -138,24 +147,5 @@ class OrderController extends Controller
         }
 
         return $data;
-    }
-
-    private function legacyAddressValue(array $data): ?string
-    {
-        if ($data['fulfillment_method'] !== 'shipping') {
-            return null;
-        }
-
-        return implode("\n", array_filter([
-            $data['shipping_full_name'] ?? null,
-            $data['shipping_address_line1'] ?? null,
-            $data['shipping_address_line2'] ?? null,
-            trim(implode(', ', array_filter([
-                $data['shipping_city'] ?? null,
-                $data['shipping_province'] ?? null,
-                $data['shipping_postal_code'] ?? null,
-            ]))),
-            $data['shipping_country'] ?? null,
-        ]));
     }
 }

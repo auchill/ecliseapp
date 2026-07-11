@@ -90,6 +90,47 @@ test('step 22 schema uses explicit source identity customer ownership and checko
         ->and(Schema::hasTable('customers'))->toBeTrue();
 });
 
+test('step 24 cleanup removes legacy quote repair order and payment compatibility columns', function () {
+    expect(Schema::hasColumns('quotes', ['customer_id', 'converted_to_repair']))->toBeTrue()
+        ->and(Schema::hasColumn('quotes', 'quote_number'))->toBeFalse()
+        ->and(Schema::hasColumn('quotes', 'customer_name'))->toBeFalse()
+        ->and(Schema::hasColumn('quotes', 'email'))->toBeFalse()
+        ->and(Schema::hasColumn('quotes', 'phone_number'))->toBeFalse()
+        ->and(Schema::hasColumn('quotes', 'converted_to_booking'))->toBeFalse()
+        ->and(Schema::hasColumns('repairs', ['customer_id', 'repair_number']))->toBeTrue()
+        ->and(Schema::hasColumn('repairs', 'user_id'))->toBeFalse()
+        ->and(Schema::hasColumn('repairs', 'tracking_number'))->toBeFalse()
+        ->and(Schema::hasColumn('repairs', 'customer_name'))->toBeFalse()
+        ->and(Schema::hasColumn('repairs', 'email'))->toBeFalse()
+        ->and(Schema::hasColumn('repairs', 'phone'))->toBeFalse()
+        ->and(Schema::hasColumn('repairs', 'shipping_full_name'))->toBeFalse()
+        ->and(Schema::hasColumn('repairs', 'shipping_phone'))->toBeFalse()
+        ->and(Schema::hasColumn('repairs', 'shipping_email'))->toBeFalse()
+        ->and(Schema::hasColumn('repairs', 'shipping_address_line1'))->toBeFalse()
+        ->and(Schema::hasColumn('repairs', 'shipping_address_line2'))->toBeFalse()
+        ->and(Schema::hasColumn('repairs', 'shipping_city'))->toBeFalse()
+        ->and(Schema::hasColumn('repairs', 'shipping_province'))->toBeFalse()
+        ->and(Schema::hasColumn('repairs', 'shipping_postal_code'))->toBeFalse()
+        ->and(Schema::hasColumn('repairs', 'shipping_country'))->toBeFalse()
+        ->and(Schema::hasColumn('orders', 'customer_id'))->toBeTrue()
+        ->and(Schema::hasColumn('orders', 'cart_id'))->toBeFalse()
+        ->and(Schema::hasColumn('orders', 'customer_name'))->toBeFalse()
+        ->and(Schema::hasColumn('orders', 'email'))->toBeFalse()
+        ->and(Schema::hasColumn('orders', 'phone'))->toBeFalse()
+        ->and(Schema::hasColumn('orders', 'address'))->toBeFalse()
+        ->and(Schema::hasColumn('orders', 'shipping_full_name'))->toBeFalse()
+        ->and(Schema::hasColumn('orders', 'shipping_phone'))->toBeFalse()
+        ->and(Schema::hasColumn('orders', 'shipping_email'))->toBeFalse()
+        ->and(Schema::hasColumn('orders', 'shipping_address_line1'))->toBeFalse()
+        ->and(Schema::hasColumn('orders', 'shipping_address_line2'))->toBeFalse()
+        ->and(Schema::hasColumn('orders', 'shipping_city'))->toBeFalse()
+        ->and(Schema::hasColumn('orders', 'shipping_province'))->toBeFalse()
+        ->and(Schema::hasColumn('orders', 'shipping_postal_code'))->toBeFalse()
+        ->and(Schema::hasColumn('orders', 'shipping_country'))->toBeFalse()
+        ->and(Schema::hasColumn('payments', 'repair_id'))->toBeTrue()
+        ->and(Schema::hasColumn('payments', 'repair_order_id'))->toBeFalse();
+});
+
 test('duplicate Eclise cart additions update one explicit source identity without a sku suffix', function () {
     $user = step22Customer('duplicate-cart@example.com');
     $product = step22Product('NO-ECL-SUFFIX');
@@ -123,7 +164,7 @@ test('verified shop payment creates customer order items and status then removes
 
     $this->actingAs($user)
         ->post(route('checkout.store'), [
-            'customer_name' => 'Updated Customer Name',
+            'full_name' => 'Updated Customer Name',
             'email' => 'successful-checkout@example.com',
             'phone' => '416-555-2200',
             'payment_gateway' => 'stripe',
@@ -188,7 +229,7 @@ test('checkout prefills and updates one existing customer profile', function () 
 
     $this->actingAs($user)
         ->post(route('checkout.store'), [
-            'customer_name' => 'Updated Existing Profile',
+            'full_name' => 'Updated Existing Profile',
             'email' => 'existing-profile@example.com',
             'phone' => '416-555-1199',
             'payment_gateway' => 'stripe',
@@ -211,7 +252,7 @@ test('failed order creation rolls back customer and order records without deleti
 
     $this->actingAs($user)
         ->post(route('checkout.store'), [
-            'customer_name' => 'Rollback Customer',
+            'full_name' => 'Rollback Customer',
             'email' => 'rollback-checkout@example.com',
             'phone' => '416-555-2299',
             'payment_gateway' => 'stripe',

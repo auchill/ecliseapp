@@ -17,9 +17,9 @@
                 <div class="col-lg-7">
                     <form class="surface p-4 p-lg-5" method="POST" action="{{ route('repairs.store') }}">
                         @csrf
-                        <label class="form-label" for="tracking_number">Repair number</label>
+                        <label class="form-label" for="repair_number">Repair number</label>
                         <div class="input-group input-group-lg">
-                            <input class="form-control" id="tracking_number" name="tracking_number" value="{{ old('tracking_number') }}" placeholder="ECL-REP-2026-0000001" required>
+                            <input class="form-control" id="repair_number" name="repair_number" value="{{ old('repair_number') }}" placeholder="ECL-REP-2026-0000001" required>
                             <button class="btn btn-primary" type="submit"><i class="bi bi-arrow-right-circle me-2"></i>Continue</button>
                         </div>
                     </form>

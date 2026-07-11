@@ -8,7 +8,7 @@
             <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
                 <div>
                     <p class="eyebrow">Repair {{ $repair->repair_number }}</p>
-                    <h1 class="display-6 fw-bold mb-0">{{ $repair->customer_name }} &middot; {{ $repair->deviceLabel() }}</h1>
+                    <h1 class="display-6 fw-bold mb-0">{{ $repair->customer?->full_name ?? 'Customer unavailable' }} &middot; {{ $repair->deviceLabel() }}</h1>
                 </div>
                 <a class="btn btn-outline-primary" href="{{ route('admin.repairs.index') }}"><i class="bi bi-arrow-left me-2"></i>Repairs</a>
             </div>
@@ -54,40 +54,40 @@
 
                             <div class="col-12"><hr><h2 class="h6 fw-bold">Shipping Address</h2></div>
                             <div class="col-md-6">
-                                <label class="form-label" for="shipping_full_name">Full name</label>
-                                <input class="form-control" id="shipping_full_name" name="shipping_full_name" value="{{ old('shipping_full_name', $repair->shipping_full_name) }}">
+                                <label class="form-label" for="recipient_name">Full name</label>
+                                <input class="form-control" id="recipient_name" name="recipient_name" value="{{ old('recipient_name', $repair->customer?->full_name) }}">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label" for="shipping_phone">Phone</label>
-                                <input class="form-control" id="shipping_phone" name="shipping_phone" value="{{ old('shipping_phone', $repair->shipping_phone) }}">
+                                <label class="form-label" for="recipient_phone">Phone</label>
+                                <input class="form-control" id="recipient_phone" name="recipient_phone" value="{{ old('recipient_phone', $repair->customer?->phone) }}">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label" for="shipping_email">Email</label>
-                                <input class="form-control" id="shipping_email" name="shipping_email" type="email" value="{{ old('shipping_email', $repair->shipping_email) }}">
+                                <label class="form-label" for="recipient_email">Email</label>
+                                <input class="form-control" id="recipient_email" name="recipient_email" type="email" value="{{ old('recipient_email', $repair->customer?->email) }}">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label" for="shipping_country">Country</label>
-                                <input class="form-control" id="shipping_country" name="shipping_country" value="{{ old('shipping_country', $repair->shipping_country) }}">
+                                <label class="form-label" for="country">Country</label>
+                                <input class="form-control" id="country" name="country" value="{{ old('country', $repair->customer?->country) }}">
                             </div>
                             <div class="col-12">
-                                <label class="form-label" for="shipping_address_line1">Street address</label>
-                                <input class="form-control" id="shipping_address_line1" name="shipping_address_line1" value="{{ old('shipping_address_line1', $repair->shipping_address_line1) }}">
+                                <label class="form-label" for="address_line1">Street address</label>
+                                <input class="form-control" id="address_line1" name="address_line1" value="{{ old('address_line1', $repair->customer?->street_address) }}">
                             </div>
                             <div class="col-12">
-                                <label class="form-label" for="shipping_address_line2">Apartment/unit</label>
-                                <input class="form-control" id="shipping_address_line2" name="shipping_address_line2" value="{{ old('shipping_address_line2', $repair->shipping_address_line2) }}">
+                                <label class="form-label" for="address_line2">Apartment/unit</label>
+                                <input class="form-control" id="address_line2" name="address_line2" value="{{ old('address_line2', $repair->customer?->address_line_2) }}">
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label" for="shipping_city">City</label>
-                                <input class="form-control" id="shipping_city" name="shipping_city" value="{{ old('shipping_city', $repair->shipping_city) }}">
+                                <label class="form-label" for="city">City</label>
+                                <input class="form-control" id="city" name="city" value="{{ old('city', $repair->customer?->city) }}">
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label" for="shipping_province">Province/state</label>
-                                <input class="form-control" id="shipping_province" name="shipping_province" value="{{ old('shipping_province', $repair->shipping_province) }}">
+                                <label class="form-label" for="province">Province/state</label>
+                                <input class="form-control" id="province" name="province" value="{{ old('province', $repair->customer?->province) }}">
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label" for="shipping_postal_code">Postal code</label>
-                                <input class="form-control" id="shipping_postal_code" name="shipping_postal_code" value="{{ old('shipping_postal_code', $repair->shipping_postal_code) }}">
+                                <label class="form-label" for="postal_code">Postal code</label>
+                                <input class="form-control" id="postal_code" name="postal_code" value="{{ old('postal_code', $repair->customer?->postal_code) }}">
                             </div>
 
                             <div class="col-md-6">
@@ -132,8 +132,8 @@
                         <div class="table-responsive">
                             <table class="table">
                                 <tbody>
-                                    <tr><th scope="row">Email</th><td>{{ $repair->email }}</td></tr>
-                                    <tr><th scope="row">Phone</th><td>{{ $repair->phone }}</td></tr>
+                                    <tr><th scope="row">Email</th><td>{{ $repair->customer?->email ?? 'Unavailable' }}</td></tr>
+                                    <tr><th scope="row">Phone</th><td>{{ $repair->customer?->phone ?? 'Unavailable' }}</td></tr>
                                     @if ($repair->quote)
                                         <tr><th scope="row">Quote</th><td><a href="{{ route('admin.quotes.show', $repair->quote) }}">#{{ $repair->quote->id }}</a></td></tr>
                                     @endif

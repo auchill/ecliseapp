@@ -12,7 +12,7 @@ class CustomerController extends Controller
     {
         $customers = User::query()
             ->customers()
-            ->withCount(['repairBookings', 'orders'])
+            ->withCount(['repairs', 'orders'])
             ->when($request->filled('q'), function ($query) use ($request): void {
                 $search = $request->string('q');
                 $query->where(function ($query) use ($search): void {
@@ -34,7 +34,7 @@ class CustomerController extends Controller
         abort_unless($customer->isCustomer(), 404);
 
         return view('admin.customers.show', [
-            'customer' => $customer->load(['customer', 'repairBookings.deviceBrand', 'repairBookings.deviceModel', 'repairBookings.issueCategory', 'orders.items']),
+            'customer' => $customer->load(['customer', 'repairs.deviceBrand', 'repairs.deviceModel', 'repairs.issueCategory', 'orders.items']),
         ]);
     }
 }

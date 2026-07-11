@@ -27,10 +27,6 @@ class QuoteController extends Controller
                 $search = $request->string('q');
                 $query->where(function ($query) use ($search): void {
                     $query->where('id', $search)
-                        ->orWhere('quote_number', 'like', "%{$search}%")
-                        ->orWhere('customer_name', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%")
-                        ->orWhere('phone_number', 'like', "%{$search}%")
                         ->orWhere('device_model', 'like', "%{$search}%")
                         ->orWhereHas('customer', function ($query) use ($search): void {
                             $query->where('full_name', 'like', "%{$search}%")
@@ -133,13 +129,8 @@ class QuoteController extends Controller
 
             $repair = Repair::query()->create([
                 'customer_id' => $quote->customer_id,
-                'user_id' => $quote->customer?->user_id,
                 'quote_id' => $quote->id,
                 'repair_number' => $repairNumber,
-                'tracking_number' => $repairNumber,
-                'customer_name' => $quote->customer_name,
-                'email' => $quote->email,
-                'phone' => $quote->phone_number,
                 'device_type_id' => $data['device_type_id'],
                 'device_type' => $deviceType?->name ?: 'Device',
                 'product_brand_id' => $data['product_brand_id'] ?? null,
@@ -180,13 +171,12 @@ class QuoteController extends Controller
             $quote->update([
                 'status' => 'converted_to_repair',
                 'converted_to_repair' => true,
-                'converted_to_booking' => true,
             ]);
 
             return $repair;
         });
 
-        Mail::to($repair->email)->send(new QuoteBookingCreatedMail($repair->fresh('quote')));
+        Mail::to($repair->customer?->email)->send(new QuoteBookingCreatedMail($repair->fresh('quote', 'customer')));
 
         return redirect()->route('admin.repairs.show', $repair)->with('status', 'Quote converted to repair.');
     }

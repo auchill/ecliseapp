@@ -56,13 +56,8 @@ class Repair extends Model
 
     protected $fillable = [
         'customer_id',
-        'user_id',
         'quote_id',
         'repair_number',
-        'tracking_number',
-        'customer_name',
-        'email',
-        'phone',
         'device_type',
         'device_type_id',
         'device_brand',
@@ -96,15 +91,6 @@ class Repair extends Model
         'customer_remark',
         'fulfillment_method',
         'pickup_or_shipping_option',
-        'shipping_full_name',
-        'shipping_phone',
-        'shipping_email',
-        'shipping_address_line1',
-        'shipping_address_line2',
-        'shipping_city',
-        'shipping_province',
-        'shipping_postal_code',
-        'shipping_country',
         'shipping_method_id',
         'shipping_method_name',
         'shipping_delivery_days',
@@ -142,11 +128,6 @@ class Repair extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
-    }
-
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
     }
 
     public function quote(): BelongsTo
@@ -204,35 +185,6 @@ class Repair extends Model
     public function latestPayment()
     {
         return $this->morphOne(Payment::class, 'payable')->latestOfMany();
-    }
-
-    public function getTrackingNumberAttribute(?string $value): ?string
-    {
-        return $this->repair_number ?: $value;
-    }
-
-    public function setTrackingNumberAttribute(?string $value): void
-    {
-        $this->attributes['tracking_number'] = $value;
-
-        if (blank($this->attributes['repair_number'] ?? null) && filled($value)) {
-            $this->attributes['repair_number'] = $value;
-        }
-    }
-
-    public function getCustomerNameAttribute(?string $value): ?string
-    {
-        return $value ?? $this->customer?->full_name;
-    }
-
-    public function getEmailAttribute(?string $value): ?string
-    {
-        return $value ?? $this->customer?->email;
-    }
-
-    public function getPhoneAttribute(?string $value): ?string
-    {
-        return $value ?? $this->customer?->phone;
     }
 
     public function deviceLabel(): string
@@ -333,14 +285,6 @@ class Repair extends Model
             return preg_split('/\R/', $this->shipping->shipping_address) ?: [];
         }
 
-        return array_values(array_filter([
-            $this->shipping_full_name,
-            $this->shipping_address_line1,
-            $this->shipping_address_line2,
-            trim(implode(', ', array_filter([$this->shipping_city, $this->shipping_province, $this->shipping_postal_code]))),
-            $this->shipping_country,
-            $this->shipping_phone ? 'Phone: '.$this->shipping_phone : null,
-            $this->shipping_email ? 'Email: '.$this->shipping_email : null,
-        ]));
+        return [];
     }
 }

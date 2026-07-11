@@ -8,7 +8,7 @@
             <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
                 <div>
                     <p class="eyebrow">Quote #{{ $quote->id }}</p>
-                    <h1 class="display-6 fw-bold mb-0">{{ $quote->customer_name }} &middot; {{ $quote->deviceLabel() }}</h1>
+                    <h1 class="display-6 fw-bold mb-0">{{ $quote->customer?->full_name ?? 'Customer unavailable' }} &middot; {{ $quote->deviceLabel() }}</h1>
                 </div>
                 <div class="d-flex gap-2">
                     @unless ($quote->converted_to_repair || $quote->status === 'rejected')
@@ -25,8 +25,8 @@
                         <div class="table-responsive">
                             <table class="table">
                                 <tbody>
-                                    <tr><th scope="row">Email</th><td>{{ $quote->email }}</td></tr>
-                                    <tr><th scope="row">Phone</th><td>{{ $quote->phone_number }}</td></tr>
+                                    <tr><th scope="row">Email</th><td>{{ $quote->customer?->email ?? 'Unavailable' }}</td></tr>
+                                    <tr><th scope="row">Phone</th><td>{{ $quote->customer?->phone ?? 'Unavailable' }}</td></tr>
                                     <tr><th scope="row">Device type</th><td>{{ $quote->deviceType?->name }}</td></tr>
                                     <tr><th scope="row">Brand</th><td>{{ $quote->deviceBrand?->name }}</td></tr>
                                     <tr><th scope="row">Model</th><td>{{ $quote->deviceModelName() }}</td></tr>

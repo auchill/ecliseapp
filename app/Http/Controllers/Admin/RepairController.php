@@ -22,10 +22,6 @@ class RepairController extends Controller
                 $search = $request->string('q');
                 $query->where(function ($query) use ($search): void {
                     $query->where('repair_number', 'like', "%{$search}%")
-                        ->orWhere('tracking_number', 'like', "%{$search}%")
-                        ->orWhere('customer_name', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%")
-                        ->orWhere('phone', 'like', "%{$search}%")
                         ->orWhere('device_brand', 'like', "%{$search}%")
                         ->orWhere('device_model', 'like', "%{$search}%")
                         ->orWhereHas('customer', function ($query) use ($search): void {
@@ -49,7 +45,7 @@ class RepairController extends Controller
     public function show(Repair $repair)
     {
         return view('admin.repairs.show', [
-            'repair' => $repair->load('customer', 'shipping', 'statusUpdates', 'user', 'latestPayment', 'quote', 'deviceType', 'deviceBrand', 'deviceModel', 'issueCategory'),
+            'repair' => $repair->load('customer', 'shipping', 'statusUpdates', 'latestPayment', 'quote', 'deviceType', 'deviceBrand', 'deviceModel', 'issueCategory'),
             'statuses' => Repair::STATUS_LABELS,
             'paymentStatuses' => Repair::PAYMENT_STATUSES,
             'fulfillmentMethods' => Repair::FULFILLMENT_METHODS,
@@ -63,15 +59,15 @@ class RepairController extends Controller
             'payment_status' => ['required', Rule::in(array_keys(Repair::PAYMENT_STATUSES))],
             'fulfillment_method' => ['required', Rule::in(array_keys(Repair::FULFILLMENT_METHODS))],
             'shipping_cost' => ['required', 'numeric', 'min:0'],
-            'shipping_full_name' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:255'],
-            'shipping_phone' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:40'],
-            'shipping_email' => ['required_if:fulfillment_method,shipping', 'nullable', 'email', 'max:255'],
-            'shipping_address_line1' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:255'],
-            'shipping_address_line2' => ['nullable', 'string', 'max:255'],
-            'shipping_city' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:120'],
-            'shipping_province' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:120'],
-            'shipping_postal_code' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:40'],
-            'shipping_country' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:120'],
+            'recipient_name' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:255'],
+            'recipient_phone' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:40'],
+            'recipient_email' => ['required_if:fulfillment_method,shipping', 'nullable', 'email', 'max:255'],
+            'address_line1' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:255'],
+            'address_line2' => ['nullable', 'string', 'max:255'],
+            'city' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:120'],
+            'province' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:120'],
+            'postal_code' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:40'],
+            'country' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:120'],
             'delivery_carrier' => ['nullable', 'string', 'max:120'],
             'delivery_tracking_number' => ['nullable', 'string', 'max:120'],
             'tracking_notes' => ['nullable', 'string'],
@@ -106,15 +102,6 @@ class RepairController extends Controller
             'repair_status' => $data['status'],
             'payment_status' => $data['payment_status'],
             'fulfillment_method' => $data['fulfillment_method'],
-            'shipping_full_name' => $data['shipping_full_name'] ?? null,
-            'shipping_phone' => $data['shipping_phone'] ?? null,
-            'shipping_email' => $data['shipping_email'] ?? null,
-            'shipping_address_line1' => $data['shipping_address_line1'] ?? null,
-            'shipping_address_line2' => $data['shipping_address_line2'] ?? null,
-            'shipping_city' => $data['shipping_city'] ?? null,
-            'shipping_province' => $data['shipping_province'] ?? null,
-            'shipping_postal_code' => $data['shipping_postal_code'] ?? null,
-            'shipping_country' => $data['shipping_country'] ?? null,
             'shipping_cost' => $data['shipping_cost'],
             'shipping_amount' => $data['shipping_cost'],
             'repair_total' => $data['repair_total'],
@@ -149,7 +136,7 @@ class RepairController extends Controller
                 'created_by' => $request->user()->id,
             ]);
 
-            Mail::to($repair->email)->send(new RepairStatusUpdatedMail($repair->fresh('customer', 'shipping'), $statusUpdate));
+            Mail::to($repair->customer?->email)->send(new RepairStatusUpdatedMail($repair->fresh('customer', 'shipping'), $statusUpdate));
         }
 
         return redirect()->route('admin.repairs.show', $repair)->with('status', 'Repair updated.');
@@ -163,15 +150,15 @@ class RepairController extends Controller
             $data['shipping_discount_amount'] = 0;
 
             foreach ([
-                'shipping_full_name',
-                'shipping_phone',
-                'shipping_email',
-                'shipping_address_line1',
-                'shipping_address_line2',
-                'shipping_city',
-                'shipping_province',
-                'shipping_postal_code',
-                'shipping_country',
+                'recipient_name',
+                'recipient_phone',
+                'recipient_email',
+                'address_line1',
+                'address_line2',
+                'city',
+                'province',
+                'postal_code',
+                'country',
                 'shipping_method_id',
                 'shipping_method_name',
                 'shipping_delivery_days',

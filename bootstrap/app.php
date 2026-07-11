@@ -8,6 +8,7 @@ use App\Console\Commands\SyncMobileSentrixCategoriesCommand;
 use App\Console\Commands\SyncMobileSentrixPartsCommand;
 use App\Console\Commands\SyncMobileSentrixPartsFullCommand;
 use App\Console\Commands\TestMobileSentrixConnectionCommand;
+use App\Console\Commands\VerifyStep24Migration;
 use App\Http\Middleware\AdminMiddleware;
 use App\Http\Middleware\CustomerMiddleware;
 use App\Http\Middleware\NoAdminCartMiddleware;
@@ -31,6 +32,7 @@ return Application::configure(basePath: dirname(__DIR__))
         SyncMobileSentrixPartsFullCommand::class,
         RefreshMobileSentrixPartCommand::class,
         TestMobileSentrixConnectionCommand::class,
+        VerifyStep24Migration::class,
     ])
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([

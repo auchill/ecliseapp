@@ -15,7 +15,7 @@ use App\Models\Product;
 use App\Models\ProductBrand;
 use App\Models\ProductModel;
 use App\Models\Quote;
-use App\Models\RepairBooking;
+use App\Models\Repair;
 use App\Models\ShippingDiscountRule;
 use App\Models\ShippingMethod;
 use App\Models\User;
@@ -63,7 +63,7 @@ test('checkout pickup creates a pickup order with zero shipping', function () {
 
     $this->actingAs($user)
         ->post(route('checkout.store'), [
-            'customer_name' => 'Pickup Customer',
+            'full_name' => 'Pickup Customer',
             'email' => 'pickup@example.com',
             'phone' => '416-555-0001',
             'payment_gateway' => 'stripe',
@@ -113,20 +113,20 @@ test('checkout normal shipping stores method snapshot and regular shipping cost'
 
     $this->actingAs($user)
         ->post(route('checkout.store'), [
-            'customer_name' => 'Shipping Customer',
+            'full_name' => 'Shipping Customer',
             'email' => 'shipping@example.com',
             'phone' => '416-555-0002',
             'payment_gateway' => 'paypal',
             'fulfillment_method' => 'shipping',
             'shipping_method_id' => $method->id,
-            'shipping_full_name' => 'Shipping Customer',
-            'shipping_phone' => '416-555-0002',
-            'shipping_email' => 'shipping@example.com',
-            'shipping_address_line1' => '10 King Street',
-            'shipping_city' => 'Toronto',
-            'shipping_province' => 'ON',
-            'shipping_postal_code' => 'M5H 1A1',
-            'shipping_country' => 'Canada',
+            'recipient_name' => 'Shipping Customer',
+            'recipient_phone' => '416-555-0002',
+            'recipient_email' => 'shipping@example.com',
+            'address_line1' => '10 King Street',
+            'city' => 'Toronto',
+            'province' => 'ON',
+            'postal_code' => 'M5H 1A1',
+            'country' => 'Canada',
         ])
         ->assertRedirect();
 
@@ -177,25 +177,27 @@ test('checkout applies the best matching shipping discount', function () {
 
     $this->actingAs($normalCustomer)
         ->post(route('checkout.store'), [
-            'customer_name' => 'Free Shipping Customer',
+            'full_name' => 'Free Shipping Customer',
             'email' => 'free-shipping@example.com',
             'phone' => '416-555-0101',
             'payment_gateway' => 'stripe',
             'fulfillment_method' => 'shipping',
             'shipping_method_id' => $normal->id,
-            'shipping_full_name' => 'Free Shipping Customer',
-            'shipping_phone' => '416-555-0101',
-            'shipping_email' => 'free-shipping@example.com',
-            'shipping_address_line1' => '50 Queen Street',
-            'shipping_city' => 'Toronto',
-            'shipping_province' => 'ON',
-            'shipping_postal_code' => 'M5V 2A1',
-            'shipping_country' => 'Canada',
+            'recipient_name' => 'Free Shipping Customer',
+            'recipient_phone' => '416-555-0101',
+            'recipient_email' => 'free-shipping@example.com',
+            'address_line1' => '50 Queen Street',
+            'city' => 'Toronto',
+            'province' => 'ON',
+            'postal_code' => 'M5V 2A1',
+            'country' => 'Canada',
         ])
         ->assertRedirect();
 
     app(PaymentFinalizer::class)->markPaid(Payment::query()->latest('id')->firstOrFail());
-    $normalOrder = Order::query()->where('email', 'free-shipping@example.com')->firstOrFail();
+    $normalOrder = Order::query()
+        ->where('customer_id', Customer::forUser($normalCustomer)->id)
+        ->firstOrFail();
 
     expect((float) $normalOrder->shipping_base_cost)->toBe(20.0)
         ->and((float) $normalOrder->shipping_discount_amount)->toBe(20.0)
@@ -223,25 +225,27 @@ test('checkout applies the best matching shipping discount', function () {
 
     $this->actingAs($overnightCustomer)
         ->post(route('checkout.store'), [
-            'customer_name' => 'Overnight Customer',
+            'full_name' => 'Overnight Customer',
             'email' => 'overnight@example.com',
             'phone' => '416-555-0102',
             'payment_gateway' => 'stripe',
             'fulfillment_method' => 'shipping',
             'shipping_method_id' => $overnight->id,
-            'shipping_full_name' => 'Overnight Customer',
-            'shipping_phone' => '416-555-0102',
-            'shipping_email' => 'overnight@example.com',
-            'shipping_address_line1' => '60 Bay Street',
-            'shipping_city' => 'Toronto',
-            'shipping_province' => 'ON',
-            'shipping_postal_code' => 'M5J 2N8',
-            'shipping_country' => 'Canada',
+            'recipient_name' => 'Overnight Customer',
+            'recipient_phone' => '416-555-0102',
+            'recipient_email' => 'overnight@example.com',
+            'address_line1' => '60 Bay Street',
+            'city' => 'Toronto',
+            'province' => 'ON',
+            'postal_code' => 'M5J 2N8',
+            'country' => 'Canada',
         ])
         ->assertRedirect();
 
     app(PaymentFinalizer::class)->markPaid(Payment::query()->latest('id')->firstOrFail());
-    $overnightOrder = Order::query()->where('email', 'overnight@example.com')->firstOrFail();
+    $overnightOrder = Order::query()
+        ->where('customer_id', Customer::forUser($overnightCustomer)->id)
+        ->firstOrFail();
 
     expect($overnightOrder->shipping_method_name)->toBe('Overnight Shipping')
         ->and($overnightOrder->shipping_delivery_days)->toBe('1 day')
@@ -258,12 +262,13 @@ test('repair shipping calculates selected return shipping method and appears in 
         'email' => 'repair@example.com',
         'password' => 'password',
     ]);
+    $customer = Customer::forUser($user);
 
-    $repair = RepairBooking::query()->create([
-        'tracking_number' => 'ECL-REP-TEST-SHIP',
-        'customer_name' => 'Repair Customer',
-        'email' => 'repair@example.com',
-        'phone' => '416-555-0003',
+    $customer->update(['phone' => '416-555-0003']);
+
+    $repair = Repair::query()->create([
+        'customer_id' => $customer->id,
+        'repair_number' => 'ECL-REP-TEST-SHIP',
         'device_type' => 'Phone',
         'device_brand' => 'Apple',
         'device_model' => 'iPhone 13',
@@ -287,26 +292,26 @@ test('repair shipping calculates selected return shipping method and appears in 
         'pickup_or_shipping_option' => 'pickup',
     ]);
 
-    $this->actingAs($user)->post(route('repairs.complete.store', $repair->tracking_number), [
+    $this->actingAs($user)->post(route('repairs.complete.store', $repair->repair_number), [
         'payment_gateway' => 'paypal',
         'payment_amount_option' => 'minimum',
         'fulfillment_method' => 'shipping',
         'shipping_method_id' => $method->id,
-        'shipping_full_name' => 'Repair Customer',
-        'shipping_phone' => '416-555-0003',
-        'shipping_email' => 'repair@example.com',
-        'shipping_address_line1' => '20 Queen Street',
-        'shipping_city' => 'Toronto',
-        'shipping_province' => 'ON',
-        'shipping_postal_code' => 'M5V 2A1',
-        'shipping_country' => 'Canada',
+        'recipient_name' => 'Repair Customer',
+        'recipient_phone' => '416-555-0003',
+        'recipient_email' => 'repair@example.com',
+        'address_line1' => '20 Queen Street',
+        'city' => 'Toronto',
+        'province' => 'ON',
+        'postal_code' => 'M5V 2A1',
+        'country' => 'Canada',
         'terms_accepted' => '1',
     ])->assertRedirect();
 
     $repair->refresh();
 
     expect($repair->fulfillment_method)->toBe('shipping')
-        ->and($repair->user_id)->toBe($user->id)
+        ->and($repair->customer_id)->toBe($customer->id)
         ->and($repair->shipping_method_name)->toBe('Overnight Shipping')
         ->and($repair->shipping_delivery_days)->toBe('1 day')
         ->and((float) $repair->shipping_base_cost)->toBe(45.0)
@@ -319,10 +324,10 @@ test('repair shipping calculates selected return shipping method and appears in 
         ->and((float) $repair->latestPayment->amount)->toBe(195.5);
 
     $this->post(route('repairs.track.submit'), [
-        'tracking_number' => $repair->tracking_number,
+        'repair_number' => $repair->repair_number,
         'contact' => 'repair@example.com',
     ])->assertOk()
-        ->assertSee($repair->tracking_number)
+        ->assertSee($repair->repair_number)
         ->assertSee('Overnight Shipping')
         ->assertSee('Final shipping');
 });
@@ -351,7 +356,7 @@ test('verified payment finalization marks order paid and commits inventory once'
 
     $this->actingAs($user)
         ->post(route('checkout.store'), [
-            'customer_name' => 'Paid Customer',
+            'full_name' => 'Paid Customer',
             'email' => 'paid@example.com',
             'phone' => '416-555-9999',
             'payment_gateway' => 'stripe',
@@ -455,7 +460,7 @@ test('customer quote submission can be converted to a priced repair booking', fu
 
     expect($quote->status)->toBe('pending')
         ->and($quote->customer_id)->toBe($quoteCustomer->id)
-        ->and(str_starts_with($quote->quote_number, 'ECL-QTE-'))->toBeTrue();
+        ->and($quote->converted_to_repair)->toBeFalse();
 
     Mail::assertSent(QuoteSubmittedCustomerMail::class);
 
@@ -476,7 +481,7 @@ test('customer quote submission can be converted to a priced repair booking', fu
         ])
         ->assertRedirect();
 
-    $booking = RepairBooking::query()->where('quote_id', $quote->id)->firstOrFail();
+    $booking = Repair::query()->where('quote_id', $quote->id)->firstOrFail();
 
     expect($quote->fresh()->status)->toBe('converted_to_repair')
         ->and($quote->fresh()->converted_to_repair)->toBeTrue()
@@ -573,11 +578,17 @@ test('admin status updates create timelines and queue mail rendering', function 
         'role' => 'admin',
     ]);
 
-    $order = Order::query()->create([
-        'order_number' => 'ECL-ORD-TEST-0001',
-        'customer_name' => 'Mail Customer',
+    $mailUser = User::query()->create([
+        'name' => 'Mail Customer',
         'email' => 'mail@example.com',
-        'phone' => '416-555-0004',
+        'password' => 'password',
+    ]);
+    $mailCustomer = Customer::forUser($mailUser);
+    $mailCustomer->update(['phone' => '416-555-0004']);
+
+    $order = Order::query()->create([
+        'customer_id' => $mailCustomer->id,
+        'order_number' => 'ECL-ORD-TEST-0001',
         'subtotal' => 100,
         'tax' => 13,
         'shipping_cost' => 20,
@@ -586,14 +597,6 @@ test('admin status updates create timelines and queue mail rendering', function 
         'payment_status' => 'Pending',
         'payment_provider' => 'stripe',
         'fulfillment_method' => 'shipping',
-        'shipping_full_name' => 'Mail Customer',
-        'shipping_phone' => '416-555-0004',
-        'shipping_email' => 'mail@example.com',
-        'shipping_address_line1' => '30 Bay Street',
-        'shipping_city' => 'Toronto',
-        'shipping_province' => 'ON',
-        'shipping_postal_code' => 'M5J 2N8',
-        'shipping_country' => 'Canada',
     ]);
 
     $this->actingAs($admin)
@@ -602,16 +605,16 @@ test('admin status updates create timelines and queue mail rendering', function 
             'payment_status' => 'Paid',
             'fulfillment_method' => 'shipping',
             'shipping_cost' => 20,
-            'shipping_full_name' => 'Mail Customer',
-            'shipping_phone' => '416-555-0004',
-            'shipping_email' => 'mail@example.com',
-            'shipping_address_line1' => '30 Bay Street',
-            'shipping_city' => 'Toronto',
-            'shipping_province' => 'ON',
-            'shipping_postal_code' => 'M5J 2N8',
-            'shipping_country' => 'Canada',
+            'recipient_name' => 'Mail Customer',
+            'recipient_phone' => '416-555-0004',
+            'recipient_email' => 'mail@example.com',
+            'address_line1' => '30 Bay Street',
+            'city' => 'Toronto',
+            'province' => 'ON',
+            'postal_code' => 'M5J 2N8',
+            'country' => 'Canada',
             'delivery_carrier' => 'Canada Post',
-            'tracking_number' => 'CP123',
+            'carrier_tracking_number' => 'CP123',
             'status_note' => 'Order shipped.',
             'is_customer_visible' => '1',
         ])
@@ -620,11 +623,17 @@ test('admin status updates create timelines and queue mail rendering', function 
     expect($order->statusUpdates()->count())->toBe(1);
     Mail::assertSent(OrderStatusUpdatedMail::class);
 
-    $repair = RepairBooking::query()->create([
-        'tracking_number' => 'ECL-REP-TEST-0001',
-        'customer_name' => 'Repair Mail',
+    $repairUser = User::query()->create([
+        'name' => 'Repair Mail',
         'email' => 'repairmail@example.com',
-        'phone' => '416-555-0005',
+        'password' => 'password',
+    ]);
+    $repairCustomer = Customer::forUser($repairUser);
+    $repairCustomer->update(['phone' => '416-555-0005']);
+
+    $repair = Repair::query()->create([
+        'customer_id' => $repairCustomer->id,
+        'repair_number' => 'ECL-REP-TEST-0001',
         'device_type' => 'Phone',
         'device_brand' => 'Apple',
         'device_model' => 'iPhone 14',
@@ -640,14 +649,6 @@ test('admin status updates create timelines and queue mail rendering', function 
         'repair_total' => 20,
         'total_amount' => 20,
         'balance_due' => 20,
-        'shipping_full_name' => 'Repair Mail',
-        'shipping_phone' => '416-555-0005',
-        'shipping_email' => 'repairmail@example.com',
-        'shipping_address_line1' => '40 Front Street',
-        'shipping_city' => 'Toronto',
-        'shipping_province' => 'ON',
-        'shipping_postal_code' => 'M5J 1E3',
-        'shipping_country' => 'Canada',
     ]);
 
     $this->actingAs($admin)
@@ -656,14 +657,14 @@ test('admin status updates create timelines and queue mail rendering', function 
             'payment_status' => 'unpaid',
             'fulfillment_method' => 'shipping',
             'shipping_cost' => 20,
-            'shipping_full_name' => 'Repair Mail',
-            'shipping_phone' => '416-555-0005',
-            'shipping_email' => 'repairmail@example.com',
-            'shipping_address_line1' => '40 Front Street',
-            'shipping_city' => 'Toronto',
-            'shipping_province' => 'ON',
-            'shipping_postal_code' => 'M5J 1E3',
-            'shipping_country' => 'Canada',
+            'recipient_name' => 'Repair Mail',
+            'recipient_phone' => '416-555-0005',
+            'recipient_email' => 'repairmail@example.com',
+            'address_line1' => '40 Front Street',
+            'city' => 'Toronto',
+            'province' => 'ON',
+            'postal_code' => 'M5J 1E3',
+            'country' => 'Canada',
             'delivery_carrier' => 'FedEx',
             'delivery_tracking_number' => 'FX123',
             'status_note' => 'Repair shipped.',

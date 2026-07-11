@@ -75,7 +75,7 @@ class PaymentFinalizer
         });
 
         if ($sendMail) {
-            $recipient = $payment->payable?->email
+            $recipient = $payment->payable?->customer?->email
                 ?: data_get($payment->checkout_data, 'customer.email');
 
             if ($recipient) {
@@ -140,10 +140,6 @@ class PaymentFinalizer
         $order = Order::query()->create([
             'customer_id' => $customer->id,
             'order_number' => $this->orderNumbers->next(),
-            'customer_name' => $customerData['full_name'],
-            'email' => $customerData['email'],
-            'phone' => $customerData['phone'],
-            'address' => $this->legacyAddressValue($fulfillment),
             'subtotal' => (float) $totals['subtotal'],
             'tax' => (float) $totals['tax'],
             'total' => (float) $totals['total'],
@@ -156,15 +152,6 @@ class PaymentFinalizer
             'payment_amount' => $payment->amount,
             'currency' => $payment->currency,
             'paid_at' => $payment->paid_at ?? now(),
-            'shipping_full_name' => $fulfillment['shipping_full_name'] ?? null,
-            'shipping_phone' => $fulfillment['shipping_phone'] ?? null,
-            'shipping_email' => $fulfillment['shipping_email'] ?? null,
-            'shipping_address_line1' => $fulfillment['shipping_address_line1'] ?? null,
-            'shipping_address_line2' => $fulfillment['shipping_address_line2'] ?? null,
-            'shipping_city' => $fulfillment['shipping_city'] ?? null,
-            'shipping_province' => $fulfillment['shipping_province'] ?? null,
-            'shipping_postal_code' => $fulfillment['shipping_postal_code'] ?? null,
-            'shipping_country' => $fulfillment['shipping_country'] ?? null,
             'shipping_method_id' => $fulfillment['shipping_method_id'] ?? null,
             'shipping_method_name' => $fulfillment['shipping_method_name'] ?? null,
             'shipping_delivery_days' => $fulfillment['shipping_delivery_days'] ?? null,
@@ -172,7 +159,7 @@ class PaymentFinalizer
             'shipping_discount_amount' => (float) ($fulfillment['shipping_discount_amount'] ?? 0),
             'shipping_cost' => (float) ($fulfillment['shipping_cost'] ?? 0),
             'delivery_carrier' => $fulfillment['delivery_carrier'] ?? null,
-            'tracking_number' => $fulfillment['tracking_number'] ?? null,
+            'tracking_number' => $fulfillment['carrier_tracking_number'] ?? null,
             'customer_notes' => $fulfillment['notes'] ?? null,
             'notes' => $fulfillment['notes'] ?? null,
         ]);
@@ -205,11 +192,11 @@ class PaymentFinalizer
             'phone' => $customerData['phone'] ?? null,
         ]);
 
-        $cartId = (int) (data_get($snapshot, 'cart_id') ?: $cart?->id);
+        $cartReference = (int) (data_get($snapshot, 'cart_reference') ?: $cart?->id);
         $cartToDelete = $cart ?: Cart::query()
             ->where('customer_id', $customer->id)
             ->lockForUpdate()
-            ->find($cartId);
+            ->find($cartReference);
 
         if ($cartToDelete) {
             $cartToDelete->items()->delete();
@@ -240,12 +227,12 @@ class PaymentFinalizer
 
         if (($fulfillment['fulfillment_method'] ?? null) === 'shipping') {
             $profile->fill([
-                'street_address' => $fulfillment['shipping_address_line1'] ?? null,
-                'address_line_2' => $fulfillment['shipping_address_line2'] ?? null,
-                'city' => $fulfillment['shipping_city'] ?? null,
-                'province' => $fulfillment['shipping_province'] ?? null,
-                'postal_code' => $fulfillment['shipping_postal_code'] ?? null,
-                'country' => $fulfillment['shipping_country'] ?? null,
+                'street_address' => $fulfillment['address_line1'] ?? null,
+                'address_line_2' => $fulfillment['address_line2'] ?? null,
+                'city' => $fulfillment['city'] ?? null,
+                'province' => $fulfillment['province'] ?? null,
+                'postal_code' => $fulfillment['postal_code'] ?? null,
+                'country' => $fulfillment['country'] ?? null,
             ]);
         }
 
@@ -369,25 +356,6 @@ class PaymentFinalizer
         $this->persistRepairShippingSnapshot($repair, $payment);
     }
 
-    private function legacyAddressValue(array $data): ?string
-    {
-        if (($data['fulfillment_method'] ?? null) !== 'shipping') {
-            return null;
-        }
-
-        return implode("\n", array_filter([
-            $data['shipping_full_name'] ?? null,
-            $data['shipping_address_line1'] ?? null,
-            $data['shipping_address_line2'] ?? null,
-            trim(implode(', ', array_filter([
-                $data['shipping_city'] ?? null,
-                $data['shipping_province'] ?? null,
-                $data['shipping_postal_code'] ?? null,
-            ]))),
-            $data['shipping_country'] ?? null,
-        ]));
-    }
-
     private function persistOrderShippingSnapshot(Order $order, array $addressData): void
     {
         if (! $order->isShipping()) {
@@ -433,30 +401,18 @@ class PaymentFinalizer
     private function snapshotFromOrder(Order $order): array
     {
         return [
-            'shipping_full_name' => $order->shipping_full_name ?: $order->customer?->full_name,
-            'shipping_phone' => $order->shipping_phone ?: $order->customer?->phone,
-            'shipping_email' => $order->shipping_email ?: $order->customer?->email,
-            'shipping_address_line1' => $order->shipping_address_line1,
-            'shipping_address_line2' => $order->shipping_address_line2,
-            'shipping_city' => $order->shipping_city,
-            'shipping_province' => $order->shipping_province,
-            'shipping_postal_code' => $order->shipping_postal_code,
-            'shipping_country' => $order->shipping_country,
+            'full_name' => $order->customer?->full_name,
+            'phone' => $order->customer?->phone,
+            'email' => $order->customer?->email,
         ];
     }
 
     private function snapshotFromRepair(Repair $repair): array
     {
         return [
-            'shipping_full_name' => $repair->shipping_full_name ?: $repair->customer?->full_name,
-            'shipping_phone' => $repair->shipping_phone ?: $repair->customer?->phone,
-            'shipping_email' => $repair->shipping_email ?: $repair->customer?->email,
-            'shipping_address_line1' => $repair->shipping_address_line1,
-            'shipping_address_line2' => $repair->shipping_address_line2,
-            'shipping_city' => $repair->shipping_city,
-            'shipping_province' => $repair->shipping_province,
-            'shipping_postal_code' => $repair->shipping_postal_code,
-            'shipping_country' => $repair->shipping_country,
+            'full_name' => $repair->customer?->full_name,
+            'phone' => $repair->customer?->phone,
+            'email' => $repair->customer?->email,
         ];
     }
 }

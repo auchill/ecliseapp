@@ -36,7 +36,6 @@ class Payment extends Model
         'payable_id',
         'order_id',
         'repair_id',
-        'repair_order_id',
         'source',
         'checkout_data',
         'gateway',
@@ -84,11 +83,6 @@ class Payment extends Model
     public function repairOrder(): BelongsTo
     {
         return $this->belongsTo(Repair::class, 'repair_id');
-    }
-
-    public function legacyRepairOrder(): BelongsTo
-    {
-        return $this->belongsTo(Repair::class, 'repair_order_id');
     }
 
     public function isPaid(): bool

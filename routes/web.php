@@ -31,16 +31,16 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PaymentWebhookController;
 use App\Http\Controllers\PublicPageController;
 use App\Http\Controllers\QuoteController;
-use App\Http\Controllers\RepairBookingController;
+use App\Http\Controllers\RepairController;
 use App\Http\Controllers\ShopController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [PublicPageController::class, 'home'])->name('home');
 Route::get('/about', [PublicPageController::class, 'about'])->name('about');
 Route::get('/services', [PublicPageController::class, 'services'])->name('services');
-Route::get('/repairs/confirmation/{repairBooking}', [RepairBookingController::class, 'confirmation'])->name('repairs.confirmation');
-Route::get('/repairs/track', [RepairBookingController::class, 'trackForm'])->name('repairs.track');
-Route::post('/repairs/track', [RepairBookingController::class, 'track'])->name('repairs.track.submit');
+Route::get('/repairs/confirmation/{repair}', [RepairController::class, 'confirmation'])->name('repairs.confirmation');
+Route::get('/repairs/track', [RepairController::class, 'trackForm'])->name('repairs.track');
+Route::post('/repairs/track', [RepairController::class, 'track'])->name('repairs.track.submit');
 
 Route::get('/shop', [ShopController::class, 'index'])->name('shop.index');
 Route::get('/shop/certified-pre-owned-devices', [CertifiedPreOwnedDeviceController::class, 'index'])->name('shop.certified-pre-owned-devices.index');
@@ -62,8 +62,8 @@ Route::post('/webhooks/stripe', [PaymentWebhookController::class, 'stripe'])->na
 Route::post('/webhooks/paypal', [PaymentWebhookController::class, 'paypal'])->name('webhooks.paypal');
 
 Route::middleware('no_admin_cart')->group(function (): void {
-    Route::get('/repairs/book', [RepairBookingController::class, 'create'])->name('repairs.create');
-    Route::post('/repairs/book', [RepairBookingController::class, 'store'])->name('repairs.store');
+    Route::get('/repairs/book', [RepairController::class, 'create'])->name('repairs.create');
+    Route::post('/repairs/book', [RepairController::class, 'store'])->name('repairs.store');
     Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
     Route::post('/cart/products/{product}', [CartController::class, 'store'])->name('cart.store');
     Route::post('/cart/mobilesentrix-devices', [CartController::class, 'storeDevices'])->name('cart.devices.bulk');
@@ -97,8 +97,8 @@ Route::middleware(['auth', 'customer', 'no_admin_cart'])->group(function (): voi
     Route::get('/repairs/quote', [QuoteController::class, 'create'])->name('quotes.create');
     Route::post('/repairs/quote', [QuoteController::class, 'store'])->name('quotes.store');
 
-    Route::get('/repairs/book/{trackingNumber}', [RepairBookingController::class, 'complete'])->name('repairs.complete');
-    Route::post('/repairs/book/{trackingNumber}', [RepairBookingController::class, 'completeStore'])->name('repairs.complete.store');
+    Route::get('/repairs/book/{repairNumber}', [RepairController::class, 'complete'])->name('repairs.complete');
+    Route::post('/repairs/book/{repairNumber}', [RepairController::class, 'completeStore'])->name('repairs.complete.store');
 
     Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout.show');
     Route::post('/checkout', [CheckoutController::class, 'store'])->name('checkout.store');

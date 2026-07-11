@@ -27,9 +27,9 @@ class DeviceType extends Model
         return $this->hasMany(Quote::class);
     }
 
-    public function repairBookings(): HasMany
+    public function repairs(): HasMany
     {
-        return $this->hasMany(RepairBooking::class);
+        return $this->hasMany(Repair::class);
     }
 
     public function scopeActive(Builder $query): Builder

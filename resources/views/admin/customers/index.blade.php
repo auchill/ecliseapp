@@ -42,7 +42,7 @@
                                 <tr>
                                     <td>{{ $customer->name }}</td>
                                     <td>{{ $customer->email }}</td>
-                                    <td>{{ $customer->repair_bookings_count }}</td>
+                                    <td>{{ $customer->repairs_count }}</td>
                                     <td>{{ $customer->orders_count }}</td>
                                     <td>{{ $customer->created_at->format('M j, Y') }}</td>
                                     <td class="text-end"><a class="btn btn-outline-primary btn-sm" href="{{ route('admin.customers.show', $customer) }}"><i class="bi bi-eye"></i><span class="visually-hidden">Open</span></a></td>
