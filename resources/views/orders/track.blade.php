@@ -18,7 +18,7 @@
                 <div class="row g-3 align-items-end">
                     <div class="col-lg-5">
                         <label class="form-label" for="order_number">Order number</label>
-                        <input class="form-control" id="order_number" name="order_number" value="{{ old('order_number', $order->order_number ?? '') }}" placeholder="ECL-ORD-2026-0001" required>
+                        <input class="form-control" id="order_number" name="order_number" value="{{ old('order_number', $order->order_number ?? '') }}" placeholder="ECL-ORD-2026-0000001" required>
                     </div>
                     <div class="col-lg-5">
                         <label class="form-label" for="contact">Email or phone</label>

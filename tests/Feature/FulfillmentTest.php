@@ -588,7 +588,7 @@ test('admin status updates create timelines and queue mail rendering', function 
 
     $order = Order::query()->create([
         'customer_id' => $mailCustomer->id,
-        'order_number' => 'ECL-ORD-TEST-0001',
+        'order_number' => 'ECL-ORD-TEST-0000001',
         'subtotal' => 100,
         'tax' => 13,
         'shipping_cost' => 20,
