@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasGeneratedSlug;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -10,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class ProductBrand extends Model
 {
     use HasFactory;
+    use HasGeneratedSlug;
 
     public const STATUSES = ['active', 'inactive'];
 
@@ -33,6 +35,11 @@ class ProductBrand extends Model
     public function products(): HasMany
     {
         return $this->hasMany(Product::class);
+    }
+
+    public function models(): HasMany
+    {
+        return $this->hasMany(ProductModel::class);
     }
 
     public function quotes(): HasMany

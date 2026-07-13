@@ -83,11 +83,11 @@
                         </select>
                     </div>
                     <div class="col-sm-6 col-lg-2">
-                        <label class="form-label" for="carrier">Carrier</label>
-                        <select class="form-select" id="carrier" name="carrier">
+                        <label class="form-label" for="network">Network</label>
+                        <select class="form-select" id="network" name="network">
                             <option value="">All</option>
-                            @foreach ($carriers as $carrier)
-                                <option value="{{ $carrier->id }}" @selected((int) request('carrier') === $carrier->id)>{{ $carrier->name }}</option>
+                            @foreach ($networks as $network)
+                                <option value="{{ $network->id }}" @selected((int) request('network', request('carrier')) === $network->id)>{{ $network->name }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -113,11 +113,11 @@
                             <div class="p-4">
                                 <p class="eyebrow mb-1">{{ $product->categoryName() ?? 'Product' }}</p>
                                 <h2 class="h5 fw-bold">{{ $product->name }}</h2>
-                                <p class="muted small">{{ $product->conditionName() }} &middot; {{ $product->brandName() }} &middot; {{ $product->modelName() }} &middot; {{ $product->quantity }} in stock</p>
+                                <p class="muted small">{{ collect([$product->conditionName(), $product->brandName(), $product->modelName(), $product->sizeNames(), $product->networkName(), $product->quantity.' in stock'])->filter()->implode(' - ') }}</p>
                                 <div class="d-flex align-items-center justify-content-between gap-2">
                                     <div>
                                         @if ($product->sale_price)
-                                            <span class="text-decoration-line-through muted small">${{ number_format($product->price, 2) }}</span>
+                                            <span class="text-decoration-line-through muted small">${{ number_format($product->regularDisplayPrice(), 2) }}</span>
                                         @endif
                                         <strong>${{ number_format($product->currentPrice(), 2) }}</strong>
                                     </div>

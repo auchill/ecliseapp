@@ -99,7 +99,7 @@
                             <div class="p-4">
                                 <p class="eyebrow mb-1">{{ $product->category?->name }}</p>
                                 <h3 class="h5 fw-bold">{{ $product->name }}</h3>
-                                <p class="muted small mb-3">{{ $product->condition }} &middot; {{ $product->brand }}</p>
+                                <p class="muted small mb-3">{{ collect([$product->conditionName(), $product->brandName(), $product->modelName()])->filter()->implode(' - ') }}</p>
                                 <div class="d-flex align-items-center justify-content-between">
                                     <strong>${{ number_format($product->currentPrice(), 2) }}</strong>
                                     <a class="btn btn-sm btn-outline-primary" href="{{ route('products.show', $product) }}"><i class="bi bi-eye"></i><span class="visually-hidden">View</span></a>

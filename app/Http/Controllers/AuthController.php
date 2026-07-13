@@ -185,7 +185,7 @@ class AuthController extends Controller
             $id = preg_replace('/^ecl/i', '', $productId);
             $product = is_numeric($id) ? Product::query()->find((int) $id) : null;
 
-            if (! $product || $product->status !== 'Active' || $product->quantity <= 0) {
+            if (! $product || ! $product->isAvailable()) {
                 return;
             }
 

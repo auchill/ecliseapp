@@ -23,10 +23,27 @@
                         <label class="form-label" for="name">Name</label>
                         <input class="form-control" id="name" name="name" value="{{ old('name', $item->name) }}" required>
                     </div>
-                    <div class="col-md-6">
-                        <label class="form-label" for="slug">Slug</label>
-                        <input class="form-control" id="slug" name="slug" value="{{ old('slug', $item->slug) }}">
-                    </div>
+                    @if($usesProductBrand ?? false)
+                        <div class="col-md-6">
+                            <label class="form-label" for="product_brand_id">Product Brand</label>
+                            <select class="form-select" id="product_brand_id" name="product_brand_id" required>
+                                <option value="">Choose brand</option>
+                                @foreach ($productBrands as $brand)
+                                    <option value="{{ $brand->id }}" @selected((int) old('product_brand_id', $item->product_brand_id) === $brand->id)>{{ $brand->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endif
+                    @if($usesType ?? false)
+                        <div class="col-md-6">
+                            <label class="form-label" for="type">Type</label>
+                            <select class="form-select" id="type" name="type" required>
+                                @foreach (['storage' => 'Storage', 'screen_size' => 'Screen Size', 'memory' => 'Memory', 'other' => 'Other'] as $value => $label)
+                                    <option value="{{ $value }}" @selected(old('type', $item->type ?: 'storage') === $value)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endif
                     @if($usesSkuCode ?? false)
                         <div class="col-md-6">
                             <label class="form-label" for="code">SKU code</label>

@@ -52,10 +52,9 @@ test('checkout pickup creates a pickup order with zero shipping', function () {
         'name' => 'Pickup Phone',
         'slug' => 'pickup-phone',
         'sku' => 'PICKUP-1',
-        'condition' => 'Used',
-        'price' => 100,
+        'regular_price' => 100,
         'quantity' => 2,
-        'status' => 'Active',
+        'is_active' => true,
     ]);
 
     $cart = Customer::forUser($user)->carts()->create(['status' => 'active']);
@@ -102,10 +101,9 @@ test('checkout normal shipping stores method snapshot and regular shipping cost'
         'name' => 'Shipping Phone',
         'slug' => 'shipping-phone',
         'sku' => 'SHIP-1',
-        'condition' => 'Used',
-        'price' => 100,
+        'regular_price' => 100,
         'quantity' => 2,
-        'status' => 'Active',
+        'is_active' => true,
     ]);
 
     $cart = Customer::forUser($user)->carts()->create(['status' => 'active']);
@@ -166,10 +164,9 @@ test('checkout applies the best matching shipping discount', function () {
         'name' => 'Free Shipping Laptop',
         'slug' => 'free-shipping-laptop',
         'sku' => 'FREE-SHIP-1',
-        'condition' => 'Used',
-        'price' => 350,
+        'regular_price' => 350,
         'quantity' => 2,
-        'status' => 'Active',
+        'is_active' => true,
     ]);
 
     $normalCart = Customer::forUser($normalCustomer)->carts()->create(['status' => 'active']);
@@ -214,10 +211,9 @@ test('checkout applies the best matching shipping discount', function () {
         'name' => 'Overnight Laptop',
         'slug' => 'overnight-laptop',
         'sku' => 'OVERNIGHT-1',
-        'condition' => 'Used',
-        'price' => 600,
+        'regular_price' => 600,
         'quantity' => 2,
-        'status' => 'Active',
+        'is_active' => true,
     ]);
 
     $overnightCart = Customer::forUser($overnightCustomer)->carts()->create(['status' => 'active']);
@@ -345,10 +341,9 @@ test('verified payment finalization marks order paid and commits inventory once'
         'name' => 'Paid Phone',
         'slug' => 'paid-phone',
         'sku' => 'PAID-1',
-        'condition' => 'Used',
-        'price' => 100,
+        'regular_price' => 100,
         'quantity' => 2,
-        'status' => 'Active',
+        'is_active' => true,
     ]);
 
     $cart = Customer::forUser($user)->carts()->create(['status' => 'active']);
@@ -398,10 +393,9 @@ test('guest cart items merge into customer cart on login', function () {
         'name' => 'Merge Phone',
         'slug' => 'merge-phone',
         'sku' => 'MERGE-1',
-        'condition' => 'Used',
-        'price' => 120,
+        'regular_price' => 120,
         'quantity' => 5,
-        'status' => 'Active',
+        'is_active' => true,
     ]);
 
     $this->withSession(['cart.items' => [$product->id => 2]])

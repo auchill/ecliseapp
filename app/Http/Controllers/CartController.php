@@ -32,7 +32,7 @@ class CartController extends Controller
             return $this->authRequired($request);
         }
 
-        abort_unless($product->status === 'Active' && $product->quantity > 0, 404);
+        abort_unless($product->isAvailable(), 404);
 
         $data = $request->validate([
             'quantity' => ['required', 'integer', 'min:1', 'max:'.$product->quantity],

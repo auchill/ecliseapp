@@ -6,11 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\DeviceType;
 use App\Models\IssueCategory;
 use App\Models\ProductBrand;
-use App\Models\ProductCarrier;
 use App\Models\ProductColor;
 use App\Models\ProductCondition;
 use App\Models\ProductGrade;
 use App\Models\ProductModel;
+use App\Models\ProductNetwork;
 use App\Models\ProductSize;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -35,6 +35,7 @@ class ReferenceController extends Controller
             'route' => 'admin.product-models',
             'table' => 'product_models',
             'code_source' => true,
+            'product_brand' => true,
         ],
         'product-sizes' => [
             'model' => ProductSize::class,
@@ -42,7 +43,8 @@ class ReferenceController extends Controller
             'singular' => 'Product Size',
             'route' => 'admin.product-sizes',
             'table' => 'product_sizes',
-            'code_source' => true,
+            'uses_status' => false,
+            'uses_type' => true,
         ],
         'product-grades' => [
             'model' => ProductGrade::class,
@@ -57,7 +59,7 @@ class ReferenceController extends Controller
             'title' => 'Product Conditions',
             'singular' => 'Product Condition',
             'route' => 'admin.product-conditions',
-            'table' => 'productconditions',
+            'table' => 'product_conditions',
             'code_source' => true,
         ],
         'product-colors' => [
@@ -68,12 +70,12 @@ class ReferenceController extends Controller
             'table' => 'product_colors',
             'code_source' => true,
         ],
-        'product-carriers' => [
-            'model' => ProductCarrier::class,
-            'title' => 'Product Carriers',
-            'singular' => 'Product Carrier',
-            'route' => 'admin.product-carriers',
-            'table' => 'product_carriers',
+        'product-networks' => [
+            'model' => ProductNetwork::class,
+            'title' => 'Product Networks',
+            'singular' => 'Product Network',
+            'route' => 'admin.product-networks',
+            'table' => 'product_networks',
             'code_source' => true,
         ],
         'device-types' => [
@@ -96,13 +98,21 @@ class ReferenceController extends Controller
     {
         $config = $this->config($reference);
         $model = $config['model'];
+        $items = $model::query()
+            ->when($config['product_brand'] ?? false, fn ($query) => $query->with('brand'))
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->paginate(20);
 
         return view('admin.taxonomies.index', [
             'title' => $config['title'],
-            'items' => $model::query()->orderBy('sort_order')->orderBy('name')->paginate(20),
+            'items' => $items,
             'routePrefix' => $config['route'],
-            'usesStatus' => true,
+            'usesStatus' => (bool) ($config['uses_status'] ?? true),
             'usesCodeSource' => (bool) ($config['code_source'] ?? false),
+            'usesType' => (bool) ($config['uses_type'] ?? false),
+            'usesProductBrand' => (bool) ($config['product_brand'] ?? false),
+            'productBrands' => ProductBrand::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
         ]);
     }
 
@@ -110,13 +120,21 @@ class ReferenceController extends Controller
     {
         $config = $this->config($reference);
         $model = $config['model'];
+        $defaults = ['status' => 'active', 'is_active' => true, 'sort_order' => 0];
+
+        if ($config['uses_type'] ?? false) {
+            $defaults['type'] = 'storage';
+        }
 
         return view('admin.taxonomies.form', [
             'title' => 'Add '.$config['singular'],
-            'item' => new $model(['status' => 'active', 'sort_order' => 0]),
+            'item' => new $model($defaults),
             'routePrefix' => $config['route'],
-            'usesStatus' => true,
+            'usesStatus' => (bool) ($config['uses_status'] ?? true),
             'usesCodeSource' => (bool) ($config['code_source'] ?? false),
+            'usesType' => (bool) ($config['uses_type'] ?? false),
+            'usesProductBrand' => (bool) ($config['product_brand'] ?? false),
+            'productBrands' => ProductBrand::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
         ]);
     }
 
@@ -139,8 +157,11 @@ class ReferenceController extends Controller
             'title' => 'Edit '.$config['singular'],
             'item' => $item,
             'routePrefix' => $config['route'],
-            'usesStatus' => true,
+            'usesStatus' => (bool) ($config['uses_status'] ?? true),
             'usesCodeSource' => (bool) ($config['code_source'] ?? false),
+            'usesType' => (bool) ($config['uses_type'] ?? false),
+            'usesProductBrand' => (bool) ($config['product_brand'] ?? false),
+            'productBrands' => ProductBrand::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
         ]);
     }
 
@@ -177,21 +198,55 @@ class ReferenceController extends Controller
     {
         $rules = [
             'name' => ['required', 'string', 'max:255'],
-            'slug' => ['nullable', 'string', 'max:255', Rule::unique($config['table'], 'slug')->ignore($ignoreId)],
-            'status' => ['required', Rule::in(['active', 'inactive'])],
             'description' => ['nullable', 'string'],
             'sort_order' => ['required', 'integer', 'min:0'],
         ];
+
+        if (($config['uses_status'] ?? true) === true) {
+            $rules['status'] = ['required', Rule::in(['active', 'inactive'])];
+        } else {
+            $rules['is_active'] = ['nullable', 'boolean'];
+        }
 
         if ($config['code_source'] ?? false) {
             $rules['code'] = ['nullable', 'string', 'max:255'];
             $rules['source'] = ['nullable', 'string', 'max:255'];
         }
 
+        if ($config['uses_type'] ?? false) {
+            $rules['type'] = ['required', 'string', 'max:255'];
+        }
+
+        if ($config['product_brand'] ?? false) {
+            $rules['product_brand_id'] = ['required', 'exists:product_brands,id'];
+        }
+
         $data = $request->validate($rules);
 
-        $data['slug'] = Str::slug($data['slug'] ?: $data['name']);
+        $slug = Str::slug($data['name']);
+        $data['slug'] = $this->uniqueSlug($config['table'], $slug, $ignoreId);
+
+        if (($config['uses_status'] ?? true) === false) {
+            $data['is_active'] = $request->boolean('is_active');
+        }
 
         return $data;
+    }
+
+    private function uniqueSlug(string $table, string $base, ?int $ignoreId = null): string
+    {
+        $slug = $base ?: 'item';
+        $candidate = $slug;
+        $counter = 2;
+
+        while (\DB::table($table)
+            ->where('slug', $candidate)
+            ->when($ignoreId, fn ($query) => $query->where('id', '!=', $ignoreId))
+            ->exists()) {
+            $candidate = "{$slug}-{$counter}";
+            $counter++;
+        }
+
+        return $candidate;
     }
 }

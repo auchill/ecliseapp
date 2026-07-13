@@ -46,6 +46,15 @@
                             @endforeach
                         </select>
                     </div>
+                    <div class="col-sm-6 col-lg-2">
+                        <label class="form-label" for="active">Active</label>
+                        <select class="form-select" id="active" name="active">
+                            <option value="">All</option>
+                            @foreach ($activeOptions as $value => $label)
+                                <option value="{{ $value }}" @selected(request('active') === (string) $value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
                     <div class="col-lg-2">
                         <button class="btn btn-primary w-100" type="submit"><i class="bi bi-search"></i><span class="visually-hidden">Search</span></button>
                     </div>
@@ -57,30 +66,40 @@
                     <table class="table align-middle">
                         <thead>
                             <tr>
+                                <th>Image</th>
                                 <th>Product</th>
                                 <th>SKU</th>
                                 <th>Category</th>
                                 <th>Brand</th>
                                 <th>Model</th>
+                                <th>Sizes</th>
                                 <th>Condition</th>
-                                <th>Price</th>
+                                <th>Network</th>
+                                <th>Regular</th>
+                                <th>Sale</th>
                                 <th>Stock</th>
-                                <th>Status</th>
+                                <th>Active</th>
+                                <th>Featured</th>
                                 <th></th>
                             </tr>
                         </thead>
                         <tbody>
                             @forelse ($products as $product)
                                 <tr>
+                                    <td><img src="{{ $product->imageUrl() }}" alt="{{ $product->name }}" style="width: 54px; height: 54px; object-fit: contain;" onerror="this.onerror=null;this.src='{{ \App\Support\CatalogImage::fallbackUrl() }}';"></td>
                                     <td>{{ $product->name }}</td>
                                     <td>{{ $product->sku }}</td>
                                     <td>{{ $product->categoryName() }}</td>
                                     <td>{{ $product->brandName() }}</td>
                                     <td>{{ $product->modelName() }}</td>
+                                    <td>{{ $product->sizeNames() ?: '—' }}</td>
                                     <td>{{ $product->conditionName() }}</td>
-                                    <td>${{ number_format($product->currentPrice(), 2) }}</td>
+                                    <td>{{ $product->networkName() ?: '—' }}</td>
+                                    <td>${{ number_format($product->regularDisplayPrice(), 2) }}</td>
+                                    <td>{{ $product->sale_price !== null ? '$'.number_format((float) $product->sale_price, 2) : '—' }}</td>
                                     <td>{{ $product->quantity }}</td>
-                                    <td><span class="status-pill">{{ $product->status }}</span></td>
+                                    <td><span class="status-pill">{{ $product->is_active ? 'Active' : 'Inactive' }}</span></td>
+                                    <td>{{ $product->is_featured ? 'Yes' : 'No' }}</td>
                                     <td class="text-end">
                                         <div class="d-inline-flex gap-2">
                                             <a class="btn btn-outline-primary btn-sm" href="{{ route('admin.products.edit', $product) }}"><i class="bi bi-pencil"></i><span class="visually-hidden">Edit</span></a>
@@ -93,7 +112,7 @@
                                     </td>
                                 </tr>
                             @empty
-                                <tr><td colspan="10">No products found.</td></tr>
+                                <tr><td colspan="15">No products found.</td></tr>
                             @endforelse
                         </tbody>
                     </table>

@@ -39,10 +39,9 @@ function step22Product(string $sku = 'STEP22-1', int $quantity = 3): Product
         'name' => 'Step 22 Product',
         'slug' => strtolower($sku),
         'sku' => $sku,
-        'condition' => 'New',
-        'price' => 100,
+        'regular_price' => 100,
         'quantity' => $quantity,
-        'status' => 'Active',
+        'is_active' => true,
     ]);
 }
 

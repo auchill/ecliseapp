@@ -270,10 +270,6 @@ class PaymentFinalizer
 
                 $product->decrement('quantity', $item->quantity);
 
-                if ($product->fresh()->quantity === 0) {
-                    $product->update(['status' => 'Out of Stock']);
-                }
-
                 continue;
             }
 

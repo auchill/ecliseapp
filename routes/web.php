@@ -129,7 +129,7 @@ Route::middleware('admin')->prefix('admin')->name('admin.')->group(function (): 
         'shop/product-grades' => 'product-grades',
         'shop/product-conditions' => 'product-conditions',
         'shop/product-colors' => 'product-colors',
-        'shop/product-carriers' => 'product-carriers',
+        'shop/product-networks' => 'product-networks',
     ] as $path => $reference) {
         Route::get($path, [AdminReferenceController::class, 'index'])->defaults('reference', $reference)->name($reference.'.index');
         Route::get($path.'/create', [AdminReferenceController::class, 'create'])->defaults('reference', $reference)->name($reference.'.create');

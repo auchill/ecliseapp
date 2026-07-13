@@ -2,14 +2,16 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasGeneratedSlug;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class ProductCarrier extends Model
+class ProductNetwork extends Model
 {
     use HasFactory;
+    use HasGeneratedSlug;
 
     protected $fillable = ['name', 'slug', 'code', 'source', 'status', 'description', 'sort_order'];
 

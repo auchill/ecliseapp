@@ -107,10 +107,9 @@ test('admin users are blocked from cart checkout and customer repair booking rou
         'name' => 'Blocked Product',
         'slug' => 'blocked-product',
         'sku' => 'BLOCKED-1',
-        'condition' => 'Used',
-        'price' => 100,
+        'regular_price' => 100,
         'quantity' => 2,
-        'status' => 'Active',
+        'is_active' => true,
     ]);
 
     $this->actingAs($admin)->get(route('cart.index'))->assertRedirect(route('admin.dashboard'));

@@ -3,13 +3,29 @@
 @section('title', $product->name)
 
 @section('content')
+    @php
+        $mainImageUrl = $product->imageUrl();
+        $galleryImages = $product->images
+            ->filter(fn ($image) => $image->displayUrl() !== $mainImageUrl)
+            ->values();
+    @endphp
+
     <section class="section-pad bg-white">
         <div class="container">
             <div class="row g-5">
                 <div class="col-lg-6">
                     <div class="surface product-card overflow-hidden">
-                        <img src="{{ $product->imageUrl() }}" alt="{{ $product->name }}" style="height: 420px;" onerror="this.onerror=null;this.src='{{ \App\Support\CatalogImage::fallbackUrl() }}';">
+                        <img id="product-main-image" src="{{ $mainImageUrl }}" alt="{{ $product->name }}" style="height: 420px;" onerror="this.onerror=null;this.src='{{ \App\Support\CatalogImage::fallbackUrl() }}';">
                     </div>
+                    @if ($galleryImages->isNotEmpty())
+                        <div class="d-flex gap-2 mt-3 overflow-auto">
+                            @foreach ($galleryImages as $image)
+                                <button class="btn border rounded p-1 product-thumb-button" type="button" data-image-url="{{ $image->displayUrl() }}">
+                                    <img src="{{ $image->displayUrl() }}" alt="{{ $image->alt_text ?: $product->name }}" style="width: 76px; height: 76px; object-fit: contain;" onerror="this.onerror=null;this.src='{{ \App\Support\CatalogImage::fallbackUrl() }}';">
+                                </button>
+                            @endforeach
+                        </div>
+                    @endif
                 </div>
                 <div class="col-lg-6">
                     <p class="eyebrow">{{ $product->categoryName() }}</p>
@@ -19,23 +35,23 @@
                         <span class="status-pill">{{ $product->conditionName() }}</span>
                         <span class="status-pill">{{ $product->brandName() }}</span>
                         <span class="status-pill">{{ $product->modelName() }}</span>
-                        @if($product->productSize)
-                            <span class="status-pill">{{ $product->productSize->name }}</span>
-                        @endif
+                        @foreach($product->sizes as $size)
+                            <span class="status-pill">{{ $size->name }}</span>
+                        @endforeach
                         @if($product->productGrade)
                             <span class="status-pill">{{ $product->productGrade->name }}</span>
                         @endif
                         @if($product->productColor)
                             <span class="status-pill">{{ $product->productColor->name }}</span>
                         @endif
-                        @if($product->productCarrier)
-                            <span class="status-pill">{{ $product->productCarrier->name }}</span>
+                        @if($product->network)
+                            <span class="status-pill">{{ $product->network->name }}</span>
                         @endif
                         <span class="status-pill">{{ $product->quantity }} in stock</span>
                     </div>
                     <div class="mb-4">
                         @if ($product->sale_price)
-                            <span class="text-decoration-line-through muted fs-5">${{ number_format($product->price, 2) }}</span>
+                            <span class="text-decoration-line-through muted fs-5">${{ number_format($product->regularDisplayPrice(), 2) }}</span>
                         @endif
                         <strong class="display-6 d-block">${{ number_format($product->currentPrice(), 2) }}</strong>
                     </div>
@@ -75,4 +91,23 @@
             @endif
         </div>
     </section>
+
+    <script>
+        (() => {
+            const mainImage = document.getElementById('product-main-image');
+            const buttons = document.querySelectorAll('.product-thumb-button');
+
+            buttons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    if (!mainImage || !button.dataset.imageUrl) {
+                        return;
+                    }
+
+                    mainImage.src = button.dataset.imageUrl;
+                    buttons.forEach((item) => item.classList.remove('border-primary'));
+                    button.classList.add('border-primary');
+                });
+            });
+        })();
+    </script>
 @endsection

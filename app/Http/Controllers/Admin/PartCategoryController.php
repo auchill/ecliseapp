@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\PartCategory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
 
 class PartCategoryController extends Controller
 {
@@ -62,15 +61,31 @@ class PartCategoryController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'slug' => ['nullable', 'string', 'max:255', Rule::unique('part_categories', 'slug')->ignore($ignoreId)],
             'description' => ['nullable', 'string'],
             'is_active' => ['nullable', 'boolean'],
             'sort_order' => ['required', 'integer', 'min:0'],
         ]);
 
-        $data['slug'] = Str::slug($data['slug'] ?: $data['name']);
+        $data['slug'] = $this->uniqueSlug(Str::slug($data['name']), $ignoreId);
         $data['is_active'] = $request->boolean('is_active');
 
         return $data;
+    }
+
+    private function uniqueSlug(string $base, ?int $ignoreId = null): string
+    {
+        $slug = $base ?: 'item';
+        $candidate = $slug;
+        $counter = 2;
+
+        while (PartCategory::query()
+            ->where('slug', $candidate)
+            ->when($ignoreId, fn ($query) => $query->whereKeyNot($ignoreId))
+            ->exists()) {
+            $candidate = "{$slug}-{$counter}";
+            $counter++;
+        }
+
+        return $candidate;
     }
 }

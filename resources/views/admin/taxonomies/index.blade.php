@@ -20,6 +20,9 @@
                             <tr>
                                 <th>Name</th>
                                 <th>Slug</th>
+                                @if($usesProductBrand ?? false)
+                                    <th>Brand</th>
+                                @endif
                                 @if($usesCodeSource ?? false)
                                     <th>Code</th>
                                     <th>Source</th>
@@ -37,6 +40,9 @@
                                         <div class="small muted">{{ $item->description }}</div>
                                     </td>
                                     <td>{{ $item->slug }}</td>
+                                    @if($usesProductBrand ?? false)
+                                        <td>{{ $item->brand?->name ?: '--' }}</td>
+                                    @endif
                                     @if($usesCodeSource ?? false)
                                         <td>{{ $item->code ?: '--' }}</td>
                                         <td>{{ $item->source ?: '--' }}</td>
@@ -59,7 +65,7 @@
                                     </td>
                                 </tr>
                             @empty
-                                <tr><td colspan="{{ ($usesCodeSource ?? false) ? 7 : 5 }}">No records found.</td></tr>
+                                <tr><td colspan="{{ 5 + (($usesCodeSource ?? false) ? 2 : 0) + (($usesProductBrand ?? false) ? 1 : 0) }}">No records found.</td></tr>
                             @endforelse
                         </tbody>
                     </table>

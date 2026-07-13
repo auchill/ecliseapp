@@ -2,29 +2,34 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasGeneratedSlug;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class ProductSize extends Model
 {
     use HasFactory;
+    use HasGeneratedSlug;
 
-    protected $fillable = ['name', 'slug', 'code', 'source', 'status', 'description', 'sort_order'];
+    protected $fillable = ['name', 'slug', 'type', 'is_active', 'sort_order'];
 
     protected function casts(): array
     {
-        return ['sort_order' => 'integer'];
+        return [
+            'is_active' => 'boolean',
+            'sort_order' => 'integer',
+        ];
     }
 
-    public function products(): HasMany
+    public function products(): BelongsToMany
     {
-        return $this->hasMany(Product::class);
+        return $this->belongsToMany(Product::class, 'product_product_size')->withTimestamps();
     }
 
     public function scopeActive(Builder $query): Builder
     {
-        return $query->where('status', 'active');
+        return $query->where('is_active', true);
     }
 }

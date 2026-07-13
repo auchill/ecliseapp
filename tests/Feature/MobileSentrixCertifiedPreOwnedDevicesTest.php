@@ -7,6 +7,12 @@ use App\Models\Order;
 use App\Models\Payment;
 use App\Models\Permission;
 use App\Models\Product;
+use App\Models\ProductBrand;
+use App\Models\ProductColor;
+use App\Models\ProductCondition;
+use App\Models\ProductModel;
+use App\Models\ProductNetwork;
+use App\Models\ProductSize;
 use App\Models\User;
 use App\Services\PaymentFinalizer;
 use App\Support\MobileSentrixDeviceFilters;
@@ -48,6 +54,15 @@ function cpoTestUser(string $email, string $permissionName = 'customer'): User
 }
 
 test('mobile sentrix device sync stores direct fields without creating lookup data', function () {
+    $lookupCounts = [
+        'product_brands' => ProductBrand::query()->count(),
+        'product_models' => ProductModel::query()->count(),
+        'product_sizes' => ProductSize::query()->count(),
+        'product_conditions' => ProductCondition::query()->count(),
+        'product_colors' => ProductColor::query()->count(),
+        'product_networks' => ProductNetwork::query()->count(),
+    ];
+
     $rawDevice = [
         'entity_id' => 73001,
         'sku' => 'CPO-IPHONE-14-128',
@@ -86,6 +101,13 @@ test('mobile sentrix device sync stores direct fields without creating lookup da
         ->and(Schema::hasTable('device_models'))->toBeFalse()
         ->and(Schema::hasColumn('mobilesentrix_devices', 'device_manufacturer_id'))->toBeFalse()
         ->and(Schema::hasColumn('mobilesentrix_devices', 'device_model_id'))->toBeFalse();
+
+    expect(ProductBrand::query()->count())->toBe($lookupCounts['product_brands'])
+        ->and(ProductModel::query()->count())->toBe($lookupCounts['product_models'])
+        ->and(ProductSize::query()->count())->toBe($lookupCounts['product_sizes'])
+        ->and(ProductCondition::query()->count())->toBe($lookupCounts['product_conditions'])
+        ->and(ProductColor::query()->count())->toBe($lookupCounts['product_colors'])
+        ->and(ProductNetwork::query()->count())->toBe($lookupCounts['product_networks']);
 
     Http::assertSent(function ($request): bool {
         parse_str(parse_url($request->url(), PHP_URL_QUERY) ?: '', $query);
@@ -305,10 +327,9 @@ test('cart stores eclise and mobile sentrix items with distinct source identifie
         'name' => 'Retail Phone',
         'slug' => 'retail-phone',
         'sku' => 'RETAIL-1',
-        'condition' => 'New',
-        'price' => 400,
+        'regular_price' => 400,
         'quantity' => 5,
-        'status' => 'Active',
+        'is_active' => true,
     ]);
     $device = MobileSentrixDevice::query()->create([
         'entity_id' => 99001,
@@ -349,10 +370,9 @@ test('checkout creates mixed order items for retail and certified pre owned devi
         'name' => 'Checkout Retail Phone',
         'slug' => 'checkout-retail-phone',
         'sku' => 'CHECKOUT-RETAIL',
-        'condition' => 'New',
-        'price' => 100,
+        'regular_price' => 100,
         'quantity' => 5,
-        'status' => 'Active',
+        'is_active' => true,
     ]);
     $device = MobileSentrixDevice::query()->create([
         'entity_id' => 99002,
