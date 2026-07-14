@@ -5,6 +5,7 @@
         ],
         'MobileSentrix API' => [
             ['label' => 'API Dashboard', 'route' => 'admin.parts.mobilesentrix.index', 'icon' => 'bi-cloud-arrow-down', 'active' => 'admin.parts.mobilesentrix.*'],
+            ['label' => 'Price Markup', 'route' => 'admin.mobilesentrix-markups.index', 'icon' => 'bi-percent', 'active' => 'admin.mobilesentrix-markups.*'],
         ],
         'MobileSentrix Devices' => [
             ['label' => 'Pre-Owned Devices', 'route' => 'admin.devices.index', 'icon' => 'bi-phone', 'active' => 'admin.devices.*'],

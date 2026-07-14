@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\ContactMessageController as AdminContactMessageCo
 use App\Http\Controllers\Admin\CustomerController as AdminCustomerController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\DeviceController as AdminDeviceController;
+use App\Http\Controllers\Admin\EcliseMarkupController as AdminEcliseMarkupController;
 use App\Http\Controllers\Admin\MobileSentrixController as AdminMobileSentrixController;
 use App\Http\Controllers\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Admin\PartCategoryController as AdminPartCategoryController;
@@ -161,6 +162,9 @@ Route::middleware('admin')->prefix('admin')->name('admin.')->group(function (): 
     Route::post('/parts/mobilesentrix/sync-categories', [AdminMobileSentrixController::class, 'syncCategories'])->name('parts.mobilesentrix.sync-categories');
     Route::post('/parts/mobilesentrix/sync-parts', [AdminMobileSentrixController::class, 'syncParts'])->name('parts.mobilesentrix.sync-parts');
     Route::post('/parts/mobilesentrix/refresh', [AdminMobileSentrixController::class, 'refreshPart'])->name('parts.mobilesentrix.refresh');
+    Route::post('/parts/mobilesentrix/price-markup/refresh', [AdminEcliseMarkupController::class, 'refresh'])->name('mobilesentrix-markups.refresh');
+    Route::patch('/parts/mobilesentrix/price-markup/{ecliseMarkup}/toggle', [AdminEcliseMarkupController::class, 'toggle'])->name('mobilesentrix-markups.toggle');
+    Route::resource('/parts/mobilesentrix/price-markup', AdminEcliseMarkupController::class)->parameters(['price-markup' => 'ecliseMarkup'])->names('mobilesentrix-markups')->except(['show']);
     Route::get('/devices', [AdminDeviceController::class, 'index'])->name('devices.index');
     Route::get('/devices/export', [AdminDeviceController::class, 'export'])->name('devices.export');
     Route::post('/devices/sync', [AdminDeviceController::class, 'sync'])->name('devices.sync');

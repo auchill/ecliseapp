@@ -32,6 +32,8 @@ class DatabaseSeeder extends Seeder
         $this->call(DefaultPermissionsSeeder::class);
         $this->call(ShippingSeeder::class);
         $this->call(CatalogTaxonomySeeder::class);
+        $this->call(ProductLookupSeeder::class);
+        $this->call(ProductSeeder::class);
         $this->call(ReferenceDataSeeder::class);
 
         $customerPermissionId = Permission::query()->where('name', 'customer')->value('id');
@@ -48,105 +50,105 @@ class DatabaseSeeder extends Seeder
                 'status' => 'active',
             ],
         );
+        // sh:codes - Use the current lookup for the seeds
+        // $products = [
+        //     [
+        //         'category' => 'Used Phones',
+        //         'name' => 'Apple iPhone 14 128GB',
+        //         'sku' => 'ECL-PHN-IPH14-128',
+        //         'brand' => 'Apple',
+        //         'model' => 'iPhone 14',
+        //         'condition' => 'Used',
+        //         'regular_price' => 679.00,
+        //         'sale_price' => 629.00,
+        //         'quantity' => 4,
+        //         'description' => 'Inspected used iPhone with clean display, tested battery health, and charger cable included.',
+        //     ],
+        //     [
+        //         'category' => 'New Phones',
+        //         'name' => 'Samsung Galaxy S24 256GB',
+        //         'sku' => 'ECL-PHN-S24-256',
+        //         'brand' => 'Samsung',
+        //         'model' => 'Galaxy S24',
+        //         'condition' => 'New',
+        //         'regular_price' => 999.00,
+        //         'sale_price' => null,
+        //         'quantity' => 3,
+        //         'description' => 'Factory-new Galaxy phone with manufacturer warranty and Eclise setup support.',
+        //     ],
+        //     [
+        //         'category' => 'Used Computers',
+        //         'name' => 'Lenovo ThinkPad T14',
+        //         'sku' => 'ECL-PC-T14',
+        //         'brand' => 'Lenovo',
+        //         'model' => 'ThinkPad T14',
+        //         'condition' => 'Refurbished',
+        //         'regular_price' => 749.00,
+        //         'sale_price' => 699.00,
+        //         'quantity' => 2,
+        //         'description' => 'Business laptop refurbished for everyday productivity with SSD storage and Windows installed.',
+        //     ],
+        //     [
+        //         'category' => 'Phone Accessories',
+        //         'name' => 'USB-C Fast Charger Kit',
+        //         'sku' => 'ECL-ACC-USBC-KIT',
+        //         'brand' => 'Eclise',
+        //         'model' => '30W USB-C',
+        //         'condition' => 'New',
+        //         'regular_price' => 29.99,
+        //         'sale_price' => null,
+        //         'quantity' => 20,
+        //         'description' => 'Compact charger and USB-C cable for compatible phones, tablets, and accessories.',
+        //     ],
+        // ];
 
-        $products = [
-            [
-                'category' => 'Used Phones',
-                'name' => 'Apple iPhone 14 128GB',
-                'sku' => 'ECL-PHN-IPH14-128',
-                'brand' => 'Apple',
-                'model' => 'iPhone 14',
-                'condition' => 'Used',
-                'regular_price' => 679.00,
-                'sale_price' => 629.00,
-                'quantity' => 4,
-                'description' => 'Inspected used iPhone with clean display, tested battery health, and charger cable included.',
-            ],
-            [
-                'category' => 'New Phones',
-                'name' => 'Samsung Galaxy S24 256GB',
-                'sku' => 'ECL-PHN-S24-256',
-                'brand' => 'Samsung',
-                'model' => 'Galaxy S24',
-                'condition' => 'New',
-                'regular_price' => 999.00,
-                'sale_price' => null,
-                'quantity' => 3,
-                'description' => 'Factory-new Galaxy phone with manufacturer warranty and Eclise setup support.',
-            ],
-            [
-                'category' => 'Used Computers',
-                'name' => 'Lenovo ThinkPad T14',
-                'sku' => 'ECL-PC-T14',
-                'brand' => 'Lenovo',
-                'model' => 'ThinkPad T14',
-                'condition' => 'Refurbished',
-                'regular_price' => 749.00,
-                'sale_price' => 699.00,
-                'quantity' => 2,
-                'description' => 'Business laptop refurbished for everyday productivity with SSD storage and Windows installed.',
-            ],
-            [
-                'category' => 'Phone Accessories',
-                'name' => 'USB-C Fast Charger Kit',
-                'sku' => 'ECL-ACC-USBC-KIT',
-                'brand' => 'Eclise',
-                'model' => '30W USB-C',
-                'condition' => 'New',
-                'regular_price' => 29.99,
-                'sale_price' => null,
-                'quantity' => 20,
-                'description' => 'Compact charger and USB-C cable for compatible phones, tablets, and accessories.',
-            ],
-        ];
+        // foreach ($products as $product) {
+        //     $brand = ProductBrand::query()->updateOrCreate(
+        //         ['slug' => Str::slug($product['brand'])],
+        //         ['name' => $product['brand'], 'status' => 'active'],
+        //     );
+        //     $model = ProductModel::query()->updateOrCreate(
+        //         ['slug' => Str::slug($product['model'])],
+        //         ['name' => $product['model'], 'product_brand_id' => $brand->id, 'status' => 'active'],
+        //     );
+        //     $condition = ProductCondition::query()->where('slug', Str::slug($product['condition']))->first();
+        //     $storage = Str::contains($product['name'], ['128GB', '256GB'])
+        //         ? ProductSize::query()->updateOrCreate(
+        //             ['slug' => Str::slug(Str::contains($product['name'], '256GB') ? '256GB' : '128GB')],
+        //             ['name' => Str::contains($product['name'], '256GB') ? '256GB' : '128GB', 'type' => 'storage', 'is_active' => true],
+        //         )
+        //         : null;
+        //     $network = ProductNetwork::query()->updateOrCreate(
+        //         ['slug' => 'unlocked'],
+        //         ['name' => 'Unlocked', 'status' => 'active'],
+        //     );
 
-        foreach ($products as $product) {
-            $brand = ProductBrand::query()->updateOrCreate(
-                ['slug' => Str::slug($product['brand'])],
-                ['name' => $product['brand'], 'status' => 'active'],
-            );
-            $model = ProductModel::query()->updateOrCreate(
-                ['slug' => Str::slug($product['model'])],
-                ['name' => $product['model'], 'product_brand_id' => $brand->id, 'status' => 'active'],
-            );
-            $condition = ProductCondition::query()->where('slug', Str::slug($product['condition']))->first();
-            $storage = Str::contains($product['name'], ['128GB', '256GB'])
-                ? ProductSize::query()->updateOrCreate(
-                    ['slug' => Str::slug(Str::contains($product['name'], '256GB') ? '256GB' : '128GB')],
-                    ['name' => Str::contains($product['name'], '256GB') ? '256GB' : '128GB', 'type' => 'storage', 'is_active' => true],
-                )
-                : null;
-            $network = ProductNetwork::query()->updateOrCreate(
-                ['slug' => 'unlocked'],
-                ['name' => 'Unlocked', 'status' => 'active'],
-            );
+        //     $createdProduct = Product::query()->updateOrCreate(
+        //         ['sku' => $product['sku']],
+        //         [
+        //             'product_category_id' => ProductCategory::query()->where('slug', Str::slug(match ($product['category']) {
+        //                 'Used Phones', 'New Phones' => 'Phone',
+        //                 'Used Computers', 'New Computers' => 'Laptop',
+        //                 'Phone Accessories', 'Computer Accessories' => 'Accessories',
+        //                 default => $product['category'],
+        //             }))->value('id'),
+        //             'product_brand_id' => $brand->id,
+        //             'product_model_id' => $model->id,
+        //             'product_condition_id' => $condition?->id,
+        //             'product_network_id' => $network->id,
+        //             'name' => $product['name'],
+        //             'slug' => Str::slug($product['name']),
+        //             'description' => $product['description'],
+        //             'regular_price' => $product['regular_price'],
+        //             'sale_price' => $product['sale_price'],
+        //             'quantity' => $product['quantity'],
+        //             'source' => 'manual',
+        //             'is_active' => true,
+        //         ],
+        //     );
 
-            $createdProduct = Product::query()->updateOrCreate(
-                ['sku' => $product['sku']],
-                [
-                    'product_category_id' => ProductCategory::query()->where('slug', Str::slug(match ($product['category']) {
-                        'Used Phones', 'New Phones' => 'Phone',
-                        'Used Computers', 'New Computers' => 'Laptop',
-                        'Phone Accessories', 'Computer Accessories' => 'Accessories',
-                        default => $product['category'],
-                    }))->value('id'),
-                    'product_brand_id' => $brand->id,
-                    'product_model_id' => $model->id,
-                    'product_condition_id' => $condition?->id,
-                    'product_network_id' => $network->id,
-                    'name' => $product['name'],
-                    'slug' => Str::slug($product['name']),
-                    'description' => $product['description'],
-                    'regular_price' => $product['regular_price'],
-                    'sale_price' => $product['sale_price'],
-                    'quantity' => $product['quantity'],
-                    'source' => 'manual',
-                    'is_active' => true,
-                ],
-            );
-
-            $createdProduct->sizes()->sync($storage ? [$storage->id] : []);
-        }
+        //     $createdProduct->sizes()->sync($storage ? [$storage->id] : []);
+        // }
 
         $customerProfile = Customer::forUser($customer);
         $customerProfile->update(['phone' => $customerProfile->phone ?: '416-555-0199']);

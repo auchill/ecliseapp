@@ -83,6 +83,7 @@
 
             <main class="flex-grow-1">
                 @include('partials.flash')
+                <x-breadcrumb />
                 @yield('content')
             </main>
 

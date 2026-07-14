@@ -113,8 +113,8 @@ test('public parts search returns dynamic results without exposing supplier cost
     $response = $this->getJson(route('parts.search', [
         'q' => 'NEW-1001',
         'stock' => 'in',
-        'min_price' => '60',
-        'max_price' => '70',
+        'min_price' => '40',
+        'max_price' => '60',
     ]));
 
     $response->assertOk()
@@ -129,8 +129,8 @@ test('public parts search returns dynamic results without exposing supplier cost
         ->and($html)->toContain('parts-card-image')
         ->and($html)->toContain('parts-card-actions')
         ->and($html)->toContain('MS-1001')
-        ->and($html)->toContain('$65.00')
-        ->and($html)->not->toContain('$50.00')
+        ->and($html)->toContain('$50.00')
+        ->and($html)->not->toContain('$65.00')
         ->and($html)->not->toContain('col-xl-3')
         ->and($html)->not->toContain('access_token')
         ->and($html)->not->toContain('MSP-1001');
@@ -187,7 +187,7 @@ test('admin parts search can find mobilesentrix ids and show admin-only cost', f
     expect($html)->toContain('iPhone 15 OLED Screen')
         ->and($html)->toContain('MS ID: 1001')
         ->and($html)->toContain('$50.00')
-        ->and($html)->toContain('$65.00')
+        ->and($html)->not->toContain('$65.00')
         ->and($html)->not->toContain('should-never-render');
 });
 

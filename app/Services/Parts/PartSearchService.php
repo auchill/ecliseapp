@@ -47,8 +47,8 @@ class PartSearchService
             })
             ->when($request->filled('device_type'), fn (Builder $query) => $query->where('device_type', $request->string('device_type')->toString()))
             ->when($request->filled('stock'), fn (Builder $query) => $this->applyStock($query, $request->string('stock')->toString()))
-            ->when($request->filled('min_price'), fn (Builder $query) => $query->whereRaw('CAST(COALESCE(selling_price, final_price, price) AS DECIMAL(10,2)) >= ?', [(float) $request->input('min_price')]))
-            ->when($request->filled('max_price'), fn (Builder $query) => $query->whereRaw('CAST(COALESCE(selling_price, final_price, price) AS DECIMAL(10,2)) <= ?', [(float) $request->input('max_price')]));
+            ->when($request->filled('min_price'), fn (Builder $query) => $query->whereRaw('CAST(COALESCE(api_price, price, customer_price, final_price_without_tax, regular_price_without_tax, cost_price) AS DECIMAL(10,2)) >= ?', [(float) $request->input('min_price')]))
+            ->when($request->filled('max_price'), fn (Builder $query) => $query->whereRaw('CAST(COALESCE(api_price, price, customer_price, final_price_without_tax, regular_price_without_tax, cost_price) AS DECIMAL(10,2)) <= ?', [(float) $request->input('max_price')]));
     }
 
     public function adminQuery(Request $request): Builder

@@ -3,6 +3,7 @@
 use App\Jobs\MobileSentrix\SyncMobileSentrixCategoriesJob;
 use App\Jobs\MobileSentrix\SyncMobileSentrixPartsFullJob;
 use App\Jobs\MobileSentrix\SyncMobileSentrixPartsJob;
+use App\Models\EcliseMarkup;
 use App\Models\MobileSentrixApiSetting;
 use App\Models\MobileSentrixSyncLog;
 use App\Models\Part;
@@ -409,6 +410,16 @@ test('mobile sentrix parts sync maps products into parts without exposing suppli
     $this->artisan('mobilesentrix:generate-part-category-pivot')->assertSuccessful();
 
     expect($part->categories()->whereKey($category->id)->exists())->toBeTrue();
+
+    EcliseMarkup::query()->create([
+        'item_type' => EcliseMarkup::ITEM_TYPE_PARTS,
+        'scope_type' => EcliseMarkup::SCOPE_ALL,
+        'category_id' => null,
+        'markup_type' => EcliseMarkup::MARKUP_PERCENTAGE,
+        'markup_value' => 20,
+        'priority' => 0,
+        'is_active' => true,
+    ]);
 
     $this->get(route('parts.index', ['q' => 'iPhone 14']))
         ->assertOk()

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\MobileSentrixMarkupService;
 use App\Support\CatalogImage;
 use App\Support\CustomerFacingPartCategories;
 use App\Support\ProductDescriptionSanitizer;
@@ -154,7 +155,12 @@ class Part extends Model
 
     public function displayPrice(): float
     {
-        return (float) ($this->selling_price ?: $this->final_price ?: $this->customer_price ?: $this->price);
+        return (float) (app(MobileSentrixMarkupService::class)->calculatePartPrice($this)->selling_price ?? 0);
+    }
+
+    public function markupPrice()
+    {
+        return app(MobileSentrixMarkupService::class)->calculatePartPrice($this);
     }
 
     public function imageUrl(): string

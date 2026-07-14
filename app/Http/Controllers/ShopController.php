@@ -3,65 +3,58 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
-use App\Models\ProductBrand;
-use App\Models\ProductCategory;
-use App\Models\ProductColor;
-use App\Models\ProductCondition;
-use App\Models\ProductGrade;
-use App\Models\ProductModel;
-use App\Models\ProductNetwork;
-use App\Models\ProductSize;
+use App\Support\ShopProductFilters;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+use Throwable;
 
 class ShopController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, ShopProductFilters $filters)
     {
-        $networkId = $request->integer('network') ?: $request->integer('carrier');
+        $this->normalizeFilterRequest($request);
 
-        $products = Product::query()
-            ->with('category', 'productBrand', 'productModel', 'sizes', 'productGrade', 'productCondition', 'productColor', 'network', 'primaryImage')
-            ->active()
-            ->when($request->filled('q'), function ($query) use ($request): void {
-                $search = $request->string('q');
-                $query->where(function ($query) use ($search): void {
-                    $query->where('name', 'like', "%{$search}%")
-                        ->orWhereHas('productBrand', fn ($query) => $query->where('name', 'like', "%{$search}%"))
-                        ->orWhereHas('productModel', fn ($query) => $query->where('name', 'like', "%{$search}%"))
-                        ->orWhere('sku', 'like', "%{$search}%");
-                });
-            })
-            ->when($request->filled('category'), function ($query) use ($request): void {
-                $category = $request->string('category');
-                $query->whereHas('category', fn ($query) => $query->where('slug', $category));
-            })
-            ->when($request->filled('brand'), function ($query) use ($request): void {
-                $brand = $request->string('brand');
-                $query->whereHas('productBrand', fn ($query) => $query->where('slug', $brand));
-            })
-            ->when($request->filled('model'), fn ($query) => $query->where('product_model_id', $request->integer('model')))
-            ->when($request->filled('size'), fn ($query) => $query->whereHas('sizes', fn ($query) => $query->whereKey($request->integer('size'))))
-            ->when($request->filled('grade'), fn ($query) => $query->where('product_grade_id', $request->integer('grade')))
-            ->when($request->filled('condition'), fn ($query) => $query->where('product_condition_id', $request->integer('condition')))
-            ->when($request->filled('color'), fn ($query) => $query->where('product_color_id', $request->integer('color')))
-            ->when($networkId, fn ($query) => $query->where('product_network_id', $networkId))
-            ->when($request->filled('min_price'), fn ($query) => $query->whereRaw('COALESCE(sale_price, regular_price) >= ?', [(float) $request->input('min_price')]))
-            ->when($request->filled('max_price'), fn ($query) => $query->whereRaw('COALESCE(sale_price, regular_price) <= ?', [(float) $request->input('max_price')]))
-            ->latest()
-            ->paginate(12)
-            ->withQueryString();
+        if ($validationResponse = $this->validateFilterRequest($request)) {
+            return $validationResponse;
+        }
 
-        return view('shop.index', [
-            'products' => $products,
-            'categories' => ProductCategory::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
-            'brands' => ProductBrand::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
-            'models' => ProductModel::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
-            'sizes' => ProductSize::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
-            'grades' => ProductGrade::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
-            'conditions' => ProductCondition::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
-            'colors' => ProductColor::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
-            'networks' => ProductNetwork::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
-        ]);
+        try {
+            $products = $filters->query($request)
+                ->paginate(12)
+                ->withQueryString();
+
+            $viewData = [
+                'products' => $products,
+                'filterOptions' => $filters->filterOptions($request),
+                'selectedChips' => $filters->selectedChips($request),
+                'activeFilterCount' => $filters->activeFilterCount($request),
+                'priceBounds' => $filters->priceBounds($request),
+                'sortOptions' => ShopProductFilters::SORT_OPTIONS,
+            ];
+
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json($this->filterJsonPayload($viewData, $products));
+            }
+
+            return view('shop.index', $viewData);
+        } catch (Throwable $exception) {
+            if ($request->expectsJson() || $request->ajax()) {
+                Log::error('Dynamic product filter failed', [
+                    'filters' => $this->filterLogContext($request),
+                    'exception' => $exception,
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'The product filters could not be loaded.',
+                ], 500);
+            }
+
+            throw $exception;
+        }
     }
 
     public function show(Product $product)
@@ -77,6 +70,125 @@ class ShopController extends Controller
                 ->where('product_category_id', $product->product_category_id)
                 ->take(3)
                 ->get(),
+        ]);
+    }
+
+    private function normalizeFilterRequest(Request $request): void
+    {
+        if (blank($request->query('q')) && filled($request->query('search'))) {
+            $request->query->set('q', trim((string) $request->query('search')));
+        }
+
+        if ($request->query('sort') === 'sale') {
+            $request->query->set('sort', 'on_sale');
+        }
+
+        foreach (['min_price', 'max_price'] as $key) {
+            if ($request->query($key) === '') {
+                $request->query->remove($key);
+            }
+        }
+
+        foreach (['brands', 'conditions', 'grades', 'colors'] as $key) {
+            $value = $request->query($key);
+
+            if (is_string($value)) {
+                $request->query->set(
+                    $key,
+                    str_contains($value, ',')
+                        ? collect(explode(',', $value))->map(fn (string $item): string => trim($item))->filter()->values()->all()
+                        : [$value],
+                );
+            }
+        }
+    }
+
+    private function validateFilterRequest(Request $request): ?JsonResponse
+    {
+        $validator = Validator::make($request->query(), [
+            'q' => ['nullable', 'string', 'max:255'],
+            'search' => ['nullable', 'string', 'max:255'],
+            'category' => ['nullable', 'string', 'max:255'],
+            'brands' => ['nullable', 'array'],
+            'brands.*' => ['string', 'distinct', 'max:255'],
+            'conditions' => ['nullable', 'array'],
+            'conditions.*' => ['string', 'distinct', 'max:255'],
+            'grades' => ['nullable', 'array'],
+            'grades.*' => ['string', 'distinct', 'max:255'],
+            'colors' => ['nullable', 'array'],
+            'colors.*' => ['string', 'distinct', 'max:255'],
+            'brand' => ['nullable', 'string', 'max:255'],
+            'condition' => ['nullable', 'string', 'max:255'],
+            'grade' => ['nullable', 'string', 'max:255'],
+            'color' => ['nullable', 'string', 'max:255'],
+            'min_price' => ['nullable', 'numeric', 'min:0'],
+            'max_price' => ['nullable', 'numeric', 'min:0', 'gte:min_price'],
+            'sort' => ['nullable', Rule::in(array_merge(array_keys(ShopProductFilters::SORT_OPTIONS), ['sale']))],
+            'page' => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        if (! $validator->fails()) {
+            return null;
+        }
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The selected product filters are invalid.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        abort(404);
+    }
+
+    private function filterJsonPayload(array $viewData, $products): array
+    {
+        $html = [
+            'products' => view('shop.products.partials.results', $viewData)->render(),
+            'summary' => view('shop.products.partials.summary', $viewData)->render(),
+            'active_filters' => view('shop.products.partials.active-filters', $viewData)->render(),
+            'desktop_filter_groups' => view('shop.partials.filter-groups', $viewData + ['idPrefix' => 'desktop'])->render(),
+            'mobile_filter_groups' => view('shop.partials.filter-groups', $viewData + ['idPrefix' => 'mobile'])->render(),
+            'desktop_filters' => view('shop.partials.filter-panel', $viewData + ['idPrefix' => 'desktop'])->render(),
+            'mobile_filters' => view('shop.partials.filter-panel', $viewData + ['idPrefix' => 'mobile'])->render(),
+        ];
+
+        return [
+            'success' => true,
+            'html' => $html,
+            'meta' => [
+                'total' => $products->total(),
+                'current_page' => $products->currentPage(),
+                'last_page' => $products->lastPage(),
+                'active_filter_count' => $viewData['activeFilterCount'],
+            ],
+            'results' => $html['products'],
+            'summary' => $html['summary'],
+            'activeFilters' => $html['active_filters'],
+            'desktopFilterGroups' => $html['desktop_filter_groups'],
+            'mobileFilterGroups' => $html['mobile_filter_groups'],
+            'desktopFilters' => $html['desktop_filters'],
+            'mobileFilters' => $html['mobile_filters'],
+            'activeFilterCount' => $viewData['activeFilterCount'],
+            'total' => $products->total(),
+        ];
+    }
+
+    private function filterLogContext(Request $request): array
+    {
+        return $request->only([
+            'q',
+            'search',
+            'category',
+            'brands',
+            'conditions',
+            'grades',
+            'colors',
+            'min_price',
+            'max_price',
+            'sort',
+            'page',
         ]);
     }
 }

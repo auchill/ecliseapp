@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\MobileSentrixMarkupService;
 use App\Support\CatalogImage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -70,9 +71,12 @@ class MobileSentrixDevice extends Model
 
     public function displayPrice(): ?float
     {
-        $price = $this->price ?? $this->final_price ?? $this->regular_price;
+        return app(MobileSentrixMarkupService::class)->calculatePreOwnedDevicePrice($this)->selling_price;
+    }
 
-        return $price === null ? null : (float) $price;
+    public function markupPrice()
+    {
+        return app(MobileSentrixMarkupService::class)->calculatePreOwnedDevicePrice($this);
     }
 
     public function cartProductId(): string
