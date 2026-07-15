@@ -5,8 +5,8 @@ namespace App\Services;
 use App\Models\EcliseMarkup;
 use App\Models\MobileSentrixDevice;
 use App\Models\Part;
-use App\Models\PartCategory;
 use App\Support\MarkupPriceResult;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
@@ -26,7 +26,7 @@ class MobileSentrixMarkupService
     {
         return $this->calculate(
             EcliseMarkup::ITEM_TYPE_PARTS,
-            $this->partCategoryIds($part),
+            $part->manufacturer_text,
             $this->partSourcePrice($part),
         );
     }
@@ -35,47 +35,55 @@ class MobileSentrixMarkupService
     {
         return $this->calculate(
             EcliseMarkup::ITEM_TYPE_PRE_OWNED_DEVICES,
-            $this->deviceCategoryIds($device),
+            $device->manufacturer_text,
             $this->deviceSourcePrice($device),
         );
     }
 
-    public function resolveMarkupRule(string $itemType, array $categoryIds = []): ?EcliseMarkup
+    public function resolveMarkupRule(string $itemType, ?string $manufacturerText = null, ?float $basePrice = null): ?EcliseMarkup
     {
         if (! array_key_exists($itemType, EcliseMarkup::ITEM_TYPES)) {
             return null;
         }
 
-        $categoryIds = collect($categoryIds)
-            ->map(fn ($id): int => (int) $id)
-            ->filter(fn (int $id): bool => $id > 0)
-            ->unique()
-            ->values();
-
         $rules = $this->activeRules()
             ->where('item_type', $itemType);
 
-        $categoryRules = $rules
-            ->where('scope_type', EcliseMarkup::SCOPE_CATEGORY)
-            ->filter(fn (EcliseMarkup $rule): bool => $categoryIds->contains((int) $rule->category_id));
+        $brand = EcliseMarkup::normalizeBrand($manufacturerText);
 
-        if ($categoryRules->isNotEmpty()) {
-            $depths = $this->categoryDepths($categoryIds->all());
-
-            // Deterministic precedence: highest priority, deepest matching category when known,
-            // then lowest rule id. Category rules do not stack with global rules.
-            return $categoryRules
+        if ($brand) {
+            $brandRule = $rules
+                ->where('scope_type', EcliseMarkup::SCOPE_BRAND)
+                ->where('brand_normalized', $brand)
                 ->sortBy([
                     fn (EcliseMarkup $rule): int => -1 * (int) $rule->priority,
-                    fn (EcliseMarkup $rule): int => -1 * (int) ($depths[(int) $rule->category_id] ?? 0),
                     fn (EcliseMarkup $rule): int => (int) $rule->id,
                 ])
                 ->first();
+
+            if ($brandRule) {
+                return $brandRule;
+            }
+        }
+
+        if ($basePrice !== null) {
+            $rangeRule = $rules
+                ->where('scope_type', EcliseMarkup::SCOPE_PRICE_RANGE)
+                ->filter(fn (EcliseMarkup $rule): bool => (float) $rule->min_price <= $basePrice && (float) $rule->max_price >= $basePrice)
+                ->sortBy([
+                    fn (EcliseMarkup $rule): int => -1 * (int) $rule->priority,
+                    fn (EcliseMarkup $rule): float => (float) $rule->min_price,
+                    fn (EcliseMarkup $rule): int => (int) $rule->id,
+                ])
+                ->first();
+
+            if ($rangeRule) {
+                return $rangeRule;
+            }
         }
 
         return $rules
             ->where('scope_type', EcliseMarkup::SCOPE_ALL)
-            ->where('category_id', null)
             ->sortBy([
                 fn (EcliseMarkup $rule): int => -1 * (int) $rule->priority,
                 fn (EcliseMarkup $rule): int => (int) $rule->id,
@@ -85,30 +93,40 @@ class MobileSentrixMarkupService
 
     public function categoryOptions(string $itemType): Collection
     {
+        return collect();
+    }
+
+    public function brandOptions(string $itemType): Collection
+    {
         return match ($itemType) {
-            EcliseMarkup::ITEM_TYPE_PARTS => PartCategory::query()
-                ->active()
-                ->orderBy('level')
-                ->orderBy('name')
-                ->get(['id', 'name', 'parent_id', 'level'])
-                ->map(fn (PartCategory $category): array => [
-                    'id' => (int) $category->id,
-                    'label' => $this->partCategoryLabel($category),
-                ])
-                ->values(),
-            EcliseMarkup::ITEM_TYPE_PRE_OWNED_DEVICES => MobileSentrixDevice::query()
-                ->whereNotNull('raw_payload')
-                ->get(['raw_payload'])
-                ->flatMap(fn (MobileSentrixDevice $device): array => $this->deviceCategoryIds($device))
-                ->unique()
-                ->sort()
-                ->values()
-                ->map(fn (int $categoryId): array => [
-                    'id' => $categoryId,
-                    'label' => 'MobileSentrix Category #'.$categoryId,
-                ]),
+            EcliseMarkup::ITEM_TYPE_PARTS => $this->sourceBrands(Part::query()),
+            EcliseMarkup::ITEM_TYPE_PRE_OWNED_DEVICES => $this->sourceBrands(MobileSentrixDevice::query()),
             default => collect(),
         };
+    }
+
+    public function priceBounds(string $itemType): array
+    {
+        $query = match ($itemType) {
+            EcliseMarkup::ITEM_TYPE_PARTS => Part::query(),
+            EcliseMarkup::ITEM_TYPE_PRE_OWNED_DEVICES => MobileSentrixDevice::query(),
+            default => null,
+        };
+
+        if (! $query) {
+            return ['min' => null, 'max' => null];
+        }
+
+        $expression = $this->sourcePriceExpression($itemType);
+        $row = $query
+            ->whereRaw($expression.' IS NOT NULL')
+            ->selectRaw('MIN('.$expression.') as min_price, MAX('.$expression.') as max_price')
+            ->first();
+
+        return [
+            'min' => $row?->min_price !== null ? round((float) $row->min_price, 2) : null,
+            'max' => $row?->max_price !== null ? round((float) $row->max_price, 2) : null,
+        ];
     }
 
     public function refreshSummary(): array
@@ -123,13 +141,13 @@ class MobileSentrixMarkupService
         ];
     }
 
-    private function calculate(string $itemType, array $categoryIds, ?float $basePrice): MarkupPriceResult
+    private function calculate(string $itemType, ?string $manufacturerText, ?float $basePrice): MarkupPriceResult
     {
         if (! array_key_exists($itemType, EcliseMarkup::ITEM_TYPES) || $basePrice === null) {
             return new MarkupPriceResult($basePrice, null, 0.0, 0.0, $basePrice, null, null);
         }
 
-        $rule = $this->resolveMarkupRule($itemType, $categoryIds);
+        $rule = $this->resolveMarkupRule($itemType, $manufacturerText, $basePrice);
 
         if (! $rule) {
             return new MarkupPriceResult($basePrice, null, 0.0, 0.0, round($basePrice, 2), null, null);
@@ -194,71 +212,29 @@ class MobileSentrixMarkupService
         return null;
     }
 
-    private function partCategoryIds(Part $part): array
+    private function sourceBrands(Builder $query): Collection
     {
-        $ids = collect($part->category_ids ?: []);
-
-        if ($part->relationLoaded('categories')) {
-            $ids = $ids->merge($part->categories->pluck('id'));
-        } else {
-            $ids = $ids->merge($part->categories()->pluck('part_categories.id'));
-        }
-
-        return $ids
-            ->map(fn ($id): int => (int) $id)
-            ->filter(fn (int $id): bool => $id > 0)
-            ->unique()
-            ->values()
-            ->all();
+        return $query
+            ->whereNotNull('manufacturer_text')
+            ->pluck('manufacturer_text')
+            ->map(fn ($brand): string => trim((string) $brand))
+            ->filter(fn (string $brand): bool => $brand !== '')
+            ->groupBy(fn (string $brand): string => EcliseMarkup::normalizeBrand($brand) ?? $brand)
+            ->map(fn (Collection $brands): string => $brands->sortBy(fn (string $brand): string => mb_strtolower($brand))->first())
+            ->sortBy(fn (string $brand): string => mb_strtolower($brand))
+            ->map(fn (string $brand): array => [
+                'value' => $brand,
+                'label' => $brand,
+            ])
+            ->values();
     }
 
-    private function deviceCategoryIds(MobileSentrixDevice $device): array
+    private function sourcePriceExpression(string $itemType): string
     {
-        return collect([
-            data_get($device->raw_payload, 'category_id'),
-            data_get($device->raw_payload, 'category_ids'),
-            data_get($device->raw_payload, 'categories'),
-            data_get($device->raw_payload, 'category'),
-            data_get($device->raw_payload, 'product.category_id'),
-            data_get($device->raw_payload, 'product.category_ids'),
-        ])
-            ->flatten()
-            ->map(function ($value): ?int {
-                if (is_array($value)) {
-                    $value = $value['id'] ?? $value['category_id'] ?? null;
-                }
-
-                return is_numeric($value) ? (int) $value : null;
-            })
-            ->filter(fn (?int $id): bool => $id !== null && $id > 0)
-            ->unique()
-            ->values()
-            ->all();
-    }
-
-    private function categoryDepths(array $categoryIds): array
-    {
-        if ($categoryIds === []) {
-            return [];
-        }
-
-        return PartCategory::query()
-            ->whereIn('id', $categoryIds)
-            ->pluck('level', 'id')
-            ->map(fn ($level): int => (int) $level)
-            ->all();
-    }
-
-    private function partCategoryLabel(PartCategory $category): string
-    {
-        $labels = collect([$category->name]);
-        $parent = $category->parentCategory;
-
-        while ($parent) {
-            $labels->prepend($parent->name);
-            $parent = $parent->parentCategory;
-        }
-
-        return $labels->implode(' > ');
+        return match ($itemType) {
+            EcliseMarkup::ITEM_TYPE_PARTS => 'COALESCE(api_price, price, customer_price, final_price_without_tax, regular_price_without_tax, cost_price)',
+            EcliseMarkup::ITEM_TYPE_PRE_OWNED_DEVICES => 'COALESCE(price, final_price, regular_price, cost)',
+            default => 'NULL',
+        };
     }
 }

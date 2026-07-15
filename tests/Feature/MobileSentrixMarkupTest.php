@@ -38,6 +38,7 @@ function markupPart(array $overrides = [], array $categoryIds = []): Part
         'sku' => 'MARKUP-PART-'.random_int(1000, 9999),
         'api_price' => 100,
         'price' => 100,
+        'manufacturer_text' => 'Apple',
         'cost_price' => 100,
         'quantity' => 3,
         'in_stock_qty' => 3,
@@ -108,41 +109,51 @@ test('global percentage and fixed markup calculate parts prices', function () {
     expect($service->calculatePartPrice($part)->selling_price)->toBe(115.0);
 });
 
-test('category markup overrides global markup for parts', function () {
-    $category = markupCategory(16490, 'Screens');
-    $part = markupPart([], [$category->id]);
+test('brand markup overrides price range and global markup for parts', function () {
+    $part = markupPart(['manufacturer_text' => ' apple ', 'api_price' => 120, 'price' => 120]);
 
     markupRule(['markup_type' => EcliseMarkup::MARKUP_PERCENTAGE, 'markup_value' => 20]);
     markupRule([
-        'scope_type' => EcliseMarkup::SCOPE_CATEGORY,
-        'category_id' => $category->id,
+        'scope_type' => EcliseMarkup::SCOPE_PRICE_RANGE,
+        'min_price' => 100,
+        'max_price' => 150,
+        'markup_type' => EcliseMarkup::MARKUP_FIXED,
+        'markup_value' => 40,
+        'priority' => 10,
+    ]);
+    markupRule([
+        'scope_type' => EcliseMarkup::SCOPE_BRAND,
+        'brand_text' => 'Apple',
         'markup_type' => EcliseMarkup::MARKUP_FIXED,
         'markup_value' => 15,
-        'priority' => 5,
     ]);
 
     $result = app(MobileSentrixMarkupService::class)->calculatePartPrice($part);
 
-    expect($result->selling_price)->toBe(115.0)
-        ->and($result->applied_scope)->toBe(EcliseMarkup::SCOPE_CATEGORY);
+    expect($result->selling_price)->toBe(135.0)
+        ->and($result->applied_scope)->toBe(EcliseMarkup::SCOPE_BRAND);
 });
 
-test('multiple category rules use priority deterministically', function () {
-    $low = markupCategory(2001, 'Apple', null, 1);
-    $high = markupCategory(2002, 'iPhone 15', $low->id, 2);
-    $part = markupPart([], [$low->id, $high->id]);
+test('price range markup overrides global markup when brand does not match', function () {
+    $part = markupPart(['manufacturer_text' => 'Samsung', 'api_price' => 125, 'price' => 125]);
 
-    markupRule(['scope_type' => EcliseMarkup::SCOPE_CATEGORY, 'category_id' => $low->id, 'markup_type' => EcliseMarkup::MARKUP_FIXED, 'markup_value' => 5, 'priority' => 1]);
-    $winning = markupRule(['scope_type' => EcliseMarkup::SCOPE_CATEGORY, 'category_id' => $high->id, 'markup_type' => EcliseMarkup::MARKUP_FIXED, 'markup_value' => 25, 'priority' => 10]);
+    markupRule(['markup_type' => EcliseMarkup::MARKUP_PERCENTAGE, 'markup_value' => 20]);
+    $winning = markupRule([
+        'scope_type' => EcliseMarkup::SCOPE_PRICE_RANGE,
+        'min_price' => 100,
+        'max_price' => 150,
+        'markup_type' => EcliseMarkup::MARKUP_FIXED,
+        'markup_value' => 25,
+    ]);
 
     $result = app(MobileSentrixMarkupService::class)->calculatePartPrice($part);
 
-    expect($result->selling_price)->toBe(125.0)
+    expect($result->selling_price)->toBe(150.0)
         ->and($result->applied_rule_id)->toBe($winning->id);
 });
 
-test('pre owned devices use global and category markup rules', function () {
-    $device = markupDevice(['raw_payload' => ['category_ids' => [123]]]);
+test('pre owned devices use global brand and price range markup rules', function () {
+    $device = markupDevice(['manufacturer_text' => 'Samsung', 'price' => 100]);
 
     markupRule(['item_type' => EcliseMarkup::ITEM_TYPE_PRE_OWNED_DEVICES, 'markup_type' => EcliseMarkup::MARKUP_FIXED, 'markup_value' => 50]);
     expect(app(MobileSentrixMarkupService::class)->calculatePreOwnedDevicePrice($device)->selling_price)->toBe(150.0);
@@ -150,13 +161,25 @@ test('pre owned devices use global and category markup rules', function () {
     EcliseMarkup::query()->get()->each->delete();
     markupRule([
         'item_type' => EcliseMarkup::ITEM_TYPE_PRE_OWNED_DEVICES,
-        'scope_type' => EcliseMarkup::SCOPE_CATEGORY,
-        'category_id' => 123,
+        'scope_type' => EcliseMarkup::SCOPE_PRICE_RANGE,
+        'min_price' => 75,
+        'max_price' => 125,
         'markup_type' => EcliseMarkup::MARKUP_PERCENTAGE,
         'markup_value' => 12.5,
     ]);
 
     expect(app(MobileSentrixMarkupService::class)->calculatePreOwnedDevicePrice($device)->selling_price)->toBe(112.5);
+
+    EcliseMarkup::query()->get()->each->delete();
+    markupRule([
+        'item_type' => EcliseMarkup::ITEM_TYPE_PRE_OWNED_DEVICES,
+        'scope_type' => EcliseMarkup::SCOPE_BRAND,
+        'brand_text' => ' samsung ',
+        'markup_type' => EcliseMarkup::MARKUP_FIXED,
+        'markup_value' => 30,
+    ]);
+
+    expect(app(MobileSentrixMarkupService::class)->calculatePreOwnedDevicePrice($device)->selling_price)->toBe(130.0);
 });
 
 test('inactive rules are ignored and invalid prices are handled', function () {
@@ -246,7 +269,8 @@ test('admin can manage mobilesentrix markup rules', function () {
     $this->actingAs($admin)
         ->post(route('admin.mobilesentrix-markups.store'), [
             'item_type' => EcliseMarkup::ITEM_TYPE_PARTS,
-            'scope_type' => EcliseMarkup::SCOPE_ALL,
+            'scope_type' => EcliseMarkup::SCOPE_BRAND,
+            'brand_text' => 'Apple',
             'markup_type' => EcliseMarkup::MARKUP_PERCENTAGE,
             'markup_value' => 20,
             'priority' => 1,
@@ -255,6 +279,78 @@ test('admin can manage mobilesentrix markup rules', function () {
         ->assertRedirect(route('admin.mobilesentrix-markups.index'));
 
     expect(EcliseMarkup::query()->count())->toBe(1);
+});
+
+test('active all and brand markup rules cannot be duplicated per source', function () {
+    $admin = markupUser('markup-duplicates-admin@example.com', 'admin');
+
+    markupRule(['item_type' => EcliseMarkup::ITEM_TYPE_PARTS, 'scope_type' => EcliseMarkup::SCOPE_ALL]);
+
+    $this->actingAs($admin)
+        ->post(route('admin.mobilesentrix-markups.store'), [
+            'item_type' => EcliseMarkup::ITEM_TYPE_PARTS,
+            'scope_type' => EcliseMarkup::SCOPE_ALL,
+            'markup_type' => EcliseMarkup::MARKUP_FIXED,
+            'markup_value' => 5,
+            'priority' => 0,
+            'is_active' => 1,
+        ])
+        ->assertSessionHasErrors('item_type');
+
+    markupRule([
+        'item_type' => EcliseMarkup::ITEM_TYPE_PRE_OWNED_DEVICES,
+        'scope_type' => EcliseMarkup::SCOPE_BRAND,
+        'brand_text' => 'Apple',
+    ]);
+
+    $this->actingAs($admin)
+        ->post(route('admin.mobilesentrix-markups.store'), [
+            'item_type' => EcliseMarkup::ITEM_TYPE_PRE_OWNED_DEVICES,
+            'scope_type' => EcliseMarkup::SCOPE_BRAND,
+            'brand_text' => ' apple ',
+            'markup_type' => EcliseMarkup::MARKUP_FIXED,
+            'markup_value' => 5,
+            'priority' => 0,
+            'is_active' => 1,
+        ])
+        ->assertSessionHasErrors('item_type');
+});
+
+test('active price range markup rules cannot overlap within the same source', function () {
+    $admin = markupUser('markup-range-admin@example.com', 'admin');
+
+    markupRule([
+        'item_type' => EcliseMarkup::ITEM_TYPE_PARTS,
+        'scope_type' => EcliseMarkup::SCOPE_PRICE_RANGE,
+        'min_price' => 10,
+        'max_price' => 50,
+    ]);
+
+    $this->actingAs($admin)
+        ->post(route('admin.mobilesentrix-markups.store'), [
+            'item_type' => EcliseMarkup::ITEM_TYPE_PARTS,
+            'scope_type' => EcliseMarkup::SCOPE_PRICE_RANGE,
+            'min_price' => 50,
+            'max_price' => 75,
+            'markup_type' => EcliseMarkup::MARKUP_PERCENTAGE,
+            'markup_value' => 10,
+            'priority' => 0,
+            'is_active' => 1,
+        ])
+        ->assertSessionHasErrors('min_price');
+
+    $this->actingAs($admin)
+        ->post(route('admin.mobilesentrix-markups.store'), [
+            'item_type' => EcliseMarkup::ITEM_TYPE_PRE_OWNED_DEVICES,
+            'scope_type' => EcliseMarkup::SCOPE_PRICE_RANGE,
+            'min_price' => 50,
+            'max_price' => 75,
+            'markup_type' => EcliseMarkup::MARKUP_PERCENTAGE,
+            'markup_value' => 10,
+            'priority' => 0,
+            'is_active' => 1,
+        ])
+        ->assertRedirect(route('admin.mobilesentrix-markups.index'));
 });
 
 test('admin markup refresh reports rule counts without changing source prices', function () {

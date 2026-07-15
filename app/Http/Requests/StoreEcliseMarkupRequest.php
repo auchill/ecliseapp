@@ -16,8 +16,14 @@ class StoreEcliseMarkupRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        $scope = $this->input('scope_type');
+
         $this->merge([
-            'category_id' => $this->input('scope_type') === EcliseMarkup::SCOPE_ALL ? null : $this->input('category_id'),
+            'category_id' => null,
+            'brand_text' => $scope === EcliseMarkup::SCOPE_BRAND ? trim((string) $this->input('brand_text')) : null,
+            'brand_normalized' => $scope === EcliseMarkup::SCOPE_BRAND ? EcliseMarkup::normalizeBrand($this->input('brand_text')) : null,
+            'min_price' => $scope === EcliseMarkup::SCOPE_PRICE_RANGE ? $this->input('min_price') : null,
+            'max_price' => $scope === EcliseMarkup::SCOPE_PRICE_RANGE ? $this->input('max_price') : null,
             'is_active' => $this->boolean('is_active'),
         ]);
     }
@@ -27,12 +33,11 @@ class StoreEcliseMarkupRequest extends FormRequest
         return [
             'item_type' => ['required', Rule::in(array_keys(EcliseMarkup::ITEM_TYPES))],
             'scope_type' => ['required', Rule::in(array_keys(EcliseMarkup::SCOPE_TYPES))],
-            'category_id' => [
-                Rule::requiredIf(fn (): bool => $this->input('scope_type') === EcliseMarkup::SCOPE_CATEGORY),
-                'nullable',
-                'integer',
-                'min:1',
-            ],
+            'category_id' => ['nullable'],
+            'brand_text' => [Rule::requiredIf(fn (): bool => $this->input('scope_type') === EcliseMarkup::SCOPE_BRAND), 'nullable', 'string', 'max:255'],
+            'brand_normalized' => ['nullable', 'string', 'max:255'],
+            'min_price' => [Rule::requiredIf(fn (): bool => $this->input('scope_type') === EcliseMarkup::SCOPE_PRICE_RANGE), 'nullable', 'numeric', 'min:0'],
+            'max_price' => [Rule::requiredIf(fn (): bool => $this->input('scope_type') === EcliseMarkup::SCOPE_PRICE_RANGE), 'nullable', 'numeric', 'min:0', 'gte:min_price'],
             'markup_type' => ['required', Rule::in(array_keys(EcliseMarkup::MARKUP_TYPES))],
             'markup_value' => ['required', 'numeric', 'min:0'],
             'priority' => ['required', 'integer', 'min:0'],
@@ -49,20 +54,37 @@ class StoreEcliseMarkupRequest extends FormRequest
                 }
 
                 $markup = $this->route('ecliseMarkup');
-                $duplicate = EcliseMarkup::query()
+                $query = EcliseMarkup::query()
                     ->whereKeyNot($markup?->id ?: 0)
                     ->where('is_active', true)
                     ->where('item_type', $this->input('item_type'))
-                    ->where('scope_type', $this->input('scope_type'))
-                    ->when(
-                        $this->input('category_id'),
-                        fn ($query) => $query->where('category_id', (int) $this->input('category_id')),
-                        fn ($query) => $query->whereNull('category_id'),
-                    )
-                    ->exists();
+                    ->where('scope_type', $this->input('scope_type'));
+
+                $duplicate = match ($this->input('scope_type')) {
+                    EcliseMarkup::SCOPE_ALL => $query->exists(),
+                    EcliseMarkup::SCOPE_BRAND => $query->where('brand_normalized', $this->input('brand_normalized'))->exists(),
+                    default => false,
+                };
 
                 if ($duplicate) {
-                    $validator->errors()->add('item_type', 'An active markup rule already exists for this inventory type, scope, and category.');
+                    $validator->errors()->add('item_type', 'An active markup rule already exists for this source and condition.');
+                }
+
+                if ($this->input('scope_type') !== EcliseMarkup::SCOPE_PRICE_RANGE) {
+                    return;
+                }
+
+                $overlap = EcliseMarkup::query()
+                    ->whereKeyNot($markup?->id ?: 0)
+                    ->where('is_active', true)
+                    ->where('item_type', $this->input('item_type'))
+                    ->where('scope_type', EcliseMarkup::SCOPE_PRICE_RANGE)
+                    ->where('min_price', '<=', (float) $this->input('max_price'))
+                    ->where('max_price', '>=', (float) $this->input('min_price'))
+                    ->exists();
+
+                if ($overlap) {
+                    $validator->errors()->add('min_price', 'This active price range overlaps another active range for the selected source.');
                 }
             },
         ];

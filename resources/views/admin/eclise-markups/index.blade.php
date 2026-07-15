@@ -22,7 +22,7 @@
             <form class="surface p-4 mb-4" method="GET" action="{{ route('admin.mobilesentrix-markups.index') }}">
                 <div class="row g-3 align-items-end">
                     <div class="col-md-3">
-                        <label class="form-label" for="item_type">Inventory Type</label>
+                        <label class="form-label" for="item_type">Source</label>
                         <select class="form-select" id="item_type" name="item_type">
                             <option value="">All</option>
                             @foreach (\App\Models\EcliseMarkup::ITEM_TYPES as $value => $label)
@@ -31,7 +31,7 @@
                         </select>
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label" for="scope_type">Scope</label>
+                        <label class="form-label" for="scope_type">Applies To</label>
                         <select class="form-select" id="scope_type" name="scope_type">
                             <option value="">All</option>
                             @foreach (\App\Models\EcliseMarkup::SCOPE_TYPES as $value => $label)
@@ -60,8 +60,8 @@
                         <table class="table align-middle">
                             <thead>
                                 <tr>
-                                    <th>Scope</th>
-                                    <th>MobileSentrix Category</th>
+                                    <th>Rule Type</th>
+                                    <th>Applies To</th>
                                     <th>Markup</th>
                                     <th>Priority</th>
                                     <th>Status</th>
@@ -73,7 +73,7 @@
                                 @forelse ($markups->where('item_type', $itemType) as $markup)
                                     <tr>
                                         <td>{{ $markup->scopeTypeLabel() }}</td>
-                                        <td>{{ $markup->category_id ? ($categoryLabels[$markup->item_type][$markup->category_id] ?? 'MobileSentrix Category #'.$markup->category_id) : 'All '.$itemLabel }}</td>
+                                        <td>{{ $markup->appliesToLabel() }}</td>
                                         <td>
                                             {{ $markup->markupTypeLabel() }}
                                             <div class="small muted">

@@ -12,6 +12,7 @@ use App\Models\Order;
 use App\Models\Payment;
 use App\Models\Product;
 use App\Models\Repair;
+use App\Models\RepairConversation;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -348,6 +349,32 @@ class PaymentFinalizer
             'note' => 'Payment confirmed through '.$payment->gatewayLabel().'.',
             'is_customer_visible' => true,
         ]);
+
+        $conversationId = (int) data_get($payment->checkout_data, 'conversation_id');
+        $conversation = $conversationId > 0
+            ? RepairConversation::query()->where('repair_id', $repair->id)->find($conversationId)
+            : $repair->repairConversation;
+
+        if ($conversation && $paymentStatus === 'paid') {
+            $conversation->update(['status' => RepairConversation::STATUS_PAID]);
+            $conversation->messages()->create([
+                'sender_type' => 'system',
+                'sender_id' => null,
+                'message_type' => 'payment',
+                'message' => 'Payment was received for the accepted repair proposal.',
+                'is_internal' => false,
+            ]);
+            $conversation->update(['last_message_at' => now()]);
+            $conversation->events()->create([
+                'actor_type' => 'system',
+                'actor_id' => null,
+                'event_type' => 'payment_paid',
+                'payload' => [
+                    'payment_id' => $payment->id,
+                    'amount' => $payment->amount,
+                ],
+            ]);
+        }
 
         $this->persistRepairShippingSnapshot($repair, $payment);
     }

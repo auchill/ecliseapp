@@ -19,13 +19,13 @@ class EcliseMarkupController extends Controller
             ->orderBy('item_type')
             ->orderBy('scope_type')
             ->orderByDesc('priority')
-            ->orderBy('category_id')
+            ->orderBy('brand_text')
+            ->orderBy('min_price')
             ->paginate(20)
             ->withQueryString();
 
         return view('admin.eclise-markups.index', [
             'markups' => $markups,
-            'categoryLabels' => $this->categoryLabels($markupService),
         ]);
     }
 
@@ -40,7 +40,8 @@ class EcliseMarkupController extends Controller
                 'priority' => 0,
                 'is_active' => true,
             ]),
-            'categoryOptions' => $this->categoryOptions($markupService),
+            'brandOptions' => $this->brandOptions($markupService),
+            'priceBounds' => $this->priceBounds($markupService),
         ]);
     }
 
@@ -55,7 +56,8 @@ class EcliseMarkupController extends Controller
     {
         return view('admin.eclise-markups.form', [
             'markup' => $ecliseMarkup,
-            'categoryOptions' => $this->categoryOptions($markupService),
+            'brandOptions' => $this->brandOptions($markupService),
+            'priceBounds' => $this->priceBounds($markupService),
         ]);
     }
 
@@ -93,17 +95,17 @@ class EcliseMarkupController extends Controller
         );
     }
 
-    private function categoryOptions(MobileSentrixMarkupService $markupService): array
+    private function brandOptions(MobileSentrixMarkupService $markupService): array
     {
         return collect(array_keys(EcliseMarkup::ITEM_TYPES))
-            ->mapWithKeys(fn (string $itemType): array => [$itemType => $markupService->categoryOptions($itemType)->all()])
+            ->mapWithKeys(fn (string $itemType): array => [$itemType => $markupService->brandOptions($itemType)->all()])
             ->all();
     }
 
-    private function categoryLabels(MobileSentrixMarkupService $markupService): array
+    private function priceBounds(MobileSentrixMarkupService $markupService): array
     {
-        return collect($this->categoryOptions($markupService))
-            ->map(fn (array $options): array => collect($options)->mapWithKeys(fn (array $option): array => [(int) $option['id'] => $option['label']])->all())
+        return collect(array_keys(EcliseMarkup::ITEM_TYPES))
+            ->mapWithKeys(fn (string $itemType): array => [$itemType => $markupService->priceBounds($itemType)])
             ->all();
     }
 }

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Mail\RepairStatusUpdatedMail;
 use App\Models\Repair;
 use App\Services\AddressSnapshotFormatter;
+use App\Services\RepairNegotiationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
@@ -42,10 +43,20 @@ class RepairController extends Controller
         ]);
     }
 
-    public function show(Repair $repair)
+    public function show(Repair $repair, RepairNegotiationService $negotiation)
     {
+        $repair->load('customer', 'shipping', 'statusUpdates', 'latestPayment', 'quote', 'deviceType', 'deviceBrand', 'deviceModel', 'issueCategory');
+        $conversation = $repair->customer_id ? $negotiation->conversationForRepair($repair) : null;
+
+        $conversation?->load([
+            'partGroups.activeOptions',
+            'partGroups.selections.option',
+        ]);
+
         return view('admin.repairs.show', [
-            'repair' => $repair->load('customer', 'shipping', 'statusUpdates', 'latestPayment', 'quote', 'deviceType', 'deviceBrand', 'deviceModel', 'issueCategory'),
+            'repair' => $repair,
+            'conversation' => $conversation,
+            'conversationMessages' => $conversation?->messages()->oldest()->get() ?? collect(),
             'statuses' => Repair::STATUS_LABELS,
             'paymentStatuses' => Repair::PAYMENT_STATUSES,
             'fulfillmentMethods' => Repair::FULFILLMENT_METHODS,

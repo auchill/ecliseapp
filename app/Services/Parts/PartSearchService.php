@@ -3,9 +3,11 @@
 namespace App\Services\Parts;
 
 use App\Models\Part;
+use App\Support\CatalogImage;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 class PartSearchService
 {
@@ -100,6 +102,30 @@ class PartSearchService
         )));
     }
 
+    public function repairProposalResults(string $term, int $limit = 10): Collection
+    {
+        $term = trim($term);
+
+        if (mb_strlen($term) < 2) {
+            return collect();
+        }
+
+        return $this->publicQuery(new Request(['q' => $term]))
+            ->orderByRaw('CASE WHEN sku = ? OR new_sku = ? THEN 0 ELSE 1 END', [$term, $term])
+            ->orderBy('name')
+            ->limit(max(1, min($limit, 20)))
+            ->get()
+            ->map(fn (Part $part): array => $this->proposalPayload($part))
+            ->values();
+    }
+
+    public function eligibleRepairPart(int $partId): ?Part
+    {
+        return $this->publicQuery(new Request)
+            ->whereKey($partId)
+            ->first();
+    }
+
     private function applyKeyword(Builder $query, string $search, bool $admin = false): void
     {
         $query->where(function (Builder $query) use ($search, $admin): void {
@@ -108,7 +134,9 @@ class PartSearchService
                 ->orWhere('new_sku', 'like', "%{$search}%")
                 ->orWhere('brand', 'like', "%{$search}%")
                 ->orWhere('manufacturer_text', 'like', "%{$search}%")
+                ->orWhere('model', 'like', "%{$search}%")
                 ->orWhere('model_compatibility', 'like', "%{$search}%")
+                ->orWhere('device_model_text', 'like', "%{$search}%")
                 ->orWhere('model_text', 'like', "%{$search}%")
                 ->orWhere('part_category', 'like', "%{$search}%")
                 ->orWhere('front_position_text', 'like', "%{$search}%")
@@ -212,5 +240,21 @@ class PartSearchService
                 'field' => 'model',
             ])
             ->all();
+    }
+
+    public function proposalPayload(Part $part): array
+    {
+        return [
+            'id' => (int) $part->id,
+            'name' => $part->name,
+            'sku' => $part->sku ?: $part->new_sku,
+            'model' => $part->modelName(),
+            'brand' => $part->brandName(),
+            'category' => $part->categoryName(),
+            'price' => number_format($part->displayPrice(), 2),
+            'price_value' => round($part->displayPrice(), 2),
+            'image_url' => $part->imageUrl(),
+            'fallback_image_url' => CatalogImage::fallbackUrl(),
+        ];
     }
 }

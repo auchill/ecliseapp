@@ -16,6 +16,7 @@ use App\Http\Controllers\Admin\ProductController as AdminProductController;
 use App\Http\Controllers\Admin\QuoteController as AdminQuoteController;
 use App\Http\Controllers\Admin\ReferenceController as AdminReferenceController;
 use App\Http\Controllers\Admin\RepairController as AdminRepairController;
+use App\Http\Controllers\Admin\RepairConversationController as AdminRepairConversationController;
 use App\Http\Controllers\Admin\ShippingDiscountRuleController as AdminShippingDiscountRuleController;
 use App\Http\Controllers\Admin\ShippingMethodController as AdminShippingMethodController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
@@ -33,6 +34,7 @@ use App\Http\Controllers\PaymentWebhookController;
 use App\Http\Controllers\PublicPageController;
 use App\Http\Controllers\QuoteController;
 use App\Http\Controllers\RepairController;
+use App\Http\Controllers\RepairConversationController;
 use App\Http\Controllers\ShopController;
 use Illuminate\Support\Facades\Route;
 
@@ -91,6 +93,12 @@ Route::middleware('auth')->post('/logout', [AuthController::class, 'logout'])->n
 Route::middleware(['auth', 'customer'])->group(function (): void {
     Route::get('/dashboard', [CustomerDashboardController::class, 'dashboard'])->name('dashboard');
     Route::get('/my-repairs', [CustomerDashboardController::class, 'repairs'])->name('customer.repairs');
+    Route::get('/my-repairs/{repair}/conversation', [RepairConversationController::class, 'showForRepair'])->whereNumber('repair')->name('repair-conversations.show-for-repair');
+    Route::get('/repair-conversations/{repairConversation}', [RepairConversationController::class, 'show'])->whereNumber('repairConversation')->name('repair-conversations.show');
+    Route::post('/repair-conversations/{repairConversation}/messages', [RepairConversationController::class, 'storeMessage'])->whereNumber('repairConversation')->name('repair-conversations.messages.store');
+    Route::post('/repair-conversations/{repairConversation}/part-selections', [RepairConversationController::class, 'selectPart'])->whereNumber('repairConversation')->name('repair-conversations.part-selections.store');
+    Route::post('/repair-conversations/{repairConversation}/accept', [RepairConversationController::class, 'accept'])->whereNumber('repairConversation')->name('repair-conversations.accept');
+    Route::post('/repair-conversations/{repairConversation}/payment', [RepairConversationController::class, 'payment'])->whereNumber('repairConversation')->middleware('no_admin_cart')->name('repair-conversations.payment');
     Route::get('/my-orders', [CustomerDashboardController::class, 'orders'])->name('customer.orders');
 });
 
@@ -120,6 +128,15 @@ Route::middleware('admin')->prefix('admin')->name('admin.')->group(function (): 
     Route::get('/repairs', [AdminRepairController::class, 'index'])->name('repairs.index');
     Route::get('/repairs/{repair}', [AdminRepairController::class, 'show'])->whereNumber('repair')->name('repairs.show');
     Route::patch('/repairs/{repair}', [AdminRepairController::class, 'update'])->whereNumber('repair')->name('repairs.update');
+    Route::post('/repairs/{repair}/conversation/messages', [AdminRepairConversationController::class, 'storeMessage'])->whereNumber('repair')->name('repairs.conversation.messages.store');
+    Route::patch('/repairs/{repair}/conversation/charges', [AdminRepairConversationController::class, 'updateCharges'])->whereNumber('repair')->name('repairs.conversation.charges.update');
+    Route::post('/repairs/{repair}/conversation/part-groups', [AdminRepairConversationController::class, 'storePartGroup'])->whereNumber('repair')->name('repairs.conversation.part-groups.store');
+    Route::get('/repairs/{repair}/conversation/part-search', [AdminRepairConversationController::class, 'partSearch'])->whereNumber('repair')->name('repairs.conversation.part-search');
+    Route::post('/repairs/{repair}/conversation/part-groups/{repairPartGroup}/options', [AdminRepairConversationController::class, 'storePartOption'])->whereNumber('repair')->whereNumber('repairPartGroup')->name('repairs.conversation.part-options.store');
+    Route::patch('/repairs/{repair}/conversation/part-options/{repairPartOption}/primary', [AdminRepairConversationController::class, 'markPrimary'])->whereNumber('repair')->whereNumber('repairPartOption')->name('repairs.conversation.part-options.primary');
+    Route::delete('/repairs/{repair}/conversation/part-options/{repairPartOption}', [AdminRepairConversationController::class, 'destroyPartOption'])->whereNumber('repair')->whereNumber('repairPartOption')->name('repairs.conversation.part-options.destroy');
+    Route::post('/repairs/{repair}/conversation/proposal', [AdminRepairConversationController::class, 'sendProposal'])->whereNumber('repair')->name('repairs.conversation.proposal.store');
+    Route::patch('/repairs/conversations/{repairConversation}/close', [AdminRepairConversationController::class, 'close'])->whereNumber('repairConversation')->name('repairs.conversation.close');
 
     foreach ([
         'repairs/device-types' => 'device-types',

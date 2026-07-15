@@ -187,6 +187,16 @@ class Repair extends Model
         return $this->morphOne(Payment::class, 'payable')->latestOfMany();
     }
 
+    public function repairConversation(): HasOne
+    {
+        return $this->hasOne(RepairConversation::class);
+    }
+
+    public function negotiation(): HasOne
+    {
+        return $this->repairConversation();
+    }
+
     public function deviceLabel(): string
     {
         return trim(implode(' ', array_filter([
@@ -270,6 +280,17 @@ class Repair extends Model
 
     public function canCustomerPay(): bool
     {
+        $conversation = $this->relationLoaded('repairConversation')
+            ? $this->repairConversation
+            : $this->repairConversation()->first();
+
+        if ($conversation) {
+            return $conversation->isPayable()
+                && ! in_array($this->repair_status ?: $this->status, ['cancelled', 'completed'], true)
+                && $this->payment_status !== 'paid'
+                && $this->currentBalanceDue() > 0;
+        }
+
         return ! in_array($this->repair_status ?: $this->status, ['cancelled', 'completed'], true)
             && $this->payment_status !== 'paid'
             && $this->currentBalanceDue() > 0;

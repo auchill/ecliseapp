@@ -22,6 +22,7 @@
                                 <th>Issue</th>
                                 <th>Status</th>
                                 <th>Estimated Completion</th>
+                                <th></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -32,9 +33,12 @@
                                     <td>{{ $repair->issueCategoryName() }}</td>
                                     <td><span class="status-pill">{{ $repair->statusLabel() }}</span></td>
                                     <td>{{ $repair->estimated_completion_date?->format('M j, Y') ?? 'To be confirmed' }}</td>
+                                    <td class="text-end">
+                                        <a class="btn btn-outline-primary btn-sm" href="{{ route('repair-conversations.show-for-repair', $repair) }}">Proposal</a>
+                                    </td>
                                 </tr>
                             @empty
-                                <tr><td colspan="5">No repairs found.</td></tr>
+                                <tr><td colspan="6">No repairs found.</td></tr>
                             @endforelse
                         </tbody>
                     </table>

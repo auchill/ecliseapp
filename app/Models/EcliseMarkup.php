@@ -20,6 +20,10 @@ class EcliseMarkup extends Model
 
     public const SCOPE_CATEGORY = 'category';
 
+    public const SCOPE_BRAND = 'brand';
+
+    public const SCOPE_PRICE_RANGE = 'price_range';
+
     public const MARKUP_PERCENTAGE = 'percentage';
 
     public const MARKUP_FIXED = 'fixed';
@@ -31,7 +35,12 @@ class EcliseMarkup extends Model
 
     public const SCOPE_TYPES = [
         self::SCOPE_ALL => 'All',
-        self::SCOPE_CATEGORY => 'Category',
+        self::SCOPE_BRAND => 'Brand',
+        self::SCOPE_PRICE_RANGE => 'Price Range',
+    ];
+
+    public const LEGACY_SCOPE_TYPES = [
+        self::SCOPE_CATEGORY => 'Legacy Category',
     ];
 
     public const MARKUP_TYPES = [
@@ -45,6 +54,10 @@ class EcliseMarkup extends Model
         'item_type',
         'scope_type',
         'category_id',
+        'brand_text',
+        'brand_normalized',
+        'min_price',
+        'max_price',
         'markup_type',
         'markup_value',
         'is_active',
@@ -55,6 +68,8 @@ class EcliseMarkup extends Model
     {
         return [
             'category_id' => 'integer',
+            'min_price' => 'decimal:2',
+            'max_price' => 'decimal:2',
             'markup_value' => 'decimal:2',
             'is_active' => 'boolean',
             'priority' => 'integer',
@@ -68,7 +83,7 @@ class EcliseMarkup extends Model
                 throw new InvalidArgumentException('Unsupported MobileSentrix markup item type.');
             }
 
-            if (! array_key_exists($markup->scope_type, self::SCOPE_TYPES)) {
+            if (! array_key_exists($markup->scope_type, self::scopeTypeLabels())) {
                 throw new InvalidArgumentException('Unsupported MobileSentrix markup scope type.');
             }
 
@@ -82,14 +97,48 @@ class EcliseMarkup extends Model
 
             if ($markup->scope_type === self::SCOPE_ALL) {
                 $markup->category_id = null;
+                $markup->brand_text = null;
+                $markup->brand_normalized = null;
+                $markup->min_price = null;
+                $markup->max_price = null;
             }
 
-            if ($markup->scope_type === self::SCOPE_CATEGORY && ! $markup->category_id) {
-                throw new InvalidArgumentException('A MobileSentrix category is required for category markup.');
+            if ($markup->scope_type === self::SCOPE_BRAND) {
+                $markup->category_id = null;
+                $markup->min_price = null;
+                $markup->max_price = null;
+                $markup->brand_text = trim((string) $markup->brand_text);
+                $markup->brand_normalized = self::normalizeBrand($markup->brand_text);
+
+                if (! $markup->brand_normalized) {
+                    throw new InvalidArgumentException('A MobileSentrix manufacturer is required for brand markup.');
+                }
+            }
+
+            if ($markup->scope_type === self::SCOPE_PRICE_RANGE) {
+                $markup->category_id = null;
+                $markup->brand_text = null;
+                $markup->brand_normalized = null;
+
+                if ($markup->min_price === null || $markup->max_price === null) {
+                    throw new InvalidArgumentException('Minimum and maximum prices are required for price range markup.');
+                }
+
+                if ((float) $markup->min_price > (float) $markup->max_price) {
+                    throw new InvalidArgumentException('Minimum price cannot be greater than maximum price.');
+                }
+            }
+
+            if ($markup->scope_type === self::SCOPE_CATEGORY && $markup->is_active) {
+                throw new InvalidArgumentException('Category markup rules are no longer supported as active MobileSentrix markup conditions.');
             }
 
             if ($markup->is_active && $markup->activeDuplicateExists()) {
-                throw new InvalidArgumentException('An active markup rule already exists for this item type, scope, and category.');
+                throw new InvalidArgumentException('An active markup rule already exists for this source and condition.');
+            }
+
+            if ($markup->is_active && $markup->overlappingRangeExists()) {
+                throw new InvalidArgumentException('An active price range markup rule overlaps another active range for this source.');
             }
         });
 
@@ -109,7 +158,7 @@ class EcliseMarkup extends Model
 
     public function scopeTypeLabel(): string
     {
-        return self::SCOPE_TYPES[$this->scope_type] ?? $this->scope_type;
+        return self::scopeTypeLabels()[$this->scope_type] ?? $this->scope_type;
     }
 
     public function markupTypeLabel(): string
@@ -119,16 +168,55 @@ class EcliseMarkup extends Model
 
     public function activeDuplicateExists(): bool
     {
+        if (! in_array($this->scope_type, [self::SCOPE_ALL, self::SCOPE_BRAND], true)) {
+            return false;
+        }
+
         return self::query()
             ->whereKeyNot($this->getKey() ?: 0)
             ->where('is_active', true)
             ->where('item_type', $this->item_type)
             ->where('scope_type', $this->scope_type)
-            ->when(
-                $this->category_id,
-                fn (Builder $query): Builder => $query->where('category_id', $this->category_id),
-                fn (Builder $query): Builder => $query->whereNull('category_id'),
-            )
+            ->when($this->scope_type === self::SCOPE_BRAND, fn (Builder $query): Builder => $query->where('brand_normalized', $this->brand_normalized))
             ->exists();
+    }
+
+    public function overlappingRangeExists(): bool
+    {
+        if ($this->scope_type !== self::SCOPE_PRICE_RANGE || $this->min_price === null || $this->max_price === null) {
+            return false;
+        }
+
+        return self::query()
+            ->whereKeyNot($this->getKey() ?: 0)
+            ->where('is_active', true)
+            ->where('item_type', $this->item_type)
+            ->where('scope_type', self::SCOPE_PRICE_RANGE)
+            ->where('min_price', '<=', (float) $this->max_price)
+            ->where('max_price', '>=', (float) $this->min_price)
+            ->exists();
+    }
+
+    public function appliesToLabel(): string
+    {
+        return match ($this->scope_type) {
+            self::SCOPE_BRAND => $this->brand_text ?: 'Brand',
+            self::SCOPE_PRICE_RANGE => '$'.number_format((float) $this->min_price, 2).' - $'.number_format((float) $this->max_price, 2),
+            self::SCOPE_CATEGORY => $this->category_id ? 'Legacy category #'.$this->category_id : 'Legacy category',
+            default => 'All '.$this->itemTypeLabel(),
+        };
+    }
+
+    public static function normalizeBrand(?string $brand): ?string
+    {
+        $normalized = mb_strtolower(trim((string) $brand));
+        $normalized = preg_replace('/\s+/', ' ', $normalized) ?: '';
+
+        return $normalized === '' ? null : $normalized;
+    }
+
+    public static function scopeTypeLabels(): array
+    {
+        return self::SCOPE_TYPES + self::LEGACY_SCOPE_TYPES;
     }
 }

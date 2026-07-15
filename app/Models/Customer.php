@@ -56,6 +56,11 @@ class Customer extends Model
         return $this->hasMany(Repair::class);
     }
 
+    public function repairConversations(): HasMany
+    {
+        return $this->hasMany(RepairConversation::class);
+    }
+
     public function carts(): HasMany
     {
         return $this->hasMany(Cart::class);

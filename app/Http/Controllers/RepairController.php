@@ -48,6 +48,10 @@ class RepairController extends Controller
         abort_if($request->user()?->isAdmin(), 403);
 
         $booking = $this->bookingForCustomer($repairNumber, $request);
+        if ($booking->repairConversation) {
+            return redirect()->route('repair-conversations.show', $booking->repairConversation);
+        }
+
         $baseSubtotal = (float) $booking->subtotal + (float) $booking->tax_amount;
         $shippingMethods = $shippingCosts->getAvailableShippingMethods();
         $shippingQuotes = $shippingMethods
@@ -74,6 +78,11 @@ class RepairController extends Controller
         abort_if($request->user()?->isAdmin(), 403);
 
         $booking = $this->bookingForCustomer($repairNumber, $request);
+
+        if ($booking->repairConversation) {
+            return redirect()->route('repair-conversations.show', $booking->repairConversation)
+                ->withErrors(['payment_gateway' => 'Please pay from the accepted repair proposal.']);
+        }
 
         abort_unless($booking->canCustomerPay(), 422, 'This repair is not available for payment.');
 

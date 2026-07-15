@@ -21,7 +21,7 @@
 
                 <div class="row g-3">
                     <div class="col-md-6">
-                        <label class="form-label" for="item_type">Inventory Type</label>
+                        <label class="form-label" for="item_type">Source</label>
                         <select class="form-select" id="item_type" name="item_type" data-markup-item-type required>
                             @foreach (\App\Models\EcliseMarkup::ITEM_TYPES as $value => $label)
                                 <option value="{{ $value }}" @selected(old('item_type', $markup->item_type) === $value)>{{ $label }}</option>
@@ -29,19 +29,31 @@
                         </select>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label" for="scope_type">Markup Scope</label>
+                        <label class="form-label" for="scope_type">Applies To</label>
                         <select class="form-select" id="scope_type" name="scope_type" data-markup-scope required>
                             @foreach (\App\Models\EcliseMarkup::SCOPE_TYPES as $value => $label)
                                 <option value="{{ $value }}" @selected(old('scope_type', $markup->scope_type) === $value)>{{ $label }}</option>
                             @endforeach
                         </select>
                     </div>
-                    <div class="col-12" data-markup-category-wrap>
-                        <label class="form-label" for="category_id">MobileSentrix Category</label>
-                        <select class="form-select" id="category_id" name="category_id" data-markup-category data-selected-category="{{ old('category_id', $markup->category_id) }}">
-                            <option value="">Choose category</option>
-                        </select>
-                        <div class="form-text">This list is built from MobileSentrix categories only, not Eclise Shop product categories.</div>
+                    <div class="col-12" data-markup-brand-wrap>
+                        <label class="form-label" for="brand_text">MobileSentrix Manufacturer</label>
+                        <input class="form-control" id="brand_text" name="brand_text" list="markup_brand_options" value="{{ old('brand_text', $markup->brand_text) }}" data-markup-brand data-selected-brand="{{ old('brand_text', $markup->brand_text) }}">
+                        <datalist id="markup_brand_options" data-markup-brand-list></datalist>
+                        <div class="form-text">Uses the MobileSentrix manufacturer_text field. Matching is case-insensitive and trim-insensitive.</div>
+                    </div>
+                    <div class="col-12" data-markup-range-wrap>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label" for="min_price">Minimum Source Price</label>
+                                <input class="form-control" id="min_price" name="min_price" type="number" min="0" step="0.01" value="{{ old('min_price', $markup->min_price) }}" data-markup-min-price>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="max_price">Maximum Source Price</label>
+                                <input class="form-control" id="max_price" name="max_price" type="number" min="0" step="0.01" value="{{ old('max_price', $markup->max_price) }}" data-markup-max-price>
+                            </div>
+                        </div>
+                        <div class="form-text" data-markup-bounds>Available source price range will be shown after choosing a source.</div>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label" for="markup_type">Markup Type</label>
@@ -83,36 +95,64 @@
 @push('scripts')
     <script>
         (() => {
-            const optionsByType = @json($categoryOptions);
+            const brandOptionsByType = @json($brandOptions);
+            const priceBoundsByType = @json($priceBounds);
             const itemType = document.querySelector('[data-markup-item-type]');
             const scope = document.querySelector('[data-markup-scope]');
-            const categoryWrap = document.querySelector('[data-markup-category-wrap]');
-            const category = document.querySelector('[data-markup-category]');
+            const brandWrap = document.querySelector('[data-markup-brand-wrap]');
+            const brand = document.querySelector('[data-markup-brand]');
+            const brandList = document.querySelector('[data-markup-brand-list]');
+            const rangeWrap = document.querySelector('[data-markup-range-wrap]');
+            const minPrice = document.querySelector('[data-markup-min-price]');
+            const maxPrice = document.querySelector('[data-markup-max-price]');
+            const bounds = document.querySelector('[data-markup-bounds]');
             const markupType = document.querySelector('[data-markup-type]');
             const markupValue = document.querySelector('[data-markup-value]');
             const previewPrice = document.querySelector('[data-markup-preview-price]');
 
-            if (!itemType || !scope || !category || !categoryWrap || !markupType || !markupValue || !previewPrice) return;
+            if (!itemType || !scope || !brand || !brandWrap || !brandList || !rangeWrap || !minPrice || !maxPrice || !markupType || !markupValue || !previewPrice) return;
 
-            const selectedCategory = category.dataset.selectedCategory || '';
+            const selectedBrand = brand.dataset.selectedBrand || '';
 
-            const syncCategories = () => {
-                const options = optionsByType[itemType.value] || [];
-                category.innerHTML = '<option value="">Choose category</option>';
+            const syncBrands = () => {
+                const options = brandOptionsByType[itemType.value] || [];
+                brandList.innerHTML = '';
                 options.forEach((option) => {
                     const element = document.createElement('option');
-                    element.value = option.id;
-                    element.textContent = option.label;
-                    if (String(option.id) === String(selectedCategory)) element.selected = true;
-                    category.appendChild(element);
+                    element.value = option.value;
+                    element.label = option.label;
+                    brandList.appendChild(element);
                 });
+                if (!brand.value && selectedBrand) brand.value = selectedBrand;
+            };
+
+            const syncBounds = () => {
+                const range = priceBoundsByType[itemType.value] || {};
+                if (range.min !== null && range.min !== undefined && range.max !== null && range.max !== undefined) {
+                    minPrice.min = range.min;
+                    maxPrice.min = range.min;
+                    maxPrice.max = range.max;
+                    bounds.textContent = `Current ${itemType.options[itemType.selectedIndex].text} source price range: $${Number(range.min).toFixed(2)} - $${Number(range.max).toFixed(2)}.`;
+                } else {
+                    minPrice.removeAttribute('min');
+                    maxPrice.removeAttribute('max');
+                    bounds.textContent = 'No source price range is available yet for this source.';
+                }
             };
 
             const syncScope = () => {
-                const categoryMode = scope.value === 'category';
-                categoryWrap.classList.toggle('d-none', !categoryMode);
-                category.required = categoryMode;
-                if (!categoryMode) category.value = '';
+                const brandMode = scope.value === 'brand';
+                const rangeMode = scope.value === 'price_range';
+                brandWrap.classList.toggle('d-none', !brandMode);
+                rangeWrap.classList.toggle('d-none', !rangeMode);
+                brand.required = brandMode;
+                minPrice.required = rangeMode;
+                maxPrice.required = rangeMode;
+                if (!brandMode) brand.value = '';
+                if (!rangeMode) {
+                    minPrice.value = '';
+                    maxPrice.value = '';
+                }
             };
 
             const syncPreview = () => {
@@ -124,12 +164,16 @@
                 previewPrice.textContent = new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' }).format(total);
             };
 
-            itemType.addEventListener('change', syncCategories);
+            itemType.addEventListener('change', () => {
+                syncBrands();
+                syncBounds();
+            });
             scope.addEventListener('change', syncScope);
             markupType.addEventListener('change', syncPreview);
             markupValue.addEventListener('input', syncPreview);
 
-            syncCategories();
+            syncBrands();
+            syncBounds();
             syncScope();
             syncPreview();
         })();

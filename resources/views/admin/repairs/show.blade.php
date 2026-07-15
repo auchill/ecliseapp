@@ -201,6 +201,8 @@
                     </div>
                 </div>
             </div>
+
+            @include('admin.repairs.partials.conversation')
         </div>
     </section>
 @endsection

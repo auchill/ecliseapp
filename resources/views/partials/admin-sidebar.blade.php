@@ -11,6 +11,7 @@
             ['label' => 'Pre-Owned Devices', 'route' => 'admin.devices.index', 'icon' => 'bi-phone', 'active' => 'admin.devices.*'],
         ],
         'Repairs' => [
+            ['label' => 'Repairs', 'route' => 'admin.repairs.index', 'icon' => 'bi-tools', 'active' => 'admin.repairs.*', 'visible' => auth()->user()?->isAdmin() === true],
             ['label' => 'Device Types', 'route' => 'admin.device-types.index', 'icon' => 'bi-hdd-stack', 'active' => 'admin.device-types.*'],
             ['label' => 'Issues', 'route' => 'admin.issue-categories.index', 'icon' => 'bi-wrench-adjustable', 'active' => 'admin.issue-categories.*'],
             ['label' => 'Quotes', 'route' => 'admin.quotes.index', 'icon' => 'bi-chat-square-text', 'active' => 'admin.quotes.*'],
@@ -52,9 +53,13 @@
     <nav class="admin-menu" aria-label="Admin navigation">
         @foreach ($adminNavGroups as $group => $items)
             @php
+                $items = collect($items)
+                    ->filter(fn ($item) => $item['visible'] ?? true)
+                    ->values();
                 $groupKey = ($sidebarId ?? 'admin').'-'.\Illuminate\Support\Str::slug($group);
-                $groupActive = collect($items)->contains(fn ($item) => request()->routeIs($item['active']));
+                $groupActive = $items->contains(fn ($item) => request()->routeIs($item['active']));
             @endphp
+            @continue($items->isEmpty())
             <div class="admin-menu-group">
                 <button class="admin-menu-heading" type="button" data-bs-toggle="collapse" data-bs-target="#{{ $groupKey }}" aria-expanded="{{ $groupActive || $loop->first ? 'true' : 'false' }}" aria-controls="{{ $groupKey }}">
                     <span>{{ $group }}</span>
