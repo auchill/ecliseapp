@@ -7,6 +7,7 @@ use App\Models\CartItem;
 use App\Models\Customer;
 use App\Models\MobileSentrixDevice;
 use App\Models\Product;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
@@ -48,7 +49,13 @@ class CartController extends Controller
             (int) $product->quantity,
         );
 
-        return back()->with('status', 'Product added to cart.');
+        $message = 'Product added to cart.';
+
+        if ($request->expectsJson()) {
+            return $this->cartJson($request, $message);
+        }
+
+        return back()->with('status', $message);
     }
 
     public function storeDevice(Request $request, MobileSentrixDevice $device)
@@ -75,10 +82,16 @@ class CartController extends Controller
             $device->availableQuantity(),
         );
 
-        return back()->with('status', 'Certified pre-owned device added to cart.');
+        $message = 'Certified pre-owned device added to cart.';
+
+        if ($request->expectsJson()) {
+            return $this->cartJson($request, $message);
+        }
+
+        return back()->with('status', $message);
     }
 
-    public function storeDevices(Request $request): RedirectResponse
+    public function storeDevices(Request $request): RedirectResponse|JsonResponse
     {
         abort_if($request->user()?->isAdmin(), 403);
 
@@ -96,7 +109,7 @@ class CartController extends Controller
             ->filter(fn (int $quantity): bool => $quantity > 0);
 
         if ($selected->isEmpty()) {
-            return back()->withErrors(['devices' => 'Select at least one device quantity before adding to cart.']);
+            return $this->cartValidationError($request, 'devices', 'Select at least one device quantity before adding to cart.');
         }
 
         $cart = $this->activeCart($request);
@@ -122,10 +135,16 @@ class CartController extends Controller
         }
 
         if ($added === 0) {
-            return back()->withErrors(['devices' => 'Selected devices are no longer available.']);
+            return $this->cartValidationError($request, 'devices', 'Selected devices are no longer available.');
         }
 
-        return back()->with('status', $added.' certified pre-owned device '.($added === 1 ? 'item was' : 'items were').' added to cart.');
+        $message = $added.' certified pre-owned device '.($added === 1 ? 'item was' : 'items were').' added to cart.';
+
+        if ($request->expectsJson()) {
+            return $this->cartJson($request, $message);
+        }
+
+        return back()->with('status', $message);
     }
 
     public function update(Request $request, Product $product)
@@ -148,7 +167,13 @@ class CartController extends Controller
             $request->session()->put('cart.items', $cart);
         }
 
-        return redirect()->route('cart.index')->with('status', 'Cart updated.');
+        $message = 'Cart updated.';
+
+        if ($request->expectsJson()) {
+            return $this->cartJson($request, $message);
+        }
+
+        return redirect()->route('cart.index')->with('status', $message);
     }
 
     public function updateItem(Request $request)
@@ -179,7 +204,13 @@ class CartController extends Controller
             $request->session()->put('cart.items', $cart);
         }
 
-        return redirect()->route('cart.index')->with('status', 'Cart updated.');
+        $message = 'Cart updated.';
+
+        if ($request->expectsJson()) {
+            return $this->cartJson($request, $message);
+        }
+
+        return redirect()->route('cart.index')->with('status', $message);
     }
 
     public function destroy(Request $request, Product $product)
@@ -198,7 +229,13 @@ class CartController extends Controller
             $request->session()->put('cart.items', $cart);
         }
 
-        return redirect()->route('cart.index')->with('status', 'Item removed from cart.');
+        $message = 'Item removed from cart.';
+
+        if ($request->expectsJson()) {
+            return $this->cartJson($request, $message);
+        }
+
+        return redirect()->route('cart.index')->with('status', $message);
     }
 
     public function destroyItem(Request $request)
@@ -223,7 +260,13 @@ class CartController extends Controller
             $request->session()->put('cart.items', $cart);
         }
 
-        return redirect()->route('cart.index')->with('status', 'Item removed from cart.');
+        $message = 'Item removed from cart.';
+
+        if ($request->expectsJson()) {
+            return $this->cartJson($request, $message);
+        }
+
+        return redirect()->route('cart.index')->with('status', $message);
     }
 
     private function addItem(
@@ -250,11 +293,64 @@ class CartController extends Controller
         return Customer::forUser($request->user())->getOrCreateActiveCart();
     }
 
-    private function authRequired(Request $request): RedirectResponse
+    private function authRequired(Request $request): RedirectResponse|JsonResponse
     {
+        $intendedUrl = $request->headers->get('referer') ?: url()->previous() ?: route('shop.index');
+
+        if ($request->expectsJson()) {
+            return new JsonResponse([
+                'message' => 'Customer sign in is required to continue.',
+                'auth_required' => true,
+                'login_url' => route('login', ['intended' => $intendedUrl]),
+                'register_url' => route('register', ['intended' => $intendedUrl]),
+            ], 401);
+        }
+
         return back()
             ->with('auth_required', true)
-            ->with('auth_required_url', $request->headers->get('referer') ?: url()->previous() ?: route('shop.index'));
+            ->with('auth_required_url', $intendedUrl);
+    }
+
+    private function cartValidationError(Request $request, string $field, string $message): RedirectResponse|JsonResponse
+    {
+        if ($request->expectsJson()) {
+            return new JsonResponse([
+                'message' => 'Please review the highlighted fields and try again.',
+                'errors' => [
+                    $field => [$message],
+                ],
+            ], 422);
+        }
+
+        return back()->withErrors([$field => $message]);
+    }
+
+    private function cartJson(Request $request, string $message): JsonResponse
+    {
+        return new JsonResponse([
+            'message' => $message,
+            'cart' => $this->cartPayload($request),
+        ]);
+    }
+
+    private function cartPayload(Request $request): array
+    {
+        $items = $this->cartItems($request);
+        $subtotal = (float) $items->sum('line_total');
+
+        return [
+            'count' => (int) $items->sum('quantity'),
+            'subtotal' => $subtotal,
+            'subtotal_display' => '$'.number_format($subtotal, 2),
+            'items' => $items
+                ->map(fn (array $item): array => [
+                    ...$item,
+                    'unit_price_display' => '$'.number_format((float) $item['unit_price'], 2),
+                    'line_total_display' => '$'.number_format((float) $item['line_total'], 2),
+                ])
+                ->values()
+                ->all(),
+        ];
     }
 
     private function cartItems(Request $request)

@@ -16,12 +16,14 @@
                         </div>
                         <div class="d-inline-flex gap-2">
                             <a class="btn btn-outline-primary btn-sm" href="{{ route('products.show', $product) }}"><i class="bi bi-eye"></i><span class="visually-hidden">View</span></a>
-                            @if(! auth()->user()?->isAdmin())
-                                <form method="POST" action="{{ route('cart.store', $product) }}">
+                            @if(auth()->user()?->isCustomer())
+                                <form method="POST" action="{{ route('cart.store', $product) }}" data-eclise-cart-form data-cart-action="add">
                                     @csrf
                                     <input type="hidden" name="quantity" value="1">
                                     <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-bag-plus"></i><span class="visually-hidden">Add to Cart</span></button>
                                 </form>
+                            @elseif(! auth()->user()?->isAdmin())
+                                <button class="btn btn-primary btn-sm" type="button" data-auth-required data-intended-url="{{ request()->fullUrl() }}"><i class="bi bi-bag-plus"></i><span class="visually-hidden">Add to Cart</span></button>
                             @endif
                         </div>
                     </div>

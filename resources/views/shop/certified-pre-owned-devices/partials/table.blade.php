@@ -9,7 +9,7 @@
     ];
 @endphp
 
-<form id="cpoBulkCartForm" method="POST" action="{{ route('cart.devices.bulk') }}" data-cpo-bulk-cart>
+<form id="cpoBulkCartForm" method="POST" action="{{ route('cart.devices.bulk') }}" data-cpo-bulk-cart data-eclise-cart-form data-cart-action="add">
     @csrf
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <p class="mb-0 text-primary fw-bold">{{ number_format($devices->total()) }} result{{ $devices->total() === 1 ? '' : 's' }}</p>

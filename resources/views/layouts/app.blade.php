@@ -1,26 +1,38 @@
 <!doctype html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
+        @php
+            $siteName = config('eclise.company.name', config('app.name'));
+            $siteDescription = trim($__env->yieldContent('meta_description', config('eclise.company.description', '')));
+        @endphp
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
-        <title>@yield('title', config('app.name')) | {{ config('app.name') }}</title>
+        @if ($siteDescription !== '')
+            <meta name="description" content="{{ $siteDescription }}">
+        @endif
+        <title>@yield('title', $siteName) | {{ $siteName }}</title>
         <link rel="icon" type="image/png" href="{{ asset('favicon.png') }}">
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
         <link href="{{ asset('css/eclise.css') }}" rel="stylesheet">
+        @vite('resources/js/app.js')
     </head>
     <body>
         <div class="site-shell">
             <nav class="navbar navbar-expand-xl bg-white sticky-top">
                 @php
+                    $publicSiteName = config('eclise.company.name', 'Eclise Technology Inc.');
+                    $publicTagline = config('eclise.company.tagline', 'Repair. Reuse. Reconnect.');
+                    $publicContact = config('eclise.contact', []);
+                    $publicSocialLinks = collect($publicContact['social_links'] ?? [])->filter();
                     $publicNavUser = auth()->user();
                     $publicNavIsAdmin = $publicNavUser?->isAdmin() === true;
                     $publicNavIsCustomer = $publicNavUser?->isCustomer() === true;
                 @endphp
                 <div class="container">
-                    <a class="navbar-brand d-flex align-items-center" href="{{ route('home') }}" aria-label="Eclise Technology Inc. home">
-                        <img class="brand-logo" src="{{ asset('images/brand/header_logo.png') }}" alt="Eclise Technology Inc.">
+                    <a class="navbar-brand d-flex align-items-center" href="{{ route('home') }}" aria-label="{{ $publicSiteName }} home">
+                        <img class="brand-logo" src="{{ asset('images/brand/header_logo.png') }}" alt="{{ $publicSiteName }}">
                     </a>
                     <div class="mobile-header-actions d-flex d-xl-none align-items-center ms-auto">
                         @unless($publicNavIsAdmin)
@@ -47,19 +59,19 @@
                             <li class="nav-item"><a class="nav-link {{ request()->routeIs('about') ? 'active' : '' }}" href="{{ route('about') }}">About</a></li>
                             <li class="nav-item"><a class="nav-link {{ request()->routeIs('services') ? 'active' : '' }}" href="{{ route('services') }}">Services</a></li>
                             <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle {{ request()->routeIs('repairs.*') || request()->routeIs('quotes.*') ? 'active' : '' }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Repair</a>
+                                <button class="nav-link dropdown-toggle {{ request()->routeIs('repairs.*') || request()->routeIs('quotes.*') ? 'active' : '' }} border-0 bg-transparent" type="button" data-bs-toggle="dropdown" aria-expanded="false">Repair</button>
                                 <ul class="dropdown-menu">
                                     <li><a class="dropdown-item" href="{{ route('quotes.create') }}" @unless($publicNavUser) data-auth-required data-intended-url="{{ route('quotes.create') }}" @endunless>Get a Quote</a></li>
-                                    <li><a class="dropdown-item" href="{{ route('repairs.create') }}" @unless($publicNavUser) data-auth-required data-intended-url="{{ route('repairs.create') }}" @endunless>Book Repair</a></li>
-                                    <li><a class="dropdown-item" href="{{ route('repairs.track') }}" @unless($publicNavUser) data-auth-required data-intended-url="{{ route('repairs.track') }}" @endunless>Track Repair</a></li>
+                                    <li><a class="dropdown-item" href="{{ route('repairs.create') }}">Book Repair</a></li>
+                                    <li><a class="dropdown-item" href="{{ route('repairs.track') }}">Track Repair</a></li>
                                 </ul>
                             </li>
                             <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle {{ request()->routeIs('shop.*') || request()->routeIs('products.*') || request()->routeIs('orders.track*') ? 'active' : '' }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Shop</a>
+                                <button class="nav-link dropdown-toggle {{ request()->routeIs('shop.*') || request()->routeIs('products.*') || request()->routeIs('orders.track*') ? 'active' : '' }} border-0 bg-transparent" type="button" data-bs-toggle="dropdown" aria-expanded="false">Shop</button>
                                 <ul class="dropdown-menu">
-                                    <li><a class="dropdown-item" href="{{ route('shop.index') }}" @unless($publicNavUser) data-auth-required data-intended-url="{{ route('shop.index') }}" @endunless>New & Retail Products</a></li>
-                                    <li><a class="dropdown-item" href="{{ route('shop.certified-pre-owned-devices.index') }}" @unless($publicNavUser) data-auth-required data-intended-url="{{ route('shop.certified-pre-owned-devices.index') }}" @endunless>Certified Pre-Owned Devices</a></li>
-                                    <li><a class="dropdown-item" href="{{ route('orders.track') }}" @unless($publicNavUser) data-auth-required data-intended-url="{{ route('orders.track') }}" @endunless>Track Order</a></li>
+                                    <li><a class="dropdown-item" href="{{ route('shop.index') }}">New & Retail Products</a></li>
+                                    <li><a class="dropdown-item" href="{{ route('shop.certified-pre-owned-devices.index') }}">Certified Pre-Owned Devices</a></li>
+                                    <li><a class="dropdown-item" href="{{ route('orders.track') }}">Track Order</a></li>
                                 </ul>
                             </li>
                             <li class="nav-item"><a class="nav-link {{ request()->routeIs('parts.*') ? 'active' : '' }}" href="{{ route('parts.index') }}">Parts</a></li>
@@ -82,7 +94,7 @@
             </nav>
 
             <main class="flex-grow-1">
-                @include('partials.flash')
+                @include('partials.flash', ['sweetAlerts' => true])
                 <x-breadcrumb />
                 @yield('content')
             </main>
@@ -91,28 +103,63 @@
                 <div class="container">
                     <div class="row g-4 align-items-start">
                         <div class="col-lg-5">
-                            <img class="footer-logo mb-3" src="{{ asset('images/brand/logo_wt.png') }}" alt="Eclise Technology Inc.">
-                            <p class="text-white-50 mb-0">Repair. Reuse. Reconnect.</p>
+                            <img class="footer-logo mb-3" src="{{ asset('images/brand/logo_wt.png') }}" alt="{{ $publicSiteName }}">
+                            <p class="text-white-50 mb-3">{{ $publicTagline }}</p>
+                            <p class="text-white-50 small mb-0">{{ config('eclise.company.description') }}</p>
                         </div>
-                        <div class="col-sm-6 col-lg-3">
+                        <div class="col-sm-6 col-lg-2">
                             <h2 class="h6">Services</h2>
                             <ul class="list-unstyled text-white-50 mb-0">
-                                <li>Phone and computer repairs</li>
-                                <li>Used and new devices</li>
-                                <li>Accessories and parts checks</li>
+                                <li>Phone and tablet repair</li>
+                                <li>Computer and laptop repair</li>
+                                <li>Parts and products</li>
                             </ul>
                         </div>
-                        <div class="col-sm-6 col-lg-4">
+                        <div class="col-sm-6 col-lg-3">
                             <h2 class="h6">Quick Links</h2>
                             <div class="d-flex flex-wrap gap-2">
                                 <a class="btn btn-outline-light btn-sm" href="{{ route('quotes.create') }}" @unless($publicNavUser) data-auth-required data-intended-url="{{ route('quotes.create') }}" @endunless>Get a Quote</a>
-                                <a class="btn btn-outline-light btn-sm" href="{{ route('repairs.create') }}" @unless($publicNavUser) data-auth-required data-intended-url="{{ route('repairs.create') }}" @endunless>Book Repair</a>
-                                <a class="btn btn-outline-light btn-sm" href="{{ route('repairs.track') }}" @unless($publicNavUser) data-auth-required data-intended-url="{{ route('repairs.track') }}" @endunless>Track Repair</a>
-                                <a class="btn btn-outline-light btn-sm" href="{{ route('orders.track') }}" @unless($publicNavUser) data-auth-required data-intended-url="{{ route('orders.track') }}" @endunless>Track Order</a>
-                                <a class="btn btn-outline-light btn-sm" href="{{ route('shop.index') }}" @unless($publicNavUser) data-auth-required data-intended-url="{{ route('shop.index') }}" @endunless>Shop</a>
+                                <a class="btn btn-outline-light btn-sm" href="{{ route('repairs.create') }}">Book Repair</a>
+                                <a class="btn btn-outline-light btn-sm" href="{{ route('repairs.track') }}">Track Repair</a>
+                                <a class="btn btn-outline-light btn-sm" href="{{ route('orders.track') }}">Track Order</a>
+                                <a class="btn btn-outline-light btn-sm" href="{{ route('shop.index') }}">Shop</a>
                                 <a class="btn btn-outline-light btn-sm" href="{{ route('parts.index') }}">Parts</a>
+                                <a class="btn btn-outline-light btn-sm" href="{{ route('contact.create') }}">Contact</a>
                             </div>
                         </div>
+                        <div class="col-sm-6 col-lg-2">
+                            <h2 class="h6">Contact</h2>
+                            @if (filled($publicContact['email'] ?? null) || filled($publicContact['phone'] ?? null) || filled($publicContact['address'] ?? null) || filled($publicContact['hours'] ?? null))
+                                <ul class="list-unstyled text-white-50 mb-3">
+                                    @if (filled($publicContact['email'] ?? null))
+                                        <li><a class="link-light link-offset-2 link-underline-opacity-25 link-underline-opacity-75-hover" href="mailto:{{ $publicContact['email'] }}">{{ $publicContact['email'] }}</a></li>
+                                    @endif
+                                    @if (filled($publicContact['phone'] ?? null))
+                                        <li><a class="link-light link-offset-2 link-underline-opacity-25 link-underline-opacity-75-hover" href="tel:{{ preg_replace('/[^0-9+]/', '', $publicContact['phone']) }}">{{ $publicContact['phone'] }}</a></li>
+                                    @endif
+                                    @if (filled($publicContact['address'] ?? null))
+                                        <li>{{ $publicContact['address'] }}</li>
+                                    @endif
+                                    @if (filled($publicContact['hours'] ?? null))
+                                        <li>{{ $publicContact['hours'] }}</li>
+                                    @endif
+                                </ul>
+                            @else
+                                <p class="text-white-50 small mb-3">Use the contact form for service questions and support requests.</p>
+                            @endif
+                            @if ($publicSocialLinks->isNotEmpty())
+                                <div class="d-flex gap-2">
+                                    @foreach ($publicSocialLinks as $platform => $url)
+                                        <a class="btn btn-outline-light btn-sm footer-social-link" href="{{ $url }}" rel="noopener" target="_blank" aria-label="{{ ucfirst($platform) }}">
+                                            <i class="bi bi-{{ $platform }}"></i>
+                                        </a>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                    <div class="border-top border-secondary-subtle mt-4 pt-4">
+                        <p class="text-white-50 small mb-0">&copy; {{ now()->year }} {{ $publicSiteName }}. All rights reserved.</p>
                     </div>
                 </div>
             </footer>

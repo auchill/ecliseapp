@@ -55,8 +55,8 @@
                         @endif
                         <strong class="display-6 d-block">${{ number_format($product->currentPrice(), 2) }}</strong>
                     </div>
-                    @if(! auth()->user()?->isAdmin())
-                        <form class="d-flex gap-2 align-items-end" method="POST" action="{{ route('cart.store', $product) }}">
+                    @if(auth()->user()?->isCustomer())
+                        <form class="d-flex gap-2 align-items-end" method="POST" action="{{ route('cart.store', $product) }}" data-eclise-cart-form data-cart-action="add">
                             @csrf
                             <div>
                                 <label class="form-label" for="quantity">Quantity</label>
@@ -64,6 +64,8 @@
                             </div>
                             <button class="btn btn-primary btn-lg" type="submit"><i class="bi bi-bag-plus me-2"></i>Add to Cart</button>
                         </form>
+                    @elseif(! auth()->user()?->isAdmin())
+                        <button class="btn btn-primary btn-lg" type="button" data-auth-required data-intended-url="{{ request()->fullUrl() }}"><i class="bi bi-bag-plus me-2"></i>Add to Cart</button>
                     @endif
                 </div>
             </div>
