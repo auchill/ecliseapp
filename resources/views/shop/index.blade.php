@@ -180,9 +180,13 @@
                 }
 
                 element.focus({ preventScroll: true });
-                if (typeof element.setSelectionRange === 'function') {
+                if (typeof element.setSelectionRange === 'function' && state.start !== null && state.end !== null) {
                     const cursor = state.end ?? element.value.length;
-                    element.setSelectionRange(cursor, cursor);
+                    try {
+                        element.setSelectionRange(cursor, cursor);
+                    } catch (error) {
+                        // Some focused controls, such as checkboxes and number inputs, expose setSelectionRange but reject it.
+                    }
                 }
             };
 
@@ -357,14 +361,113 @@
                 return true;
             };
 
+            const captureFilterCollapseState = () => {
+                const state = {};
+
+                document.querySelectorAll('[data-filter-group]').forEach((group) => {
+                    const content = group.querySelector('.collapse');
+
+                    if (!content?.id) {
+                        return;
+                    }
+
+                    state[content.id] = content.classList.contains('show');
+                });
+
+                return state;
+            };
+
+            const restoreFilterCollapseState = (state) => {
+                Object.entries(state).forEach(([id, isExpanded]) => {
+                    const content = document.getElementById(id);
+
+                    if (!content) {
+                        return;
+                    }
+
+                    content.classList.remove('collapsing');
+                    content.classList.add('collapse');
+                    content.classList.toggle('show', isExpanded);
+                    content.style.height = '';
+
+                    const toggle = Array.from(document.querySelectorAll('[aria-controls]'))
+                        .find((element) => element.getAttribute('aria-controls') === id);
+
+                    if (toggle) {
+                        toggle.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+                        toggle.classList.toggle('collapsed', !isExpanded);
+                    }
+                });
+            };
+
+            const updateFilterGroups = (selector, html, label) => {
+                if (typeof html !== 'string') {
+                    console.warn(`Product response did not include ${label}; existing content was preserved.`);
+                    return false;
+                }
+
+                const container = document.querySelector(selector);
+                if (!container) {
+                    console.warn(`Product page container was not found for ${label}; existing content was preserved.`);
+                    return false;
+                }
+
+                const template = document.createElement('template');
+                template.innerHTML = html.trim();
+
+                const incomingGroups = Array.from(template.content.querySelectorAll('[data-filter-group]'));
+                if (incomingGroups.length === 0) {
+                    container.innerHTML = html;
+                    return true;
+                }
+
+                const currentGroups = Array.from(container.querySelectorAll('[data-filter-group]'));
+                const incomingKeys = new Set(incomingGroups.map((group) => group.dataset.filterGroup));
+
+                incomingGroups.forEach((incomingGroup) => {
+                    const groupKey = incomingGroup.dataset.filterGroup;
+                    const currentGroup = currentGroups.find((group) => group.dataset.filterGroup === groupKey);
+
+                    if (!currentGroup) {
+                        container.appendChild(incomingGroup.cloneNode(true));
+                        return;
+                    }
+
+                    currentGroup.hidden = incomingGroup.hidden;
+
+                    const currentOptions = currentGroup.querySelector('[data-filter-options]');
+                    const incomingOptions = incomingGroup.querySelector('[data-filter-options]');
+
+                    if (currentOptions && incomingOptions) {
+                        currentOptions.innerHTML = incomingOptions.innerHTML;
+                    } else {
+                        currentGroup.innerHTML = incomingGroup.innerHTML;
+                    }
+                });
+
+                currentGroups.forEach((currentGroup) => {
+                    if (currentGroup.dataset.filterGroup !== 'category' && !incomingKeys.has(currentGroup.dataset.filterGroup)) {
+                        currentGroup.hidden = true;
+                    }
+                });
+
+                return true;
+            };
+
             const applyPayload = (payload, focus, url) => {
                 const html = payload.html || {};
+                const collapseState = captureFilterCollapseState();
                 const productsUpdated = updateHtmlSection(selectors.results, html.products ?? payload.results, 'product results', !document.querySelector(selectors.results)?.innerHTML.trim());
 
                 updateHtmlSection(selectors.summary, html.summary ?? payload.summary, 'result summary');
                 updateHtmlSection(selectors.activeFilters, html.active_filters ?? payload.activeFilters, 'active filter chips');
-                updateHtmlSection(selectors.desktopFilterGroups, html.desktop_filter_groups ?? payload.desktopFilterGroups, 'desktop filter options');
-                updateHtmlSection(selectors.mobileFilterGroups, html.mobile_filter_groups ?? payload.mobileFilterGroups, 'mobile filter options');
+                const desktopFiltersUpdated = updateFilterGroups(selectors.desktopFilterGroups, html.desktop_filter_groups ?? payload.desktopFilterGroups, 'desktop filter options');
+                const mobileFiltersUpdated = updateFilterGroups(selectors.mobileFilterGroups, html.mobile_filter_groups ?? payload.mobileFilterGroups, 'mobile filter options');
+
+                if (desktopFiltersUpdated || mobileFiltersUpdated) {
+                    restoreFilterCollapseState(collapseState);
+                }
+
                 updateActiveCount(payload.meta?.active_filter_count ?? payload.activeFilterCount ?? 0);
                 syncFormsFromParams(new URL(url, window.location.origin).searchParams, focus);
                 restoreFocus(focus);
