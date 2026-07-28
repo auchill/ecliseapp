@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Enums\PaymentStatus;
+use App\Enums\PaymentTransactionType;
 use App\Mail\AdminPaymentReceivedMail;
 use App\Mail\PaymentReceiptMail;
 use App\Models\Cart;
@@ -14,6 +16,7 @@ use App\Models\Product;
 use App\Models\Repair;
 use App\Models\RepairConversation;
 use App\Models\User;
+use App\Services\Payments\PaymentPayloadSanitizer;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use RuntimeException;
@@ -23,6 +26,7 @@ class PaymentFinalizer
     public function __construct(
         private readonly OrderNumberGenerator $orderNumbers,
         private readonly AddressSnapshotFormatter $addressFormatter,
+        private readonly PaymentPayloadSanitizer $payloadSanitizer,
     ) {}
 
     public function markPaid(Payment $payment, array $attributes = []): Payment
@@ -32,7 +36,7 @@ class PaymentFinalizer
         $payment = DB::transaction(function () use ($payment, $attributes, &$sendMail): Payment {
             $payment = Payment::query()->lockForUpdate()->findOrFail($payment->id);
 
-            if ($payment->status === 'paid') {
+            if (in_array($payment->status, PaymentStatus::successfulValues(), true)) {
                 $payable = $payment->payable()->lockForUpdate()->first();
 
                 if ($payable instanceof Order) {
@@ -44,10 +48,24 @@ class PaymentFinalizer
                 return $payment;
             }
 
-            $payment->fill(array_merge([
+            $attributes = array_merge([
                 'status' => 'paid',
                 'paid_at' => now(),
-            ], $attributes));
+            ], $attributes);
+
+            if (array_key_exists('raw_response', $attributes)) {
+                $attributes['raw_response'] = $this->payloadSanitizer->sanitize($attributes['raw_response']);
+            }
+
+            $attributes['gateway_payment_id'] ??= $attributes['stripe_payment_intent_id']
+                ?? $attributes['paypal_capture_id']
+                ?? $attributes['paypal_order_id']
+                ?? $attributes['gateway_reference_id']
+                ?? $payment->gateway_payment_id;
+            $attributes['gateway_reference'] ??= $attributes['gateway_reference_id']
+                ?? $payment->gateway_reference;
+
+            $payment->fill($attributes);
 
             $payable = $payment->payable()->lockForUpdate()->first();
 
@@ -69,6 +87,13 @@ class PaymentFinalizer
             } else {
                 throw new RuntimeException('The payment checkout record is no longer available.');
             }
+
+            $this->recordTransaction(
+                $payment->fresh(),
+                PaymentTransactionType::Payment->value,
+                'succeeded',
+                (array) ($attributes['raw_response'] ?? []),
+            );
 
             $sendMail = true;
 
@@ -98,10 +123,24 @@ class PaymentFinalizer
             $status = 'failed';
         }
 
+        $sanitizedResponse = $this->payloadSanitizer->sanitize($rawResponse ?: $payment->raw_response);
+
         $payment->update([
             'status' => $status,
-            'raw_response' => $rawResponse ?: $payment->raw_response,
+            'raw_response' => $sanitizedResponse,
+            'failed_at' => $status === 'failed' ? now() : $payment->failed_at,
+            'cancelled_at' => $status === 'cancelled' ? now() : $payment->cancelled_at,
+            'refunded_at' => in_array($status, ['refunded', 'partially_refunded'], true) ? now() : $payment->refunded_at,
         ]);
+
+        $this->recordTransaction(
+            $payment->fresh(),
+            $status === 'cancelled' ? PaymentTransactionType::Void->value : PaymentTransactionType::Failure->value,
+            $status,
+            (array) $sanitizedResponse,
+            data_get($sanitizedResponse, 'error.code'),
+            data_get($sanitizedResponse, 'error.message') ?: data_get($sanitizedResponse, 'failure_message'),
+        );
 
         $payable = $payment->payable;
 
@@ -112,6 +151,32 @@ class PaymentFinalizer
         }
 
         return $payment->fresh('payable');
+    }
+
+    private function recordTransaction(
+        Payment $payment,
+        string $type,
+        string $status,
+        array $responsePayload = [],
+        ?string $failureCode = null,
+        ?string $failureMessage = null,
+    ): void {
+        $payment->transactions()->create([
+            'transaction_type' => $type,
+            'status' => $status,
+            'amount' => $payment->amount,
+            'currency' => $payment->currency,
+            'provider_transaction_id' => $payment->gateway_payment_id
+                ?: $payment->stripe_payment_intent_id
+                ?: $payment->paypal_capture_id
+                ?: $payment->paypal_order_id
+                ?: $payment->gateway_reference_id,
+            'provider_reference' => $payment->gateway_reference ?: $payment->gateway_reference_id,
+            'response_payload' => $responsePayload === [] ? null : $this->payloadSanitizer->sanitize($responsePayload),
+            'failure_code' => $failureCode,
+            'failure_message' => $failureMessage,
+            'processed_at' => now(),
+        ]);
     }
 
     private function createOrderFromCheckout(Payment $payment, ?Cart $cart): Order

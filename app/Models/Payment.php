@@ -2,9 +2,14 @@
 
 namespace App\Models;
 
+use App\Enums\PaymentMethod;
+use App\Enums\PaymentProvider;
+use App\Enums\PaymentPurpose;
+use App\Enums\PaymentStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use InvalidArgumentException;
 
@@ -19,6 +24,10 @@ class Payment extends Model
 
     public const STATUSES = [
         'pending' => 'Pending',
+        'pending_verification' => 'Awaiting verification',
+        'processing' => 'Processing',
+        'authorized' => 'Authorized',
+        'succeeded' => 'Paid',
         'paid' => 'Paid',
         'failed' => 'Failed',
         'cancelled' => 'Cancelled',
@@ -32,30 +41,99 @@ class Payment extends Model
     ];
 
     protected $fillable = [
+        'payment_number',
         'payable_type',
         'payable_id',
+        'invoice_id',
+        'customer_id',
         'order_id',
         'repair_id',
         'source',
+        'purpose',
+        'method',
+        'provider',
         'checkout_data',
         'gateway',
         'gateway_reference_id',
+        'gateway_payment_id',
+        'gateway_reference',
+        'gateway_customer_id',
+        'gateway_payment_method_id',
+        'idempotency_key',
         'stripe_checkout_session_id',
         'stripe_payment_intent_id',
         'paypal_order_id',
         'paypal_capture_id',
         'amount',
+        'refunded_amount',
         'currency',
+        'subtotal',
+        'tax_amount',
+        'fee_amount',
+        'discount_amount',
         'status',
         'raw_response',
         'paid_at',
+        'authorized_at',
+        'failed_at',
+        'cancelled_at',
+        'refunded_at',
+        'received_by',
+        'verified_by',
+        'verified_at',
+        'failure_code',
+        'failure_message',
+        'admin_note',
+        'customer_note',
+        'metadata',
     ];
 
     protected static function booted(): void
     {
+        static::creating(function (Payment $payment): void {
+            $payment->method ??= $payment->gateway;
+            $payment->provider ??= in_array($payment->gateway, ['stripe', 'paypal'], true)
+                ? $payment->gateway
+                : 'manual';
+            $payment->purpose ??= $payment->source === 'repair' ? 'balance' : 'shop_order';
+            $payment->gateway_payment_id ??= $payment->stripe_payment_intent_id
+                ?: $payment->paypal_capture_id
+                ?: $payment->paypal_order_id
+                ?: $payment->gateway_reference_id;
+            $payment->gateway_reference ??= $payment->gateway_reference_id;
+        });
+
+        static::created(function (Payment $payment): void {
+            if (filled($payment->payment_number)) {
+                return;
+            }
+
+            $year = $payment->created_at?->format('Y') ?: now()->format('Y');
+
+            $payment->forceFill([
+                'payment_number' => sprintf('PAY-%s-%07d', $year, $payment->id),
+            ])->saveQuietly();
+        });
+
         static::saving(function (Payment $payment): void {
             if ($payment->source && ! array_key_exists($payment->source, self::SOURCES)) {
                 throw new InvalidArgumentException('Invalid payment source.');
+            }
+
+            if ($payment->status && ! PaymentStatus::tryFrom((string) $payment->status)) {
+                throw new InvalidArgumentException('Invalid payment status.');
+            }
+
+            if ($payment->method && ! PaymentMethod::tryFrom((string) $payment->method)) {
+                throw new InvalidArgumentException('Invalid payment method.');
+            }
+
+            if ($payment->provider && ! PaymentProvider::tryFrom((string) $payment->provider)) {
+                throw new InvalidArgumentException('Invalid payment provider.');
+            }
+
+            if ($payment->purpose && ! PaymentPurpose::tryFrom((string) $payment->purpose)) {
+                throw new InvalidArgumentException('Invalid payment purpose.');
             }
         });
     }
@@ -64,9 +142,20 @@ class Payment extends Model
     {
         return [
             'amount' => 'decimal:2',
+            'refunded_amount' => 'decimal:2',
+            'subtotal' => 'decimal:2',
+            'tax_amount' => 'decimal:2',
+            'fee_amount' => 'decimal:2',
+            'discount_amount' => 'decimal:2',
             'raw_response' => 'array',
             'checkout_data' => 'array',
+            'metadata' => 'array',
             'paid_at' => 'datetime',
+            'authorized_at' => 'datetime',
+            'failed_at' => 'datetime',
+            'cancelled_at' => 'datetime',
+            'refunded_at' => 'datetime',
+            'verified_at' => 'datetime',
         ];
     }
 
@@ -80,6 +169,36 @@ class Payment extends Model
         return $this->belongsTo(Order::class);
     }
 
+    public function invoice(): BelongsTo
+    {
+        return $this->belongsTo(Invoice::class);
+    }
+
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class);
+    }
+
+    public function transactions(): HasMany
+    {
+        return $this->hasMany(PaymentTransaction::class);
+    }
+
+    public function refunds(): HasMany
+    {
+        return $this->hasMany(PaymentRefund::class);
+    }
+
+    public function receiver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'received_by');
+    }
+
+    public function verifier(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'verified_by');
+    }
+
     public function repairOrder(): BelongsTo
     {
         return $this->belongsTo(Repair::class, 'repair_id');
@@ -87,17 +206,23 @@ class Payment extends Model
 
     public function isPaid(): bool
     {
-        return $this->status === 'paid';
+        return in_array($this->status, PaymentStatus::successfulValues(), true);
     }
 
     public function gatewayLabel(): string
     {
-        return self::GATEWAYS[$this->gateway] ?? ucfirst($this->gateway);
+        if (blank($this->gateway)) {
+            return ucfirst(str_replace('_', ' ', (string) ($this->provider ?: $this->method ?: 'manual')));
+        }
+
+        return self::GATEWAYS[$this->gateway] ?? ucfirst((string) $this->gateway);
     }
 
     public function statusLabel(): string
     {
-        return self::STATUSES[$this->status] ?? ucfirst($this->status);
+        return PaymentStatus::tryFrom((string) $this->status)?->label()
+            ?? self::STATUSES[$this->status]
+            ?? ucfirst(str_replace('_', ' ', (string) $this->status));
     }
 
     public function sourceLabel(): string

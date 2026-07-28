@@ -16,7 +16,7 @@ class PaymentController extends Controller
         abort_if($source && ! array_key_exists($source, Payment::SOURCES), 404);
 
         $payments = Payment::query()
-            ->with('payable')
+            ->with(['customer', 'invoice', 'payable.customer'])
             ->when($source, fn ($query) => $query->where('source', $source))
             ->when($request->filled('gateway'), fn ($query) => $query->where('gateway', $request->string('gateway')))
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
@@ -43,7 +43,7 @@ class PaymentController extends Controller
     public function show(Payment $payment)
     {
         return view('admin.payments.show', [
-            'payment' => $payment->load('payable'),
+            'payment' => $payment->load(['customer', 'invoice', 'payable.customer', 'transactions']),
         ]);
     }
 }

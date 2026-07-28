@@ -182,6 +182,11 @@ class Repair extends Model
         return $this->morphMany(Payment::class, 'payable');
     }
 
+    public function invoices(): MorphMany
+    {
+        return $this->morphMany(Invoice::class, 'invoiceable');
+    }
+
     public function latestPayment()
     {
         return $this->morphOne(Payment::class, 'payable')->latestOfMany();

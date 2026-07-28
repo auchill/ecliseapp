@@ -56,6 +56,16 @@ class Customer extends Model
         return $this->hasMany(Repair::class);
     }
 
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(Invoice::class);
+    }
+
     public function repairConversations(): HasMany
     {
         return $this->hasMany(RepairConversation::class);
