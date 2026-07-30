@@ -131,8 +131,10 @@
                                 @csrf
                                 <label class="form-label" for="payment_gateway">Payment method</label>
                                 <select class="form-select mb-3" id="payment_gateway" name="payment_gateway" required>
-                                    <option value="stripe">Card</option>
-                                    <option value="paypal">PayPal</option>
+                                    @foreach (app(\App\Services\Payments\PaymentSettingsService::class)->paymentMethodOptions(customerFacing: true) as $method => $label)
+                                        @continue($method === 'pay_in_store')
+                                        <option value="{{ $method }}">{{ $label }}</option>
+                                    @endforeach
                                 </select>
                                 <button class="btn btn-primary w-100" type="submit">Pay ${{ number_format($conversation->repair->currentBalanceDue(), 2) }}</button>
                             </form>

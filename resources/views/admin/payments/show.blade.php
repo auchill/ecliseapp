@@ -10,7 +10,12 @@
                     <p class="eyebrow">{{ $payment->payment_number ?: 'Payment #'.$payment->id }}</p>
                     <h1 class="display-6 fw-bold mb-0">{{ $payment->gatewayLabel() }} · {{ $payment->statusLabel() }}</h1>
                 </div>
-                <a class="btn btn-outline-primary" href="{{ route('admin.payments.index') }}"><i class="bi bi-arrow-left me-2"></i>Payments</a>
+                <div class="d-flex flex-wrap gap-2">
+                    @if ($payment->receipt_number)
+                        <a class="btn btn-outline-primary" href="{{ route('payments.receipt', $payment) }}"><i class="bi bi-receipt me-2"></i>Receipt</a>
+                    @endif
+                    <a class="btn btn-outline-primary" href="{{ route('admin.payments.index') }}"><i class="bi bi-arrow-left me-2"></i>Payments</a>
+                </div>
             </div>
 
             <div class="row g-4">
@@ -33,6 +38,13 @@
                                     <tr><th scope="row">Stripe payment intent</th><td>{{ $payment->stripe_payment_intent_id ?: 'N/A' }}</td></tr>
                                     <tr><th scope="row">PayPal order</th><td>{{ $payment->paypal_order_id ?: 'N/A' }}</td></tr>
                                     <tr><th scope="row">PayPal capture</th><td>{{ $payment->paypal_capture_id ?: 'N/A' }}</td></tr>
+                                    <tr><th scope="row">Proof</th><td>
+                                        @if ($payment->proof_path)
+                                            <a href="{{ route('admin.payments.proof', $payment) }}">{{ $payment->proof_original_name ?: 'Download proof' }}</a>
+                                        @else
+                                            N/A
+                                        @endif
+                                    </td></tr>
                                     <tr><th scope="row">Paid at</th><td>{{ $payment->paid_at?->format('M j, Y g:i A') ?? 'Not paid yet' }}</td></tr>
                                 </tbody>
                             </table>
@@ -44,7 +56,13 @@
                         <h2 class="h5 fw-bold">Payable</h2>
                         <p class="mb-1"><strong>Customer:</strong> {{ $payment->customer?->full_name ?? $payment->payable?->customer?->full_name ?? 'Customer unavailable' }}</p>
                         <p class="mb-1"><strong>Email:</strong> {{ $payment->customer?->email ?? $payment->payable?->customer?->email ?? 'Unavailable' }}</p>
-                        <p class="mb-1"><strong>Invoice:</strong> {{ $payment->invoice?->invoice_number ?? 'No invoice linked' }}</p>
+                        <p class="mb-1"><strong>Invoice:</strong>
+                            @if ($payment->invoice)
+                                <a href="{{ route('admin.invoices.show', $payment->invoice) }}">{{ $payment->invoice->invoice_number }}</a>
+                            @else
+                                No invoice linked
+                            @endif
+                        </p>
                         <p class="mb-1"><strong>Payment status:</strong> {{ $payment->payable?->payment_status }}</p>
                         @if ($payment->payable instanceof \App\Models\Order)
                             <a class="btn btn-outline-primary mt-3" href="{{ route('admin.orders.show', $payment->payable) }}">View Order</a>
@@ -84,6 +102,32 @@
                     </table>
                 </div>
             </div>
+
+            @if ($payment->canRequestRefund())
+                <div class="surface p-4 mt-4">
+                    <h2 class="h5 fw-bold">Request Refund</h2>
+                    <form method="POST" action="{{ route('admin.payments.refunds.store', $payment) }}">
+                        @csrf
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label" for="refund_amount">Amount</label>
+                                <input class="form-control" id="refund_amount" name="amount" type="number" min="0.01" step="0.01" max="{{ max(0, (float) $payment->amount - (float) $payment->refunded_amount) }}" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label" for="reason_code">Reason code</label>
+                                <input class="form-control" id="reason_code" name="reason_code" value="customer_request">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="reason">Reason</label>
+                                <input class="form-control" id="reason" name="reason" required>
+                            </div>
+                            <div class="col-12">
+                                <button class="btn btn-outline-danger" type="submit">Request Refund</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            @endif
         </div>
     </section>
 @endsection

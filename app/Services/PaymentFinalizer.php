@@ -16,7 +16,11 @@ use App\Models\Product;
 use App\Models\Repair;
 use App\Models\RepairConversation;
 use App\Models\User;
+use App\Services\Payments\InvoiceService;
+use App\Services\Payments\PaymentAuditLogger;
+use App\Services\Payments\PaymentBalanceService;
 use App\Services\Payments\PaymentPayloadSanitizer;
+use App\Services\Payments\ReceiptService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use RuntimeException;
@@ -27,6 +31,10 @@ class PaymentFinalizer
         private readonly OrderNumberGenerator $orderNumbers,
         private readonly AddressSnapshotFormatter $addressFormatter,
         private readonly PaymentPayloadSanitizer $payloadSanitizer,
+        private readonly InvoiceService $invoices,
+        private readonly PaymentBalanceService $balances,
+        private readonly ReceiptService $receipts,
+        private readonly PaymentAuditLogger $audit,
     ) {}
 
     public function markPaid(Payment $payment, array $attributes = []): Payment
@@ -45,7 +53,13 @@ class PaymentFinalizer
                     $this->persistRepairShippingSnapshot($payable, $payment);
                 }
 
-                return $payment;
+                $payment = $this->receipts->ensureReceiptNumber($payment->fresh('invoice'));
+
+                if ($payment->invoice) {
+                    $this->balances->synchronizeInvoice($payment->invoice);
+                }
+
+                return $payment->fresh('payable');
             }
 
             $attributes = array_merge([
@@ -77,8 +91,20 @@ class PaymentFinalizer
 
                 $payment->payable()->associate($order);
                 $payment->order_id = $order->id;
+                $payment->customer_id = $order->customer_id;
+
+                if ($payment->invoice) {
+                    $this->invoices->attachPaymentInvoiceToOrder($payment->invoice, $order);
+                } else {
+                    $invoice = $this->invoices->createShopOrderInvoice($order);
+                    $payment->invoice()->associate($invoice);
+                }
+
                 $payment->save();
             } elseif ($payable instanceof Order) {
+                if (! $payment->invoice_id) {
+                    $payment->invoice()->associate($this->invoices->createShopOrderInvoice($payable));
+                }
                 $payment->save();
                 $this->markExistingOrderPaid($payable, $payment);
             } elseif ($payable instanceof Repair) {
@@ -94,6 +120,18 @@ class PaymentFinalizer
                 'succeeded',
                 (array) ($attributes['raw_response'] ?? []),
             );
+
+            $payment = $this->receipts->ensureReceiptNumber($payment->fresh('invoice'));
+
+            if ($payment->invoice) {
+                $this->balances->synchronizeInvoice($payment->invoice);
+            }
+
+            $this->audit->log('payment.succeeded', $payment, null, [
+                'payment_id' => $payment->id,
+                'invoice_id' => $payment->invoice_id,
+                'amount' => $payment->amount,
+            ]);
 
             $sendMail = true;
 
@@ -131,6 +169,11 @@ class PaymentFinalizer
             'failed_at' => $status === 'failed' ? now() : $payment->failed_at,
             'cancelled_at' => $status === 'cancelled' ? now() : $payment->cancelled_at,
             'refunded_at' => in_array($status, ['refunded', 'partially_refunded'], true) ? now() : $payment->refunded_at,
+        ]);
+
+        $this->audit->log('payment.'.$status, $payment->fresh(), null, [
+            'payment_id' => $payment->id,
+            'invoice_id' => $payment->invoice_id,
         ]);
 
         $this->recordTransaction(

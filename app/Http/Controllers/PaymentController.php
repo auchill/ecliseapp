@@ -18,7 +18,7 @@ class PaymentController extends Controller
         $this->authorizePaymentView($payment);
 
         return view('payments.show', [
-            'payment' => $payment->load('payable'),
+            'payment' => $payment->load('payable', 'invoice.items', 'transactions'),
         ]);
     }
 
@@ -27,37 +27,38 @@ class PaymentController extends Controller
         $this->authorizePaymentView($payment);
 
         return view('payments.show', [
-            'payment' => $payment->fresh('payable'),
+            'payment' => $payment->fresh('payable', 'invoice.items', 'transactions'),
             'statusMessage' => 'Stripe returned successfully. Payment will be confirmed by webhook before the order is marked paid.',
         ]);
     }
 
-    public function paypalReturn(Payment $payment, PaymentGatewayService $gateways, PaymentFinalizer $finalizer)
+    public function paypalReturn(Payment $payment, PaymentGatewayService $gateways)
     {
         $this->authorizePaymentView($payment);
 
         try {
-            $payload = $gateways->capturePayPalOrder($payment);
-            $capture = collect($payload['purchase_units'][0]['payments']['captures'] ?? [])->first();
-
-            if (($capture['status'] ?? null) === 'COMPLETED') {
-                $payment = $finalizer->markPaid($payment, [
-                    'paypal_capture_id' => $capture['id'] ?? null,
-                    'gateway_reference_id' => $capture['id'] ?? $payment->paypal_order_id,
+            if ($payment->status === 'pending' && $payment->paypal_order_id) {
+                $payload = $gateways->capturePayPalOrder($payment);
+                $capture = collect($payload['purchase_units'][0]['payments']['captures'] ?? [])->first();
+                $payment->update([
+                    'status' => 'processing',
+                    'paypal_capture_id' => $capture['id'] ?? $payment->paypal_capture_id,
+                    'gateway_reference_id' => $capture['id'] ?? $payment->gateway_reference_id,
+                    'gateway_payment_id' => $capture['id'] ?? $payment->gateway_payment_id,
+                    'gateway_reference' => $capture['id'] ?? $payment->gateway_reference,
                     'raw_response' => $payload,
-                    'paid_at' => now(),
                 ]);
             }
         } catch (RuntimeException $exception) {
             return view('payments.show', [
-                'payment' => $payment->fresh('payable'),
+                'payment' => $payment->fresh('payable', 'invoice.items', 'transactions'),
                 'statusMessage' => $exception->getMessage(),
             ]);
         }
 
         return view('payments.show', [
-            'payment' => $payment->fresh('payable'),
-            'statusMessage' => 'PayPal payment captured and verified.',
+            'payment' => $payment->fresh('payable', 'invoice.items', 'transactions'),
+            'statusMessage' => 'PayPal returned successfully. Payment will be confirmed by server-side webhook verification before the record is marked paid.',
         ]);
     }
 
@@ -72,6 +73,16 @@ class PaymentController extends Controller
         return view('payments.show', [
             'payment' => $payment->fresh('payable'),
             'statusMessage' => 'Payment was cancelled. No order was marked paid.',
+        ]);
+    }
+
+    public function receipt(Payment $payment)
+    {
+        $this->authorizePaymentView($payment);
+        abort_unless(filled($payment->receipt_number), 404);
+
+        return view('payments.receipt', [
+            'payment' => $payment->load('invoice.items', 'invoice.payments', 'customer', 'payable.customer', 'receiver', 'verifier'),
         ]);
     }
 

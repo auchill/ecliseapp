@@ -6,9 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Mail\OrderStatusUpdatedMail;
 use App\Models\Order;
 use App\Services\AddressSnapshotFormatter;
+use App\Services\Payments\PaymentGateService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
+use InvalidArgumentException;
 
 class OrderController extends Controller
 {
@@ -47,7 +49,7 @@ class OrderController extends Controller
         ]);
     }
 
-    public function update(Request $request, Order $order, AddressSnapshotFormatter $addressFormatter)
+    public function update(Request $request, Order $order, AddressSnapshotFormatter $addressFormatter, PaymentGateService $paymentGate)
     {
         $data = $request->validate([
             'status' => ['required', Rule::in(Order::STATUSES)],
@@ -76,6 +78,17 @@ class OrderController extends Controller
         $statusChanged = $order->status !== $data['status'];
         $data = $this->normalizeFulfillmentData($data);
         $data['total'] = (float) $order->subtotal + (float) $order->tax + (float) $data['shipping_cost'];
+
+        $gateOrder = clone $order;
+        $gateOrder->forceFill([
+            'fulfillment_method' => $data['fulfillment_method'],
+        ]);
+
+        try {
+            $paymentGate->assertOrderStatusAllowed($gateOrder, $data['status']);
+        } catch (InvalidArgumentException $exception) {
+            return back()->withErrors(['status' => $exception->getMessage()])->withInput();
+        }
 
         $order->update([
             'status' => $data['status'],

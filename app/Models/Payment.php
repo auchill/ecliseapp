@@ -42,6 +42,7 @@ class Payment extends Model
 
     protected $fillable = [
         'payment_number',
+        'receipt_number',
         'payable_type',
         'payable_id',
         'invoice_id',
@@ -57,6 +58,11 @@ class Payment extends Model
         'gateway_reference_id',
         'gateway_payment_id',
         'gateway_reference',
+        'manual_reference',
+        'proof_path',
+        'proof_original_name',
+        'proof_mime_type',
+        'proof_size',
         'gateway_customer_id',
         'gateway_payment_method_id',
         'idempotency_key',
@@ -81,6 +87,12 @@ class Payment extends Model
         'received_by',
         'verified_by',
         'verified_at',
+        'submitted_at',
+        'rejected_by',
+        'rejected_at',
+        'rejection_reason',
+        'created_by',
+        'source_ip',
         'failure_code',
         'failure_message',
         'admin_note',
@@ -150,12 +162,15 @@ class Payment extends Model
             'raw_response' => 'array',
             'checkout_data' => 'array',
             'metadata' => 'array',
+            'proof_size' => 'integer',
             'paid_at' => 'datetime',
             'authorized_at' => 'datetime',
             'failed_at' => 'datetime',
             'cancelled_at' => 'datetime',
             'refunded_at' => 'datetime',
             'verified_at' => 'datetime',
+            'submitted_at' => 'datetime',
+            'rejected_at' => 'datetime',
         ];
     }
 
@@ -199,6 +214,21 @@ class Payment extends Model
         return $this->belongsTo(User::class, 'verified_by');
     }
 
+    public function rejecter(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'rejected_by');
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function auditLogs(): HasMany
+    {
+        return $this->hasMany(PaymentAuditLog::class);
+    }
+
     public function repairOrder(): BelongsTo
     {
         return $this->belongsTo(Repair::class, 'repair_id');
@@ -207,6 +237,21 @@ class Payment extends Model
     public function isPaid(): bool
     {
         return in_array($this->status, PaymentStatus::successfulValues(), true);
+    }
+
+    public function hasSettledFunds(): bool
+    {
+        return in_array($this->status, array_merge(PaymentStatus::successfulValues(), [
+            PaymentStatus::PartiallyRefunded->value,
+            PaymentStatus::Refunded->value,
+        ]), true);
+    }
+
+    public function canRequestRefund(): bool
+    {
+        return in_array($this->status, array_merge(PaymentStatus::successfulValues(), [
+            PaymentStatus::PartiallyRefunded->value,
+        ]), true) && (float) $this->refunded_amount + 0.01 < (float) $this->amount;
     }
 
     public function gatewayLabel(): string
@@ -228,5 +273,10 @@ class Payment extends Model
     public function sourceLabel(): string
     {
         return self::SOURCES[$this->source] ?? ucfirst((string) $this->source);
+    }
+
+    public function receiptNumber(): string
+    {
+        return $this->receipt_number ?: sprintf('RCT-%s-%07d', ($this->paid_at ?: $this->created_at ?: now())->format('Y'), $this->id);
     }
 }

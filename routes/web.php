@@ -5,16 +5,23 @@ use App\Http\Controllers\Admin\CustomerController as AdminCustomerController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\DeviceController as AdminDeviceController;
 use App\Http\Controllers\Admin\EcliseMarkupController as AdminEcliseMarkupController;
+use App\Http\Controllers\Admin\InvoiceController as AdminInvoiceController;
+use App\Http\Controllers\Admin\ManualPaymentController as AdminManualPaymentController;
 use App\Http\Controllers\Admin\MobileSentrixController as AdminMobileSentrixController;
 use App\Http\Controllers\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Admin\PartCategoryController as AdminPartCategoryController;
 use App\Http\Controllers\Admin\PartController as AdminPartController;
 use App\Http\Controllers\Admin\PaymentController as AdminPaymentController;
+use App\Http\Controllers\Admin\PaymentSettingsController as AdminPaymentSettingsController;
+use App\Http\Controllers\Admin\PaymentVerificationController as AdminPaymentVerificationController;
+use App\Http\Controllers\Admin\PaymentWebhookEventController as AdminPaymentWebhookEventController;
 use App\Http\Controllers\Admin\PermissionController as AdminPermissionController;
 use App\Http\Controllers\Admin\ProductCategoryController as AdminProductCategoryController;
 use App\Http\Controllers\Admin\ProductController as AdminProductController;
 use App\Http\Controllers\Admin\QuoteController as AdminQuoteController;
+use App\Http\Controllers\Admin\ReconciliationController as AdminReconciliationController;
 use App\Http\Controllers\Admin\ReferenceController as AdminReferenceController;
+use App\Http\Controllers\Admin\RefundController as AdminRefundController;
 use App\Http\Controllers\Admin\RepairController as AdminRepairController;
 use App\Http\Controllers\Admin\RepairConversationController as AdminRepairConversationController;
 use App\Http\Controllers\Admin\ShippingDiscountRuleController as AdminShippingDiscountRuleController;
@@ -26,6 +33,7 @@ use App\Http\Controllers\CertifiedPreOwnedDeviceController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\CustomerDashboardController;
+use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\OrderTrackingController;
 use App\Http\Controllers\PartController;
 use App\Http\Controllers\PartsMenuController;
@@ -79,6 +87,7 @@ Route::middleware('no_admin_cart')->group(function (): void {
     Route::get('/payments/{payment}/stripe/success', [PaymentController::class, 'stripeSuccess'])->name('payments.stripe.success');
     Route::get('/payments/{payment}/paypal/return', [PaymentController::class, 'paypalReturn'])->name('payments.paypal.return');
     Route::get('/payments/{payment}/cancel', [PaymentController::class, 'cancel'])->name('payments.cancel');
+    Route::get('/payments/{payment}/receipt', [PaymentController::class, 'receipt'])->name('payments.receipt');
 });
 
 Route::middleware('guest')->group(function (): void {
@@ -100,6 +109,8 @@ Route::middleware(['auth', 'customer'])->group(function (): void {
     Route::post('/repair-conversations/{repairConversation}/accept', [RepairConversationController::class, 'accept'])->whereNumber('repairConversation')->name('repair-conversations.accept');
     Route::post('/repair-conversations/{repairConversation}/payment', [RepairConversationController::class, 'payment'])->whereNumber('repairConversation')->middleware('no_admin_cart')->name('repair-conversations.payment');
     Route::get('/my-orders', [CustomerDashboardController::class, 'orders'])->name('customer.orders');
+    Route::get('/invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
+    Route::get('/invoices/{invoice}/print', [InvoiceController::class, 'print'])->name('invoices.print');
 });
 
 Route::middleware(['auth', 'customer', 'no_admin_cart'])->group(function (): void {
@@ -190,8 +201,28 @@ Route::middleware('admin')->prefix('admin')->name('admin.')->group(function (): 
     Route::get('/parts/suggestions', [AdminPartController::class, 'suggestions'])->name('parts.suggestions');
     Route::resource('parts', AdminPartController::class)->except(['show']);
     Route::resource('parts/part-categories', AdminPartCategoryController::class)->names('part-categories')->except(['show']);
+    Route::get('/payments/dashboard', [AdminPaymentController::class, 'dashboard'])->name('payments.dashboard');
+    Route::get('/payments/manual/create', [AdminManualPaymentController::class, 'create'])->name('payments.manual.create');
+    Route::post('/payments/manual', [AdminManualPaymentController::class, 'store'])->name('payments.manual.store');
+    Route::get('/payments/pending-verification', [AdminPaymentVerificationController::class, 'index'])->name('payments.pending-verification');
+    Route::patch('/payments/{payment}/verify-interac', [AdminPaymentVerificationController::class, 'verify'])->name('payments.verify-interac');
+    Route::patch('/payments/{payment}/reject-interac', [AdminPaymentVerificationController::class, 'reject'])->name('payments.reject-interac');
+    Route::get('/payments/reconciliation', [AdminReconciliationController::class, 'index'])->name('payments.reconciliation');
+    Route::post('/payments/reconciliation', [AdminReconciliationController::class, 'run'])->name('payments.reconciliation.run');
+    Route::get('/payments/settings', [AdminPaymentSettingsController::class, 'edit'])->name('payments.settings');
+    Route::post('/payments/settings', [AdminPaymentSettingsController::class, 'update'])->name('payments.settings.update');
     Route::get('/payments', [AdminPaymentController::class, 'index'])->name('payments.index');
     Route::get('/payments/{payment}', [AdminPaymentController::class, 'show'])->name('payments.show');
+    Route::get('/payments/{payment}/proof', [AdminPaymentController::class, 'proof'])->name('payments.proof');
+    Route::post('/payments/{payment}/refunds', [AdminRefundController::class, 'store'])->name('payments.refunds.store');
+    Route::get('/invoices', [AdminInvoiceController::class, 'index'])->name('invoices.index');
+    Route::get('/invoices/{invoice}', [AdminInvoiceController::class, 'show'])->name('invoices.show');
+    Route::get('/invoices/{invoice}/print', [AdminInvoiceController::class, 'print'])->name('invoices.print');
+    Route::patch('/invoices/{invoice}/cancel', [AdminInvoiceController::class, 'cancel'])->name('invoices.cancel');
+    Route::get('/refunds', [AdminRefundController::class, 'index'])->name('refunds.index');
+    Route::patch('/refunds/{refund}/approve', [AdminRefundController::class, 'approve'])->name('refunds.approve');
+    Route::patch('/refunds/{refund}/process', [AdminRefundController::class, 'process'])->name('refunds.process');
+    Route::get('/payment-webhooks', [AdminPaymentWebhookEventController::class, 'index'])->name('payment-webhooks.index');
     Route::resource('shipping/methods', AdminShippingMethodController::class)->parameters(['methods' => 'shippingMethod'])->names('shipping-methods')->except(['show']);
     Route::resource('shipping/discounts', AdminShippingDiscountRuleController::class)->parameters(['discounts' => 'shippingDiscount'])->names('shipping-discounts')->except(['show']);
 

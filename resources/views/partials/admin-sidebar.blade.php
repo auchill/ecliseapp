@@ -10,6 +10,17 @@
         'MobileSentrix Devices' => [
             ['label' => 'Pre-Owned Devices', 'route' => 'admin.devices.index', 'icon' => 'bi-phone', 'active' => 'admin.devices.*'],
         ],
+        'Payments' => [
+            ['label' => 'Dashboard', 'route' => 'admin.payments.dashboard', 'icon' => 'bi-graph-up-arrow', 'active' => 'admin.payments.dashboard'],
+            ['label' => 'All Payments', 'route' => 'admin.payments.index', 'icon' => 'bi-credit-card-2-front', 'active' => 'admin.payments.index'],
+            ['label' => 'Manual Payment', 'route' => 'admin.payments.manual.create', 'icon' => 'bi-cash-coin', 'active' => 'admin.payments.manual.*'],
+            ['label' => 'Pending Verification', 'route' => 'admin.payments.pending-verification', 'icon' => 'bi-hourglass-split', 'active' => 'admin.payments.pending-verification'],
+            ['label' => 'Invoices', 'route' => 'admin.invoices.index', 'icon' => 'bi-file-earmark-text', 'active' => 'admin.invoices.*'],
+            ['label' => 'Refunds', 'route' => 'admin.refunds.index', 'icon' => 'bi-arrow-counterclockwise', 'active' => 'admin.refunds.*'],
+            ['label' => 'Webhook Events', 'route' => 'admin.payment-webhooks.index', 'icon' => 'bi-broadcast', 'active' => 'admin.payment-webhooks.*'],
+            ['label' => 'Reconciliation', 'route' => 'admin.payments.reconciliation', 'icon' => 'bi-list-check', 'active' => 'admin.payments.reconciliation*'],
+            ['label' => 'Settings', 'route' => 'admin.payments.settings', 'icon' => 'bi-sliders', 'active' => 'admin.payments.settings*'],
+        ],
         'Repairs' => [
             ['label' => 'Repairs', 'route' => 'admin.repairs.index', 'icon' => 'bi-tools', 'active' => 'admin.repairs.*', 'visible' => auth()->user()?->isAdmin() === true],
             ['label' => 'Device Types', 'route' => 'admin.device-types.index', 'icon' => 'bi-hdd-stack', 'active' => 'admin.device-types.*'],

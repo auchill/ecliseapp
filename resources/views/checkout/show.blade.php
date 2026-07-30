@@ -8,6 +8,7 @@
         $tax = round($subtotal * 0.13, 2);
         $selectedFulfillment = $shippingMethods->isEmpty() ? 'pickup' : old('fulfillment_method', 'pickup');
         $selectedShippingMethodId = (string) old('shipping_method_id', array_key_first($shippingQuotes) ?? '');
+        $paymentMethods = app(\App\Services\Payments\PaymentSettingsService::class)->paymentMethodOptions(customerFacing: true);
     @endphp
 
     <section class="page-header">
@@ -40,13 +41,21 @@
                             <div class="col-12">
                                 <label class="form-label d-block">Payment method</label>
                                 <div class="row g-3">
-                                    @foreach (['stripe' => 'Stripe', 'paypal' => 'PayPal'] as $gateway => $label)
+                                    @foreach ($paymentMethods as $gateway => $label)
                                         <div class="col-md-6">
                                             <label class="surface p-3 d-flex gap-3 h-100" for="payment_{{ $gateway }}">
                                                 <input class="form-check-input mt-1" id="payment_{{ $gateway }}" name="payment_gateway" type="radio" value="{{ $gateway }}" required @checked(old('payment_gateway', 'stripe') === $gateway)>
                                                 <span>
                                                     <strong>{{ $label }}</strong>
-                                                    <span class="d-block muted small">{{ $gateway === 'stripe' ? 'Cards, Apple Pay, and Google Pay where available.' : 'Pay with your PayPal account or supported PayPal options.' }}</span>
+                                                    <span class="d-block muted small">
+                                                        @switch($gateway)
+                                                            @case('stripe') Cards, Apple Pay, and Google Pay where available. @break
+                                                            @case('paypal') Pay with your PayPal account or supported PayPal options. @break
+                                                            @case('interac') Submit an e-Transfer reference for staff verification. @break
+                                                            @case('pay_in_store') Pay at pickup before the order is released. @break
+                                                            @default Payment will be confirmed by staff.
+                                                        @endswitch
+                                                    </span>
                                                 </span>
                                             </label>
                                         </div>

@@ -7,6 +7,8 @@ use App\Models\Customer;
 use App\Models\Repair;
 use App\Services\AddressSnapshotFormatter;
 use App\Services\PaymentGatewayService;
+use App\Services\Payments\InvoiceService;
+use App\Services\Payments\PaymentSettingsService;
 use App\Services\ShippingCostService;
 use Illuminate\Http\Request;
 use InvalidArgumentException;
@@ -74,6 +76,8 @@ class RepairController extends Controller
         ShippingCostService $shippingCosts,
         PaymentGatewayService $paymentGateways,
         AddressSnapshotFormatter $addressFormatter,
+        InvoiceService $invoices,
+        PaymentSettingsService $paymentSettings,
     ) {
         abort_if($request->user()?->isAdmin(), 403);
 
@@ -99,10 +103,14 @@ class RepairController extends Controller
             'postal_code' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:40'],
             'country' => ['required_if:fulfillment_method,shipping', 'nullable', 'string', 'max:120'],
             'customer_remark' => ['nullable', 'string', 'max:3000'],
-            'payment_gateway' => ['required', 'in:stripe,paypal'],
+            'payment_gateway' => ['required', 'in:stripe,paypal,interac'],
             'payment_amount_option' => ['required', 'in:minimum,full'],
             'terms_accepted' => ['accepted'],
         ]);
+
+        if (! array_key_exists($data['payment_gateway'], $paymentSettings->paymentMethodOptions(customerFacing: true))) {
+            return back()->withErrors(['payment_gateway' => 'The selected payment method is not currently available.'])->withInput();
+        }
 
         $baseSubtotal = (float) $booking->subtotal + (float) $booking->tax_amount;
 
@@ -173,13 +181,22 @@ class RepairController extends Controller
             }
         }
 
+        $invoice = $invoices->createRepairFinalInvoice($booking->fresh('customer'));
+        $isInterac = $data['payment_gateway'] === 'interac';
+
         $payment = $booking->payments()->create([
+            'invoice_id' => $invoice->id,
+            'customer_id' => $customer->id,
             'repair_id' => $booking->id,
             'source' => 'repair',
             'gateway' => $data['payment_gateway'],
+            'method' => $data['payment_gateway'],
+            'provider' => in_array($data['payment_gateway'], ['stripe', 'paypal'], true) ? $data['payment_gateway'] : 'manual',
+            'purpose' => 'balance',
             'amount' => $paymentAmount,
             'currency' => 'cad',
-            'status' => 'pending',
+            'status' => $isInterac ? 'pending_verification' : 'pending',
+            'submitted_at' => $isInterac ? now() : null,
             'checkout_data' => [
                 'customer_id' => $customer->id,
                 'fulfillment' => $data,

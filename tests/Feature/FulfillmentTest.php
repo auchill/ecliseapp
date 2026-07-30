@@ -588,7 +588,7 @@ test('admin status updates create timelines and queue mail rendering', function 
         'shipping_cost' => 20,
         'total' => 133,
         'status' => 'Pending',
-        'payment_status' => 'Pending',
+        'payment_status' => 'paid',
         'payment_provider' => 'stripe',
         'fulfillment_method' => 'shipping',
     ]);
@@ -596,7 +596,7 @@ test('admin status updates create timelines and queue mail rendering', function 
     $this->actingAs($admin)
         ->patch(route('admin.orders.update', $order), [
             'status' => 'Shipped',
-            'payment_status' => 'Paid',
+            'payment_status' => 'paid',
             'fulfillment_method' => 'shipping',
             'shipping_cost' => 20,
             'recipient_name' => 'Mail Customer',
@@ -636,19 +636,20 @@ test('admin status updates create timelines and queue mail rendering', function 
         'terms_accepted' => true,
         'status' => 'booking_created',
         'repair_status' => 'booking_created',
-        'payment_status' => 'unpaid',
+        'payment_status' => 'paid',
         'fulfillment_method' => 'shipping',
         'shipping_cost' => 20,
         'shipping_amount' => 20,
         'repair_total' => 20,
         'total_amount' => 20,
-        'balance_due' => 20,
+        'amount_paid' => 20,
+        'balance_due' => 0,
     ]);
 
     $this->actingAs($admin)
         ->patch(route('admin.repairs.update', $repair), [
             'status' => 'shipped',
-            'payment_status' => 'unpaid',
+            'payment_status' => 'paid',
             'fulfillment_method' => 'shipping',
             'shipping_cost' => 20,
             'recipient_name' => 'Repair Mail',

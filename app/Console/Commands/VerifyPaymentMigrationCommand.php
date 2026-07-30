@@ -9,6 +9,7 @@ use App\Enums\PaymentPurpose;
 use App\Enums\PaymentStatus;
 use App\Enums\RefundStatus;
 use App\Models\Payment;
+use App\Services\Payments\PaymentSettingsService;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -37,6 +38,8 @@ class VerifyPaymentMigrationCommand extends Command
         $this->checkRefunds();
         $this->checkInvoices();
         $this->checkWebhookEvents();
+        $this->checkSettings();
+        $this->checkAuditLogs();
         $this->checkAggregateConsistency();
 
         $status = $this->blockers === []
@@ -72,12 +75,15 @@ class VerifyPaymentMigrationCommand extends Command
             'payment_webhook_events',
             'invoices',
             'invoice_items',
+            'payment_settings',
+            'payment_audit_logs',
         ] as $table) {
             $this->addMetric('schema', "{$table}_table_exists", $this->hasTable($table) ? 'yes' : 'no', ! $this->hasTable($table));
         }
 
         $paymentColumns = [
             'payment_number',
+            'receipt_number',
             'invoice_id',
             'customer_id',
             'purpose',
@@ -86,8 +92,15 @@ class VerifyPaymentMigrationCommand extends Command
             'refunded_amount',
             'gateway_payment_id',
             'gateway_reference',
+            'manual_reference',
+            'proof_path',
             'received_by',
             'verified_by',
+            'submitted_at',
+            'rejected_by',
+            'rejection_reason',
+            'created_by',
+            'source_ip',
             'metadata',
         ];
 
@@ -106,11 +119,16 @@ class VerifyPaymentMigrationCommand extends Command
         $allowedMethods = array_map(fn (PaymentMethod $method): string => $method->value, PaymentMethod::cases());
         $allowedProviders = array_map(fn (PaymentProvider $provider): string => $provider->value, PaymentProvider::cases());
         $allowedPurposes = array_map(fn (PaymentPurpose $purpose): string => $purpose->value, PaymentPurpose::cases());
-        $successful = PaymentStatus::successfulValues();
+        $settled = $this->settledPaymentStatuses();
 
         $total = DB::table('payments')->count();
         $invalidStatuses = DB::table('payments')->whereNotIn('status', $allowedStatuses)->count();
-        $successfulWithoutPaidAt = DB::table('payments')->whereIn('status', $successful)->whereNull('paid_at')->count();
+        $successfulWithoutPaidAt = DB::table('payments')->whereIn('status', $settled)->whereNull('paid_at')->count();
+        $successfulWithoutReceipt = $this->hasColumn('payments', 'receipt_number')
+            ? DB::table('payments')->whereIn('status', $settled)->where(function ($query): void {
+                $query->whereNull('receipt_number')->orWhere('receipt_number', '');
+            })->count()
+            : $total;
         $refundedOverAmount = $this->hasColumn('payments', 'refunded_amount')
             ? DB::table('payments')->whereRaw('refunded_amount > amount')->count()
             : 0;
@@ -135,10 +153,26 @@ class VerifyPaymentMigrationCommand extends Command
             : 0;
         $orphanedPayables = $this->orphanedPayableCount();
         $manualSuccessfulWithoutReceiver = $this->manualSuccessfulWithoutReceiverCount();
+        $verifiedInteracWithoutVerifier = $this->hasColumn('payments', 'verified_by')
+            ? DB::table('payments')
+                ->where('method', 'interac')
+                ->whereIn('status', $settled)
+                ->whereNull('verified_by')
+                ->count()
+            : 0;
+        $pendingInteracWithoutSubmittedAt = $this->hasColumn('payments', 'submitted_at')
+            ? DB::table('payments')
+                ->where('method', 'interac')
+                ->where('status', PaymentStatus::PendingVerification->value)
+                ->whereNull('submitted_at')
+                ->count()
+            : 0;
 
         $this->addMetric('payments', 'total_payments', $total);
         $this->addMetric('payments', 'missing_payment_numbers', $missingPaymentNumbers, $missingPaymentNumbers > 0);
         $this->addMetric('payments', 'duplicate_payment_numbers', $duplicatePaymentNumbers, $duplicatePaymentNumbers > 0);
+        $this->addMetric('payments', 'missing_receipt_numbers_for_settled_payments', $successfulWithoutReceipt, false, $successfulWithoutReceipt > 0);
+        $this->addMetric('payments', 'duplicate_receipt_numbers', $this->duplicateValueCount('payments', 'receipt_number'), $this->duplicateValueCount('payments', 'receipt_number') > 0);
         $this->addMetric('payments', 'invalid_statuses', $invalidStatuses, $invalidStatuses > 0);
         $this->addMetric('payments', 'successful_without_paid_at', $successfulWithoutPaidAt, $successfulWithoutPaidAt > 0);
         $this->addMetric('payments', 'refunded_amount_over_payment_amount', $refundedOverAmount, $refundedOverAmount > 0);
@@ -149,6 +183,8 @@ class VerifyPaymentMigrationCommand extends Command
         $this->addMetric('payments', 'invalid_purposes', $invalidPurposes, $invalidPurposes > 0);
         $this->addMetric('payments', 'orphaned_payable_records', $orphanedPayables, $orphanedPayables > 0);
         $this->addMetric('payments', 'manual_successful_without_receiver', $manualSuccessfulWithoutReceiver, false, $manualSuccessfulWithoutReceiver > 0);
+        $this->addMetric('payments', 'verified_interac_without_verifier', $verifiedInteracWithoutVerifier, false, $verifiedInteracWithoutVerifier > 0);
+        $this->addMetric('payments', 'pending_interac_without_submitted_at', $pendingInteracWithoutSubmittedAt, false, $pendingInteracWithoutSubmittedAt > 0);
         $this->addMetric('payments', 'duplicate_gateway_payment_ids', $this->duplicateValueCount('payments', 'gateway_payment_id'), $this->duplicateValueCount('payments', 'gateway_payment_id') > 0);
     }
 
@@ -161,7 +197,7 @@ class VerifyPaymentMigrationCommand extends Command
         $orphans = $this->invalidForeignKeyCount('payment_transactions', 'payment_id', 'payments');
         $successfulPaymentsWithoutTransaction = $this->hasTable('payments')
             ? DB::table('payments')
-                ->whereIn('status', PaymentStatus::successfulValues())
+                ->whereIn('status', $this->settledPaymentStatuses())
                 ->whereNotExists(function ($query): void {
                     $query->selectRaw('1')
                         ->from('payment_transactions')
@@ -250,6 +286,32 @@ class VerifyPaymentMigrationCommand extends Command
         $this->addMetric('webhooks', 'failed_webhook_events', $failedEvents, false, $failedEvents > 0);
     }
 
+    private function checkSettings(): void
+    {
+        if (! $this->hasTable('payment_settings')) {
+            return;
+        }
+
+        $missingDefaults = collect(array_keys(PaymentSettingsService::DEFAULTS))
+            ->reject(fn (string $key): bool => DB::table('payment_settings')->where('key', $key)->exists())
+            ->count();
+
+        $this->addMetric('settings', 'total_payment_settings', DB::table('payment_settings')->count());
+        $this->addMetric('settings', 'missing_default_payment_settings', $missingDefaults, $missingDefaults > 0);
+    }
+
+    private function checkAuditLogs(): void
+    {
+        if (! $this->hasTable('payment_audit_logs')) {
+            return;
+        }
+
+        $this->addMetric('audit_logs', 'total_payment_audit_logs', DB::table('payment_audit_logs')->count());
+        $this->addMetric('audit_logs', 'invalid_payment_id', $this->invalidForeignKeyCount('payment_audit_logs', 'payment_id', 'payments'), $this->invalidForeignKeyCount('payment_audit_logs', 'payment_id', 'payments') > 0);
+        $this->addMetric('audit_logs', 'invalid_invoice_id', $this->invalidForeignKeyCount('payment_audit_logs', 'invoice_id', 'invoices'), $this->invalidForeignKeyCount('payment_audit_logs', 'invoice_id', 'invoices') > 0);
+        $this->addMetric('audit_logs', 'invalid_refund_id', $this->invalidForeignKeyCount('payment_audit_logs', 'refund_id', 'payment_refunds'), $this->invalidForeignKeyCount('payment_audit_logs', 'refund_id', 'payment_refunds') > 0);
+    }
+
     private function checkAggregateConsistency(): void
     {
         if ($this->hasTable('orders') && $this->hasTable('payments')) {
@@ -259,7 +321,7 @@ class VerifyPaymentMigrationCommand extends Command
                     $query->selectRaw('1')
                         ->from('payments')
                         ->whereColumn('payments.order_id', 'orders.id')
-                        ->whereIn('payments.status', PaymentStatus::successfulValues());
+                        ->whereIn('payments.status', $this->settledPaymentStatuses());
                 })
                 ->count();
 
@@ -274,7 +336,7 @@ class VerifyPaymentMigrationCommand extends Command
                     $total = (float) ($repair->total_amount ?: $repair->repair_total);
                     $paid = (float) DB::table('payments')
                         ->where('repair_id', $repair->id)
-                        ->whereIn('status', PaymentStatus::successfulValues())
+                        ->whereIn('status', $this->settledPaymentStatuses())
                         ->sum('amount');
 
                     return $total > 0 && round($paid, 2) + 0.01 < round($total, 2);
@@ -308,13 +370,21 @@ class VerifyPaymentMigrationCommand extends Command
         }
 
         return DB::table('payments')
-            ->whereIn('status', PaymentStatus::successfulValues())
+            ->whereIn('status', $this->settledPaymentStatuses())
             ->whereNull('received_by')
             ->where(function ($query): void {
                 $query->whereIn('provider', ['manual', 'terminal'])
                     ->orWhereIn('method', ['cash', 'interac', 'debit_terminal', 'credit_terminal', 'pay_in_store']);
             })
             ->count();
+    }
+
+    private function settledPaymentStatuses(): array
+    {
+        return array_merge(PaymentStatus::successfulValues(), [
+            PaymentStatus::PartiallyRefunded->value,
+            PaymentStatus::Refunded->value,
+        ]);
     }
 
     private function duplicateValueCount(string $table, string $column): int

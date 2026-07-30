@@ -6,10 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Mail\RepairStatusUpdatedMail;
 use App\Models\Repair;
 use App\Services\AddressSnapshotFormatter;
+use App\Services\Payments\PaymentGateService;
 use App\Services\RepairNegotiationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
+use InvalidArgumentException;
 
 class RepairController extends Controller
 {
@@ -63,7 +65,7 @@ class RepairController extends Controller
         ]);
     }
 
-    public function update(Request $request, Repair $repair, AddressSnapshotFormatter $addressFormatter)
+    public function update(Request $request, Repair $repair, AddressSnapshotFormatter $addressFormatter, PaymentGateService $paymentGate)
     {
         $data = $request->validate([
             'status' => ['required', Rule::in(array_keys(Repair::STATUS_LABELS))],
@@ -92,6 +94,17 @@ class RepairController extends Controller
         $statusChanged = $repair->status !== $data['status'];
         $data = $this->normalizeFulfillmentData($data);
         $data['repair_total'] = round((float) $repair->subtotal + (float) $repair->tax_amount + (float) $data['shipping_cost'], 2);
+
+        $gateRepair = clone $repair;
+        $gateRepair->forceFill([
+            'fulfillment_method' => $data['fulfillment_method'],
+        ]);
+
+        try {
+            $paymentGate->assertRepairStatusAllowed($gateRepair, $data['status']);
+        } catch (InvalidArgumentException $exception) {
+            return back()->withErrors(['status' => $exception->getMessage()])->withInput();
+        }
         $shippingSnapshot = $data['fulfillment_method'] === 'pickup'
             ? [
                 'shipping_method_id' => null,

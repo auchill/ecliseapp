@@ -13,12 +13,18 @@ use App\Models\RepairPartOption;
 use App\Models\RepairPartSelection;
 use App\Models\User;
 use App\Services\Parts\PartSearchService;
+use App\Services\Payments\InvoiceService;
+use App\Services\Payments\PaymentBalanceService;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 class RepairNegotiationService
 {
-    public function __construct(private readonly PartSearchService $partSearch) {}
+    public function __construct(
+        private readonly PartSearchService $partSearch,
+        private readonly InvoiceService $invoices,
+        private readonly PaymentBalanceService $balances,
+    ) {}
 
     public function conversationForRepair(Repair $repair): RepairConversation
     {
@@ -318,19 +324,26 @@ class RepairNegotiationService
             }
 
             $repair = $conversation->repair;
-            $amount = round(max(0, (float) $conversation->final_total - (float) $repair->amount_paid), 2);
+            $invoice = $this->invoices->createRepairDepositInvoice($conversation);
+            $amount = $this->balances->invoiceBalanceDue($invoice);
 
             if ($amount <= 0) {
                 throw new InvalidArgumentException('There is no repair balance available for payment.');
             }
 
             $payment = $repair->payments()->create([
+                'invoice_id' => $invoice->id,
+                'customer_id' => $customer->id,
                 'repair_id' => $repair->id,
                 'source' => 'repair',
                 'gateway' => $gateway,
+                'method' => $gateway,
+                'provider' => in_array($gateway, ['stripe', 'paypal'], true) ? $gateway : 'manual',
+                'purpose' => $invoice->type === 'repair_deposit' ? 'deposit' : 'balance',
                 'amount' => $amount,
                 'currency' => 'cad',
-                'status' => 'pending',
+                'status' => $gateway === 'interac' ? 'pending_verification' : 'pending',
+                'submitted_at' => $gateway === 'interac' ? now() : null,
                 'checkout_data' => [
                     'customer_id' => $customer->id,
                     'conversation_id' => $conversation->id,

@@ -6,6 +6,7 @@ use App\Models\Customer;
 use App\Models\Repair;
 use App\Models\RepairConversation;
 use App\Services\PaymentGatewayService;
+use App\Services\Payments\PaymentSettingsService;
 use App\Services\RepairNegotiationService;
 use Illuminate\Http\Request;
 use InvalidArgumentException;
@@ -79,13 +80,18 @@ class RepairConversationController extends Controller
         Request $request,
         RepairNegotiationService $negotiation,
         PaymentGatewayService $paymentGateways,
+        PaymentSettingsService $paymentSettings,
     ) {
         $customer = Customer::forUser($request->user());
         abort_if($repairConversation->customer_id !== $customer->id, 403);
 
         $data = $request->validate([
-            'payment_gateway' => ['required', 'in:stripe,paypal'],
+            'payment_gateway' => ['required', 'in:stripe,paypal,interac'],
         ]);
+
+        if (! array_key_exists($data['payment_gateway'], $paymentSettings->paymentMethodOptions(customerFacing: true))) {
+            return back()->withErrors(['payment_gateway' => 'The selected payment method is not currently available.']);
+        }
 
         try {
             $payment = $negotiation->createPayment($repairConversation, $customer, $data['payment_gateway']);

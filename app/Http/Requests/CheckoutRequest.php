@@ -18,7 +18,7 @@ class CheckoutRequest extends FormRequest
             'full_name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255'],
             'phone' => ['required', 'string', 'max:40'],
-            'payment_gateway' => ['required', Rule::in(['stripe', 'paypal'])],
+            'payment_gateway' => ['required', Rule::in(['stripe', 'paypal', 'interac', 'pay_in_store'])],
             'fulfillment_method' => ['required', 'in:pickup,shipping'],
             'shipping_method_id' => [
                 'required_if:fulfillment_method,shipping',

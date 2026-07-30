@@ -13,7 +13,7 @@ class PaymentBalanceService
     public function invoicePaidAmount(Invoice $invoice): float
     {
         return round((float) $invoice->payments()
-            ->whereIn('status', PaymentStatus::successfulValues())
+            ->whereIn('status', $this->settledPaymentStatuses())
             ->sum('amount'), 2);
     }
 
@@ -53,7 +53,10 @@ class PaymentBalanceService
     {
         $paid = $this->invoiceNetPaidAmount($invoice);
         $refunded = $this->invoiceRefundedAmount($invoice);
-        $balance = round(max(0, (float) $invoice->total - $paid), 2);
+        $total = (float) $invoice->total;
+        $balance = $refunded >= $total && $total > 0
+            ? 0.0
+            : round(max(0, $total - $paid), 2);
 
         $invoice->forceFill([
             'amount_paid' => $paid,
@@ -97,5 +100,13 @@ class PaymentBalanceService
         }
 
         return $invoice->issued_at ? InvoiceStatus::Issued->value : InvoiceStatus::Draft->value;
+    }
+
+    private function settledPaymentStatuses(): array
+    {
+        return array_merge(PaymentStatus::successfulValues(), [
+            PaymentStatus::PartiallyRefunded->value,
+            PaymentStatus::Refunded->value,
+        ]);
     }
 }

@@ -8,6 +8,8 @@ use App\Models\CartItem;
 use App\Models\Customer;
 use App\Models\Order;
 use App\Services\PaymentGatewayService;
+use App\Services\Payments\InvoiceService;
+use App\Services\Payments\PaymentSettingsService;
 use App\Services\ShippingCostService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -48,6 +50,8 @@ class CheckoutController extends Controller
         CheckoutRequest $request,
         ShippingCostService $shippingCosts,
         PaymentGatewayService $paymentGateways,
+        InvoiceService $invoices,
+        PaymentSettingsService $paymentSettings,
     ) {
         abort_if($request->user()?->isAdmin(), 403);
 
@@ -59,6 +63,18 @@ class CheckoutController extends Controller
         }
 
         $data = $request->validated();
+
+        if (! array_key_exists($data['payment_gateway'], $paymentSettings->paymentMethodOptions(customerFacing: true))) {
+            return back()
+                ->withErrors(['payment_gateway' => 'The selected payment method is not currently available.'])
+                ->withInput();
+        }
+
+        if ($data['payment_gateway'] === 'pay_in_store' && $data['fulfillment_method'] !== 'pickup') {
+            return back()
+                ->withErrors(['payment_gateway' => 'Pay in store is available for pickup orders only.'])
+                ->withInput();
+        }
 
         try {
             $shippingQuote = $shippingCosts->calculateForFulfillment(
@@ -77,12 +93,36 @@ class CheckoutController extends Controller
         $tax = round($subtotal * 0.13, 2);
         $total = round($subtotal + $tax + (float) $data['shipping_cost'], 2);
 
+        $invoice = $invoices->createShopCheckoutInvoice(
+            $cart,
+            [
+                'full_name' => $data['full_name'],
+                'email' => $data['email'],
+                'phone' => $data['phone'],
+            ],
+            $data,
+            [
+                'subtotal' => $subtotal,
+                'tax' => $tax,
+                'total' => $total,
+            ],
+            $cartItems->all(),
+        );
+
+        $isInterac = $data['payment_gateway'] === 'interac';
+
         $payment = $cart->payments()->create([
+            'invoice_id' => $invoice->id,
+            'customer_id' => $cart->customer_id,
             'source' => 'shop',
             'gateway' => $data['payment_gateway'],
+            'method' => $data['payment_gateway'],
+            'provider' => in_array($data['payment_gateway'], ['stripe', 'paypal'], true) ? $data['payment_gateway'] : 'manual',
+            'purpose' => 'shop_order',
             'amount' => $total,
             'currency' => 'cad',
-            'status' => 'pending',
+            'status' => $isInterac ? 'pending_verification' : 'pending',
+            'submitted_at' => $isInterac ? now() : null,
             'checkout_data' => [
                 'user_id' => $request->user()->id,
                 'customer_id' => $cart->customer_id,
