@@ -3,6 +3,11 @@
 namespace App\Services;
 
 use App\Models\Payment;
+use App\Services\Payments\PaymentBalanceService;
+use App\Services\Payments\PaymentPayloadSanitizer;
+use App\Services\Payments\PaymentSettingsService;
+use App\Services\Payments\StripeApiClient;
+use App\Support\Money;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -10,6 +15,13 @@ use RuntimeException;
 
 class PaymentGatewayService
 {
+    public function __construct(
+        private readonly PaymentBalanceService $balances,
+        private readonly PaymentPayloadSanitizer $payloadSanitizer,
+        private readonly PaymentSettingsService $settings,
+        private readonly StripeApiClient $stripe,
+    ) {}
+
     public function createCheckout(Payment $payment): string
     {
         if ((float) $payment->amount <= 0) {
@@ -29,6 +41,8 @@ class PaymentGatewayService
 
         $response = Http::withToken($accessToken)
             ->acceptJson()
+            ->timeout(20)
+            ->connectTimeout(10)
             ->post($this->paypalBaseUrl().'/v2/checkout/orders/'.$payment->paypal_order_id.'/capture');
 
         if ($response->failed()) {
@@ -55,6 +69,8 @@ class PaymentGatewayService
 
         $response = Http::withToken($accessToken)
             ->acceptJson()
+            ->timeout(20)
+            ->connectTimeout(10)
             ->post($this->paypalBaseUrl().'/v1/notifications/verify-webhook-signature', [
                 'auth_algo' => $headers['paypal-auth-algo'] ?? null,
                 'cert_url' => $headers['paypal-cert-url'] ?? null,
@@ -72,17 +88,52 @@ class PaymentGatewayService
     {
         $secret = config('services.stripe.secret');
 
-        if (! $secret) {
+        if (! $secret || ! $this->settings->stripeReadyForCustomerCheckout()) {
+            Log::warning('Stripe checkout requested while Stripe is not ready', [
+                'payment_id' => $payment->id,
+                'readiness_status' => $this->settings->stripeReadiness()['status'],
+            ]);
+
             return route('payments.show', $payment);
+        }
+
+        try {
+            $amountInCents = $this->validatedStripeAmountInCents($payment);
+        } catch (RuntimeException $exception) {
+            Log::warning('Stripe checkout validation failed', [
+                'payment_id' => $payment->id,
+                'message' => $exception->getMessage(),
+            ]);
+
+            $payment->update([
+                'status' => 'failed',
+                'failure_message' => $exception->getMessage(),
+            ]);
+
+            return route('payments.show', $payment);
+        }
+
+        if ($payment->stripe_checkout_session_id && filled(data_get($payment->raw_response, 'url'))) {
+            return data_get($payment->raw_response, 'url');
+        }
+
+        if ($openSessionUrl = $this->openSiblingCheckoutUrl($payment)) {
+            return $openSessionUrl;
+        }
+
+        if (blank($payment->idempotency_key)) {
+            $payment->forceFill([
+                'idempotency_key' => 'stripe-checkout-payment-'.$payment->id,
+            ])->save();
         }
 
         $payable = $payment->payable;
         $customerEmail = data_get($payment->checkout_data, 'customer.email')
             ?: $payable?->customer?->email;
 
-        $response = Http::asForm()
-            ->withToken($secret)
-            ->post('https://api.stripe.com/v1/checkout/sessions', [
+        $response = $this->stripe
+            ->form(['Idempotency-Key' => $payment->idempotency_key])
+            ->post($this->stripe->url('checkout/sessions'), [
                 'mode' => 'payment',
                 'client_reference_id' => (string) $payment->id,
                 'customer_email' => $customerEmail,
@@ -90,37 +141,47 @@ class PaymentGatewayService
                 'cancel_url' => route('payments.cancel', $payment),
                 'payment_method_types[0]' => 'card',
                 'line_items[0][quantity]' => 1,
-                'line_items[0][price_data][currency]' => $payment->currency,
-                'line_items[0][price_data][unit_amount]' => (int) round((float) $payment->amount * 100),
+                'line_items[0][price_data][currency]' => strtolower((string) $payment->currency),
+                'line_items[0][price_data][unit_amount]' => $amountInCents,
                 'line_items[0][price_data][product_data][name]' => $this->paymentDescription($payment),
                 'metadata[payment_id]' => (string) $payment->id,
+                'metadata[payment_number]' => (string) $payment->payment_number,
+                'metadata[invoice_id]' => (string) $payment->invoice_id,
+                'metadata[invoice_number]' => (string) $payment->invoice?->invoice_number,
+                'metadata[purpose]' => (string) $payment->purpose,
                 'metadata[payable_type]' => class_basename($payment->payable_type),
                 'metadata[payable_id]' => (string) $payment->payable_id,
             ]);
 
+        $responsePayload = $response->json() ?: [
+            'status' => $response->status(),
+            'body' => Str::limit($response->body(), 1000),
+        ];
+
         if ($response->failed()) {
             Log::warning('Stripe checkout session creation failed', [
                 'payment_id' => $payment->id,
-                'response' => $response->json(),
+                'response' => $this->payloadSanitizer->sanitize($responsePayload),
             ]);
 
             $payment->update([
                 'status' => 'failed',
-                'raw_response' => $response->json(),
+                'failure_code' => data_get($responsePayload, 'error.code'),
+                'failure_message' => data_get($responsePayload, 'error.message'),
+                'raw_response' => $this->payloadSanitizer->sanitize($responsePayload),
             ]);
 
             return route('payments.show', $payment);
         }
 
-        $payload = $response->json();
         $payment->update([
-            'gateway_reference_id' => $payload['id'] ?? null,
-            'stripe_checkout_session_id' => $payload['id'] ?? null,
+            'gateway_reference_id' => $responsePayload['id'] ?? null,
+            'stripe_checkout_session_id' => $responsePayload['id'] ?? null,
             'status' => 'pending',
-            'raw_response' => $payload,
+            'raw_response' => $this->payloadSanitizer->sanitize($responsePayload),
         ]);
 
-        return $payload['url'] ?? route('payments.show', $payment);
+        return $responsePayload['url'] ?? route('payments.show', $payment);
     }
 
     private function createPayPalOrder(Payment $payment): string
@@ -131,6 +192,8 @@ class PaymentGatewayService
 
         $response = Http::withToken($this->paypalAccessToken())
             ->acceptJson()
+            ->timeout(20)
+            ->connectTimeout(10)
             ->post($this->paypalBaseUrl().'/v2/checkout/orders', [
                 'intent' => 'CAPTURE',
                 'purchase_units' => [[
@@ -182,6 +245,8 @@ class PaymentGatewayService
     {
         $response = Http::asForm()
             ->withBasicAuth(config('services.paypal.client_id'), config('services.paypal.secret'))
+            ->timeout(20)
+            ->connectTimeout(10)
             ->post($this->paypalBaseUrl().'/v1/oauth2/token', [
                 'grant_type' => 'client_credentials',
             ]);
@@ -213,5 +278,69 @@ class PaymentGatewayService
         }
 
         return class_basename($payment->payable_type).' '.$payment->payable_id;
+    }
+
+    /**
+     * Two tabs against one invoice must not become two live Checkout Sessions. When an equivalent
+     * Stripe attempt for the same invoice is still open, send the customer back to it.
+     */
+    private function openSiblingCheckoutUrl(Payment $payment): ?string
+    {
+        if (! $payment->invoice_id) {
+            return null;
+        }
+
+        $sibling = Payment::query()
+            ->where('invoice_id', $payment->invoice_id)
+            ->whereKeyNot($payment->id)
+            ->where('gateway', 'stripe')
+            ->where('status', 'pending')
+            ->whereNotNull('stripe_checkout_session_id')
+            ->whereRaw('CAST(amount AS DECIMAL(12,2)) = ?', [number_format((float) $payment->amount, 2, '.', '')])
+            ->latest('id')
+            ->first();
+
+        $url = data_get($sibling?->raw_response, 'url');
+
+        if (blank($url)) {
+            return null;
+        }
+
+        Log::info('Reusing an open Stripe checkout session for the same invoice', [
+            'payment_id' => $payment->id,
+            'reused_payment_id' => $sibling->id,
+            'invoice_id' => $payment->invoice_id,
+        ]);
+
+        return $url;
+    }
+
+    private function validatedStripeAmountInCents(Payment $payment): int
+    {
+        $payment->loadMissing('invoice');
+
+        if (strtolower((string) $payment->currency) !== 'cad') {
+            throw new RuntimeException('Stripe checkout currently supports CAD payments only.');
+        }
+
+        $amountInCents = Money::toMinorUnits($payment->amount);
+
+        if ($amountInCents <= 0) {
+            throw new RuntimeException('Stripe checkout amount must be greater than zero.');
+        }
+
+        if ($payment->invoice) {
+            $balanceDue = $this->balances->invoiceBalanceDue($payment->invoice->fresh());
+
+            if ($balanceDue <= 0) {
+                throw new RuntimeException('The linked invoice has no balance due.');
+            }
+
+            if ((float) $payment->amount > $balanceDue + 0.01) {
+                throw new RuntimeException('Stripe checkout amount exceeds the linked invoice balance.');
+            }
+        }
+
+        return $amountInCents;
     }
 }

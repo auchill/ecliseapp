@@ -9,6 +9,7 @@
         $selectedFulfillment = $shippingMethods->isEmpty() ? 'pickup' : old('fulfillment_method', 'pickup');
         $selectedShippingMethodId = (string) old('shipping_method_id', array_key_first($shippingQuotes) ?? '');
         $paymentMethods = app(\App\Services\Payments\PaymentSettingsService::class)->paymentMethodOptions(customerFacing: true);
+        $selectedPaymentGateway = old('payment_gateway', array_key_first($paymentMethods) ?? '');
     @endphp
 
     <section class="page-header">
@@ -44,7 +45,7 @@
                                     @foreach ($paymentMethods as $gateway => $label)
                                         <div class="col-md-6">
                                             <label class="surface p-3 d-flex gap-3 h-100" for="payment_{{ $gateway }}">
-                                                <input class="form-check-input mt-1" id="payment_{{ $gateway }}" name="payment_gateway" type="radio" value="{{ $gateway }}" required @checked(old('payment_gateway', 'stripe') === $gateway)>
+                                                <input class="form-check-input mt-1" id="payment_{{ $gateway }}" name="payment_gateway" type="radio" value="{{ $gateway }}" required @checked($selectedPaymentGateway === $gateway)>
                                                 <span>
                                                     <strong>{{ $label }}</strong>
                                                     <span class="d-block muted small">

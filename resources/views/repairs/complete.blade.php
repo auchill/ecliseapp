@@ -8,6 +8,9 @@
         $selectedFulfillment = $shippingMethods->isEmpty() ? 'pickup' : old('fulfillment_method', $booking->pickup_or_shipping_option ?: 'pickup');
         $selectedShippingMethodId = (string) old('shipping_method_id', $booking->shipping_method_id ?: array_key_first($shippingQuotes) ?? '');
         $paymentMethods = app(\App\Services\Payments\PaymentSettingsService::class)->paymentMethodOptions(customerFacing: true);
+        $selectedPaymentGateway = old('payment_gateway', $booking->payment_gateway && isset($paymentMethods[$booking->payment_gateway])
+            ? $booking->payment_gateway
+            : array_key_first($paymentMethods) ?? '');
     @endphp
 
     <section class="page-header">
@@ -70,7 +73,7 @@
                                 @continue($gateway === 'pay_in_store')
                                 <div class="col-md-6">
                                     <label class="surface p-3 d-flex gap-3 h-100" for="payment_{{ $gateway }}">
-                                        <input class="form-check-input mt-1" id="payment_{{ $gateway }}" name="payment_gateway" type="radio" value="{{ $gateway }}" @checked(old('payment_gateway', $booking->payment_gateway ?: 'stripe') === $gateway)>
+                                        <input class="form-check-input mt-1" id="payment_{{ $gateway }}" name="payment_gateway" type="radio" value="{{ $gateway }}" @checked($selectedPaymentGateway === $gateway)>
                                         <span><strong>{{ $label }}</strong></span>
                                     </label>
                                 </div>

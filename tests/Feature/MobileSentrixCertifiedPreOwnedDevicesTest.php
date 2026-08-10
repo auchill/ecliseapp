@@ -403,7 +403,7 @@ test('checkout creates mixed order items for retail and certified pre owned devi
             'full_name' => 'CPO Checkout',
             'email' => 'cpo-checkout@example.com',
             'phone' => '416-555-2000',
-            'payment_gateway' => 'stripe',
+            'payment_gateway' => 'interac',
             'fulfillment_method' => 'pickup',
         ])
         ->assertRedirect();

@@ -89,14 +89,19 @@ class PaymentController extends Controller
     private function authorizePaymentView(Payment $payment): void
     {
         $user = auth()->user();
-        $payable = $payment->payable;
 
-        abort_unless(
-            $user?->isAdmin()
-            || ($payable instanceof Cart && $payable->customer?->user_id === $user?->id)
-            || ($payable instanceof Order && $payable->customer?->user_id === $user?->id)
-            || ($payable instanceof Repair && $payable->customer?->user_id === $user?->id),
-            403,
-        );
+        abort_unless((bool) $user, 403);
+
+        if ($user->isAdmin()) {
+            return;
+        }
+
+        $payable = $payment->payable;
+        $ownerId = $payable instanceof Cart || $payable instanceof Order || $payable instanceof Repair
+            ? $payable->customer?->user_id
+            : null;
+
+        // Never compare two nulls: an orphaned payable must not resolve to "owned by everyone".
+        abort_unless($ownerId !== null && (int) $ownerId === (int) $user->id, 403);
     }
 }

@@ -65,7 +65,7 @@ test('checkout pickup creates a pickup order with zero shipping', function () {
             'full_name' => 'Pickup Customer',
             'email' => 'pickup@example.com',
             'phone' => '416-555-0001',
-            'payment_gateway' => 'stripe',
+            'payment_gateway' => 'interac',
             'fulfillment_method' => 'pickup',
         ])
         ->assertRedirect();
@@ -114,7 +114,7 @@ test('checkout normal shipping stores method snapshot and regular shipping cost'
             'full_name' => 'Shipping Customer',
             'email' => 'shipping@example.com',
             'phone' => '416-555-0002',
-            'payment_gateway' => 'paypal',
+            'payment_gateway' => 'interac',
             'fulfillment_method' => 'shipping',
             'shipping_method_id' => $method->id,
             'recipient_name' => 'Shipping Customer',
@@ -138,7 +138,7 @@ test('checkout normal shipping stores method snapshot and regular shipping cost'
         ->and((float) $order->shipping_base_cost)->toBe(20.0)
         ->and((float) $order->shipping_discount_amount)->toBe(0.0)
         ->and((float) $order->shipping_cost)->toBe(20.0)
-        ->and($order->latestPayment->gateway)->toBe('paypal')
+        ->and($order->latestPayment->gateway)->toBe('interac')
         ->and((float) $order->total)->toBe(133.0);
 
     $this->post(route('orders.track.result'), [
@@ -177,7 +177,7 @@ test('checkout applies the best matching shipping discount', function () {
             'full_name' => 'Free Shipping Customer',
             'email' => 'free-shipping@example.com',
             'phone' => '416-555-0101',
-            'payment_gateway' => 'stripe',
+            'payment_gateway' => 'interac',
             'fulfillment_method' => 'shipping',
             'shipping_method_id' => $normal->id,
             'recipient_name' => 'Free Shipping Customer',
@@ -224,7 +224,7 @@ test('checkout applies the best matching shipping discount', function () {
             'full_name' => 'Overnight Customer',
             'email' => 'overnight@example.com',
             'phone' => '416-555-0102',
-            'payment_gateway' => 'stripe',
+            'payment_gateway' => 'interac',
             'fulfillment_method' => 'shipping',
             'shipping_method_id' => $overnight->id,
             'recipient_name' => 'Overnight Customer',
@@ -289,7 +289,7 @@ test('repair shipping calculates selected return shipping method and appears in 
     ]);
 
     $this->actingAs($user)->post(route('repairs.complete.store', $repair->repair_number), [
-        'payment_gateway' => 'paypal',
+        'payment_gateway' => 'interac',
         'payment_amount_option' => 'minimum',
         'fulfillment_method' => 'shipping',
         'shipping_method_id' => $method->id,
@@ -314,7 +314,7 @@ test('repair shipping calculates selected return shipping method and appears in 
         ->and((float) $repair->shipping_discount_amount)->toBe(0.0)
         ->and((float) $repair->shipping_cost)->toBe(45.0)
         ->and($repair->payment_status)->toBe('unpaid')
-        ->and($repair->latestPayment->gateway)->toBe('paypal')
+        ->and($repair->latestPayment->gateway)->toBe('interac')
         ->and($repair->latestPayment->source)->toBe('repair')
         ->and((float) $repair->repair_total)->toBe(271.0)
         ->and((float) $repair->latestPayment->amount)->toBe(195.5);
@@ -354,7 +354,7 @@ test('verified payment finalization marks order paid and commits inventory once'
             'full_name' => 'Paid Customer',
             'email' => 'paid@example.com',
             'phone' => '416-555-9999',
-            'payment_gateway' => 'stripe',
+            'payment_gateway' => 'interac',
             'fulfillment_method' => 'pickup',
         ])
         ->assertRedirect();

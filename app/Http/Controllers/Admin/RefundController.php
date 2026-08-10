@@ -57,7 +57,7 @@ class RefundController extends Controller
         ]);
 
         try {
-            $refunds->processManual($refund, $request->user(), $data, $request->ip());
+            $refunds->process($refund, $request->user(), $data, $request->ip());
         } catch (InvalidArgumentException $exception) {
             return back()->withErrors(['refund' => $exception->getMessage()]);
         }

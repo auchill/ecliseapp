@@ -69,8 +69,8 @@ Route::get('/parts/suggestions', [PartController::class, 'suggestions'])->name('
 Route::get('/parts/{part}', [PartController::class, 'show'])->whereNumber('part')->name('parts.show');
 Route::get('/contact', [ContactController::class, 'create'])->name('contact.create');
 Route::post('/contact', [ContactController::class, 'store'])->name('contact.store');
-Route::post('/webhooks/stripe', [PaymentWebhookController::class, 'stripe'])->name('webhooks.stripe');
-Route::post('/webhooks/paypal', [PaymentWebhookController::class, 'paypal'])->name('webhooks.paypal');
+Route::post('/webhooks/stripe', [PaymentWebhookController::class, 'stripe'])->middleware('throttle:240,1')->name('webhooks.stripe');
+Route::post('/webhooks/paypal', [PaymentWebhookController::class, 'paypal'])->middleware('throttle:240,1')->name('webhooks.paypal');
 
 Route::middleware('no_admin_cart')->group(function (): void {
     Route::get('/repairs/book', [RepairController::class, 'create'])->name('repairs.create');
@@ -83,11 +83,13 @@ Route::middleware('no_admin_cart')->group(function (): void {
     Route::delete('/cart/products/{product}', [CartController::class, 'destroy'])->name('cart.destroy');
     Route::patch('/cart/items', [CartController::class, 'updateItem'])->name('cart.items.update');
     Route::delete('/cart/items', [CartController::class, 'destroyItem'])->name('cart.items.destroy');
-    Route::get('/payments/{payment}', [PaymentController::class, 'show'])->name('payments.show');
-    Route::get('/payments/{payment}/stripe/success', [PaymentController::class, 'stripeSuccess'])->name('payments.stripe.success');
-    Route::get('/payments/{payment}/paypal/return', [PaymentController::class, 'paypalReturn'])->name('payments.paypal.return');
-    Route::get('/payments/{payment}/cancel', [PaymentController::class, 'cancel'])->name('payments.cancel');
-    Route::get('/payments/{payment}/receipt', [PaymentController::class, 'receipt'])->name('payments.receipt');
+    Route::middleware('auth')->group(function (): void {
+        Route::get('/payments/{payment}', [PaymentController::class, 'show'])->name('payments.show');
+        Route::get('/payments/{payment}/stripe/success', [PaymentController::class, 'stripeSuccess'])->name('payments.stripe.success');
+        Route::get('/payments/{payment}/paypal/return', [PaymentController::class, 'paypalReturn'])->name('payments.paypal.return');
+        Route::get('/payments/{payment}/cancel', [PaymentController::class, 'cancel'])->name('payments.cancel');
+        Route::get('/payments/{payment}/receipt', [PaymentController::class, 'receipt'])->name('payments.receipt');
+    });
 });
 
 Route::middleware('guest')->group(function (): void {
@@ -223,6 +225,7 @@ Route::middleware('admin')->prefix('admin')->name('admin.')->group(function (): 
     Route::patch('/refunds/{refund}/approve', [AdminRefundController::class, 'approve'])->name('refunds.approve');
     Route::patch('/refunds/{refund}/process', [AdminRefundController::class, 'process'])->name('refunds.process');
     Route::get('/payment-webhooks', [AdminPaymentWebhookEventController::class, 'index'])->name('payment-webhooks.index');
+    Route::patch('/payment-webhooks/{event}/retry', [AdminPaymentWebhookEventController::class, 'retry'])->name('payment-webhooks.retry');
     Route::resource('shipping/methods', AdminShippingMethodController::class)->parameters(['methods' => 'shippingMethod'])->names('shipping-methods')->except(['show']);
     Route::resource('shipping/discounts', AdminShippingDiscountRuleController::class)->parameters(['discounts' => 'shippingDiscount'])->names('shipping-discounts')->except(['show']);
 

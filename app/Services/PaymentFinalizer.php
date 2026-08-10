@@ -157,7 +157,7 @@ class PaymentFinalizer
 
     public function markFailed(Payment $payment, string $status, array $rawResponse = []): Payment
     {
-        if (! in_array($status, ['failed', 'cancelled', 'refunded', 'partially_refunded'], true)) {
+        if (! in_array($status, ['failed', 'cancelled', 'refunded', 'partially_refunded', 'disputed', 'expired'], true)) {
             $status = 'failed';
         }
 
@@ -178,7 +178,11 @@ class PaymentFinalizer
 
         $this->recordTransaction(
             $payment->fresh(),
-            $status === 'cancelled' ? PaymentTransactionType::Void->value : PaymentTransactionType::Failure->value,
+            match ($status) {
+                'cancelled', 'expired' => PaymentTransactionType::Void->value,
+                'disputed' => PaymentTransactionType::Chargeback->value,
+                default => PaymentTransactionType::Failure->value,
+            },
             $status,
             (array) $sanitizedResponse,
             data_get($sanitizedResponse, 'error.code'),

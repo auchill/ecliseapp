@@ -12,7 +12,11 @@ class PaymentSettingsController extends Controller
 {
     public function edit(PaymentSettingsService $settings)
     {
-        return view('admin.payments.settings', ['settings' => $settings->all()]);
+        return view('admin.payments.settings', [
+            'settings' => $settings->all(),
+            'stripeReadiness' => $settings->stripeReadiness(),
+            'paypalReadiness' => $settings->paypalReadiness(),
+        ]);
     }
 
     public function update(Request $request, PaymentSettingsService $settings, PaymentAuditLogger $audit)

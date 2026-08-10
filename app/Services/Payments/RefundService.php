@@ -8,6 +8,7 @@ use App\Enums\RefundStatus;
 use App\Models\Payment;
 use App\Models\PaymentRefund;
 use App\Models\User;
+use App\Support\Money;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -17,6 +18,8 @@ class RefundService
         private readonly PaymentBalanceService $balances,
         private readonly PaymentSettingsService $settings,
         private readonly PaymentAuditLogger $audit,
+        private readonly PaymentPayloadSanitizer $payloadSanitizer,
+        private readonly StripeApiClient $stripe,
     ) {}
 
     public function request(Payment $payment, User $actor, array $data, ?string $sourceIp = null): PaymentRefund
@@ -130,6 +133,210 @@ class RefundService
 
             return $refund->fresh('payment.invoice');
         });
+    }
+
+    public function process(PaymentRefund $refund, User $actor, array $data, ?string $sourceIp = null): PaymentRefund
+    {
+        $refund->loadMissing('payment');
+
+        if ($refund->payment?->provider === 'stripe') {
+            return $this->processStripe($refund, $actor, $data, $sourceIp);
+        }
+
+        return $this->processManual($refund, $actor, $data, $sourceIp);
+    }
+
+    public function processStripe(PaymentRefund $refund, User $actor, array $data, ?string $sourceIp = null): PaymentRefund
+    {
+        if (! $this->settings->stripeReadyForCustomerCheckout()) {
+            throw new InvalidArgumentException('Stripe is not fully configured for refunds.');
+        }
+
+        $refund = DB::transaction(function () use ($refund, $actor, $data, $sourceIp): PaymentRefund {
+            $refund = PaymentRefund::query()->with('payment.invoice')->lockForUpdate()->findOrFail($refund->id);
+
+            if (! in_array($refund->status, [RefundStatus::Pending->value, RefundStatus::Approved->value, RefundStatus::Processing->value], true)) {
+                throw new InvalidArgumentException('This refund cannot be processed.');
+            }
+
+            $payment = Payment::query()->lockForUpdate()->findOrFail($refund->payment_id);
+            $this->validateRefund($payment, (float) $refund->amount, $refund->id);
+
+            $providerPaymentId = $payment->stripe_payment_intent_id ?: $payment->gateway_payment_id;
+
+            if (blank($providerPaymentId)) {
+                throw new InvalidArgumentException('Stripe payment intent is missing for this refund.');
+            }
+
+            $refund->update([
+                'status' => RefundStatus::Processing->value,
+                'processed_by' => $actor->id,
+                'processed_at' => now(),
+                'processed_method' => 'stripe',
+                'internal_note' => $data['internal_note'] ?? $refund->internal_note,
+                'metadata' => array_merge($refund->metadata ?? [], [
+                    'provider_payment_id' => $providerPaymentId,
+                ]),
+            ]);
+
+            $this->audit->log('refund.processing', $refund, $actor, [
+                'payment_id' => $payment->id,
+                'refund_id' => $refund->id,
+                'provider' => 'stripe',
+            ], $sourceIp);
+
+            return $refund->fresh('payment.invoice');
+        });
+
+        $payment = $refund->payment;
+        $providerPaymentId = $payment->stripe_payment_intent_id ?: $payment->gateway_payment_id;
+        $idempotencyKey = 'stripe-refund-'.$refund->refund_number;
+
+        $response = $this->stripe
+            ->form(['Idempotency-Key' => $idempotencyKey])
+            ->post($this->stripe->url('refunds'), [
+                'payment_intent' => $providerPaymentId,
+                'amount' => Money::toMinorUnits($refund->amount),
+                'metadata[payment_id]' => (string) $payment->id,
+                'metadata[payment_number]' => (string) $payment->payment_number,
+                'metadata[refund_id]' => (string) $refund->id,
+                'metadata[refund_number]' => (string) $refund->refund_number,
+            ]);
+
+        $payload = $response->json() ?: [
+            'status' => $response->status(),
+            'body' => substr($response->body(), 0, 1000),
+        ];
+
+        if ($response->failed()) {
+            $this->markStripeRefundFailed($refund, $actor, $payload, $sourceIp);
+
+            throw new InvalidArgumentException(data_get($payload, 'error.message') ?: 'Stripe refund failed.');
+        }
+
+        return $this->applyStripeRefundResult($refund, $actor, $payload, $sourceIp);
+    }
+
+    private function applyStripeRefundResult(PaymentRefund $refund, User $actor, array $payload, ?string $sourceIp = null): PaymentRefund
+    {
+        $failed = false;
+
+        $processedRefund = DB::transaction(function () use ($refund, $actor, $payload, $sourceIp, &$failed): PaymentRefund {
+            $refund = PaymentRefund::query()->with('payment.invoice')->lockForUpdate()->findOrFail($refund->id);
+            $payment = Payment::query()->lockForUpdate()->findOrFail($refund->payment_id);
+            $status = $this->mapStripeRefundStatus((string) ($payload['status'] ?? ''));
+            $sanitizedPayload = $this->payloadSanitizer->sanitize($payload);
+
+            if ($status === RefundStatus::Failed->value) {
+                $failed = true;
+
+                $refund->update([
+                    'status' => RefundStatus::Failed->value,
+                    'provider_refund_id' => $payload['id'] ?? $refund->provider_refund_id,
+                    'provider_reference' => $payload['id'] ?? $refund->provider_reference,
+                    'failure_message' => data_get($payload, 'failure_reason') ?: data_get($payload, 'error.message'),
+                    'metadata' => $sanitizedPayload,
+                ]);
+
+                $this->recordRefundTransaction($payment, $refund, RefundStatus::Failed->value, $sanitizedPayload);
+                $this->audit->log('refund.failed', $refund, $actor, [
+                    'payment_id' => $payment->id,
+                    'refund_id' => $refund->id,
+                    'provider' => 'stripe',
+                ], $sourceIp);
+
+                return $refund->fresh('payment.invoice');
+            }
+
+            $refund->update([
+                'status' => $status,
+                'provider_refund_id' => $payload['id'] ?? $refund->provider_refund_id,
+                'provider_reference' => $payload['id'] ?? $refund->provider_reference,
+                'refunded_at' => $status === RefundStatus::Succeeded->value ? now() : $refund->refunded_at,
+                'failure_message' => null,
+                'metadata' => $sanitizedPayload,
+            ]);
+
+            $this->recordRefundTransaction($payment, $refund->fresh(), $status, $sanitizedPayload);
+
+            if ($status === RefundStatus::Succeeded->value) {
+                $refundedAmount = round((float) $payment->refunded_amount + (float) $refund->amount, 2);
+                $payment->update([
+                    'refunded_amount' => $refundedAmount,
+                    'status' => $refundedAmount + 0.01 >= (float) $payment->amount
+                        ? PaymentStatus::Refunded->value
+                        : PaymentStatus::PartiallyRefunded->value,
+                    'refunded_at' => now(),
+                ]);
+
+                if ($payment->invoice) {
+                    $this->balances->synchronizeInvoice($payment->invoice);
+                }
+            }
+
+            $this->audit->log($status === RefundStatus::Succeeded->value ? 'refund.processed' : 'refund.processing', $refund->fresh(), $actor, [
+                'payment_id' => $payment->id,
+                'refund_id' => $refund->id,
+                'amount' => $refund->amount,
+                'provider' => 'stripe',
+            ], $sourceIp);
+
+            return $refund->fresh('payment.invoice');
+        });
+
+        if ($failed) {
+            throw new InvalidArgumentException('Stripe refund failed.');
+        }
+
+        return $processedRefund;
+    }
+
+    private function markStripeRefundFailed(PaymentRefund $refund, User $actor, array $payload, ?string $sourceIp = null): void
+    {
+        DB::transaction(function () use ($refund, $actor, $payload, $sourceIp): void {
+            $refund = PaymentRefund::query()->with('payment')->lockForUpdate()->findOrFail($refund->id);
+            $payment = Payment::query()->lockForUpdate()->findOrFail($refund->payment_id);
+            $sanitizedPayload = $this->payloadSanitizer->sanitize($payload);
+
+            $refund->update([
+                'status' => RefundStatus::Failed->value,
+                'provider_refund_id' => $payload['id'] ?? $refund->provider_refund_id,
+                'provider_reference' => $payload['id'] ?? $refund->provider_reference,
+                'failure_message' => data_get($payload, 'error.message') ?: data_get($payload, 'failure_reason') ?: 'Stripe refund failed.',
+                'metadata' => $sanitizedPayload,
+            ]);
+
+            $this->recordRefundTransaction($payment, $refund, RefundStatus::Failed->value, $sanitizedPayload);
+            $this->audit->log('refund.failed', $refund, $actor, [
+                'payment_id' => $payment->id,
+                'refund_id' => $refund->id,
+                'provider' => 'stripe',
+            ], $sourceIp);
+        });
+    }
+
+    private function recordRefundTransaction(Payment $payment, PaymentRefund $refund, string $status, array $payload): void
+    {
+        $payment->transactions()->create([
+            'transaction_type' => PaymentTransactionType::Refund->value,
+            'status' => $status,
+            'amount' => $refund->amount,
+            'currency' => $refund->currency,
+            'provider_transaction_id' => $refund->provider_refund_id,
+            'provider_reference' => $refund->provider_reference,
+            'response_payload' => $payload,
+            'failure_message' => $status === RefundStatus::Failed->value ? $refund->failure_message : null,
+            'processed_at' => now(),
+        ]);
+    }
+
+    private function mapStripeRefundStatus(string $status): string
+    {
+        return match ($status) {
+            'succeeded' => RefundStatus::Succeeded->value,
+            'pending', 'requires_action' => RefundStatus::Processing->value,
+            default => RefundStatus::Failed->value,
+        };
     }
 
     private function validateRefund(Payment $payment, float $amount, ?int $excludingRefundId = null): void

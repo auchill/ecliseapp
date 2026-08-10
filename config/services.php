@@ -45,6 +45,11 @@ return [
         'key' => env('STRIPE_KEY'),
         'secret' => env('STRIPE_SECRET'),
         'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+        // Pinned so Stripe API responses stay stable when the account default version moves.
+        // Webhook payload shape is controlled by the endpoint version in the Stripe dashboard.
+        'api_version' => env('STRIPE_API_VERSION', '2024-06-20'),
+        'timeout' => env('STRIPE_TIMEOUT', 20),
+        'connect_timeout' => env('STRIPE_CONNECT_TIMEOUT', 10),
     ],
 
     'paypal' => [

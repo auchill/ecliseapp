@@ -2,18 +2,25 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\Payments\UnresolvedWebhookPaymentException;
 use App\Models\Payment;
 use App\Models\PaymentWebhookEvent;
 use App\Services\PaymentFinalizer;
 use App\Services\PaymentGatewayService;
 use App\Services\Payments\PaymentPayloadSanitizer;
+use App\Services\Payments\StripeWebhookProcessor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
 class PaymentWebhookController extends Controller
 {
-    public function stripe(Request $request, PaymentFinalizer $finalizer, PaymentPayloadSanitizer $sanitizer)
+    /**
+     * Stripe's documented replay tolerance for the Stripe-Signature timestamp.
+     */
+    private const SIGNATURE_TOLERANCE_SECONDS = 300;
+
+    public function stripe(Request $request, PaymentPayloadSanitizer $sanitizer, StripeWebhookProcessor $processor)
     {
         $payload = $request->getContent();
 
@@ -39,50 +46,23 @@ class PaymentWebhookController extends Controller
             return response()->json(['received' => true, 'duplicate' => true]);
         }
 
-        $webhookEvent->markProcessing();
-
-        $type = $event['type'] ?? null;
-        $object = $event['data']['object'] ?? [];
-        $sessionId = $object['id'] ?? null;
-        $payment = $sessionId ? Payment::query()->where('stripe_checkout_session_id', $sessionId)->first() : null;
-
-        if (! $payment && isset($object['metadata']['payment_id'])) {
-            $payment = Payment::query()->find($object['metadata']['payment_id']);
-        }
-
-        if (! $payment) {
-            Log::warning('Stripe webhook payment not found', ['event' => $event['id'] ?? null, 'session' => $sessionId]);
-            $webhookEvent->markProcessed(PaymentWebhookEvent::STATUS_IGNORED);
-
-            return response()->json(['received' => true]);
-        }
-
         try {
-            $handled = false;
+            $processor->process($webhookEvent, $event);
+        } catch (UnresolvedWebhookPaymentException $exception) {
+            Log::warning('Stripe webhook could not be matched to a local payment', [
+                'event' => $event['id'] ?? null,
+                'type' => $event['type'] ?? null,
+            ]);
 
-            if ($type === 'checkout.session.completed') {
-                $finalizer->markPaid($payment, [
-                    'stripe_payment_intent_id' => $object['payment_intent'] ?? null,
-                    'gateway_reference_id' => $object['payment_intent'] ?? $sessionId,
-                    'gateway_payment_id' => $object['payment_intent'] ?? $sessionId,
-                    'amount' => isset($object['amount_total']) ? round($object['amount_total'] / 100, 2) : $payment->amount,
-                    'currency' => strtolower($object['currency'] ?? $payment->currency),
-                    'raw_response' => $event,
-                    'paid_at' => now(),
-                ]);
-                $handled = true;
-            }
-
-            if (in_array($type, ['checkout.session.expired', 'payment_intent.payment_failed'], true)) {
-                $finalizer->markFailed($payment, $type === 'checkout.session.expired' ? 'cancelled' : 'failed', $event);
-                $handled = true;
-            }
-
-            $webhookEvent->markProcessed($handled ? PaymentWebhookEvent::STATUS_PROCESSED : PaymentWebhookEvent::STATUS_IGNORED);
+            // 422 keeps Stripe retrying, which is what resolves a webhook that outran the local commit.
+            return response()->json(['received' => false, 'message' => 'Payment not found for this event.'], 422);
         } catch (Throwable $exception) {
-            $webhookEvent->markFailed($exception->getMessage());
+            Log::warning('Stripe webhook processing failed', [
+                'event' => $event['id'] ?? null,
+                'message' => $exception->getMessage(),
+            ]);
 
-            throw $exception;
+            return response()->json(['received' => false, 'message' => 'Webhook processing failed.'], 422);
         }
 
         return response()->json(['received' => true]);
@@ -165,6 +145,11 @@ class PaymentWebhookController extends Controller
         return response()->json(['received' => true]);
     }
 
+    /**
+     * Verifies a Stripe-Signature header the way Stripe documents it: a shared timestamp,
+     * one or more v1 signatures (several are sent while a signing secret is being rotated),
+     * and a replay tolerance on the timestamp.
+     */
     private function validStripeSignature(string $payload, string $signatureHeader): bool
     {
         $secret = config('services.stripe.webhook_secret');
@@ -173,17 +158,38 @@ class PaymentWebhookController extends Controller
             return false;
         }
 
-        parse_str(str_replace(',', '&', $signatureHeader), $parts);
-        $timestamp = $parts['t'] ?? null;
-        $signature = $parts['v1'] ?? null;
+        $timestamp = null;
+        $signatures = [];
 
-        if (! $timestamp || ! $signature) {
+        foreach (explode(',', $signatureHeader) as $part) {
+            [$key, $value] = array_pad(explode('=', trim($part), 2), 2, null);
+
+            if ($key === 't' && $timestamp === null) {
+                $timestamp = $value;
+            } elseif ($key === 'v1' && filled($value)) {
+                $signatures[] = $value;
+            }
+        }
+
+        if (! is_numeric($timestamp) || $signatures === []) {
+            return false;
+        }
+
+        if (abs(now()->getTimestamp() - (int) $timestamp) > self::SIGNATURE_TOLERANCE_SECONDS) {
+            Log::warning('Stripe webhook rejected: signature timestamp outside tolerance.');
+
             return false;
         }
 
         $expected = hash_hmac('sha256', $timestamp.'.'.$payload, $secret);
 
-        return hash_equals($expected, $signature);
+        foreach ($signatures as $signature) {
+            if (hash_equals($expected, $signature)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function recordWebhookEvent(

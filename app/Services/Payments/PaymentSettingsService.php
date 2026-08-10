@@ -4,6 +4,7 @@ namespace App\Services\Payments;
 
 use App\Models\PaymentSetting;
 use App\Models\User;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 
@@ -65,6 +66,122 @@ class PaymentSettingsService
         return (bool) $this->get($method.'_enabled', false);
     }
 
+    public function stripeReadiness(): array
+    {
+        $enabled = $this->enabled('stripe');
+        $publishableKey = (string) config('services.stripe.key');
+        $secretKey = (string) config('services.stripe.secret');
+        $webhookSecret = (string) config('services.stripe.webhook_secret');
+        $currency = strtolower((string) $this->get('default_currency', 'CAD'));
+
+        $requirements = [
+            'stripe_enabled' => $enabled,
+            'STRIPE_KEY' => $this->isStripePublishableKey($publishableKey),
+            'STRIPE_SECRET' => $this->isStripeSecretKey($secretKey),
+            'STRIPE_WEBHOOK_SECRET' => str_starts_with($webhookSecret, 'whsec_'),
+            'CAD currency' => $currency === 'cad',
+            'consistent key mode' => $this->stripeKeyModesMatch($publishableKey, $secretKey),
+            'checkout routes' => $this->stripeRoutesRegistered(),
+            'HTTPS callbacks' => $this->stripeCallbacksUseHttps(),
+        ];
+
+        $configured = ! in_array(false, $requirements, true);
+
+        return [
+            'enabled' => $enabled,
+            'configured' => $configured,
+            'status' => $configured ? 'ready' : ($enabled ? 'incomplete' : 'disabled'),
+            'currency' => $currency,
+            'mode' => $this->stripeMode($secretKey ?: $publishableKey),
+            'requirements' => $requirements,
+            'missing' => collect($requirements)
+                ->filter(fn (bool $met): bool => ! $met)
+                ->keys()
+                ->values()
+                ->all(),
+        ];
+    }
+
+    /**
+     * PayPal is deferred: it is reported for transparency but never gates Stripe.
+     */
+    public function paypalReadiness(): array
+    {
+        $enabled = $this->enabled('paypal');
+        $credentialsConfigured = filled(config('services.paypal.client_id')) && filled(config('services.paypal.secret'));
+        $webhookConfigured = filled(config('services.paypal.webhook_id'));
+
+        return [
+            'enabled' => $enabled,
+            'configured' => false,
+            'deferred' => true,
+            'status' => 'deferred',
+            'requirements' => [
+                'paypal_enabled' => $enabled,
+                'PAYPAL_CLIENT_ID / PAYPAL_CLIENT_SECRET' => $credentialsConfigured,
+                'PAYPAL_WEBHOOK_ID' => $webhookConfigured,
+            ],
+            'note' => 'PayPal is deferred until a PayPal webhook ID is available. It is excluded from Stage 3 acceptance.',
+        ];
+    }
+
+    public function stripeMode(string $key): ?string
+    {
+        return match (true) {
+            str_contains($key, '_test_') => 'test',
+            str_contains($key, '_live_') => 'live',
+            default => null,
+        };
+    }
+
+    private function isStripePublishableKey(string $key): bool
+    {
+        return (bool) preg_match('/^p(k)_(test|live)_[A-Za-z0-9]+$/', $key);
+    }
+
+    private function isStripeSecretKey(string $key): bool
+    {
+        return (bool) preg_match('/^(sk|rk)_(test|live)_[A-Za-z0-9]+$/', $key);
+    }
+
+    private function stripeKeyModesMatch(string $publishableKey, string $secretKey): bool
+    {
+        $publishableMode = $this->stripeMode($publishableKey);
+        $secretMode = $this->stripeMode($secretKey);
+
+        return $publishableMode !== null && $publishableMode === $secretMode;
+    }
+
+    private function stripeRoutesRegistered(): bool
+    {
+        $routes = Route::getRoutes();
+
+        foreach (['payments.stripe.success', 'payments.cancel', 'webhooks.stripe'] as $name) {
+            if (! $routes->hasNamedRoute($name)) {
+                return false;
+            }
+        }
+
+        return in_array('POST', $routes->getByName('webhooks.stripe')->methods(), true);
+    }
+
+    /**
+     * Stripe requires HTTPS callbacks outside local development.
+     */
+    private function stripeCallbacksUseHttps(): bool
+    {
+        if (! app()->environment('production')) {
+            return true;
+        }
+
+        return str_starts_with(strtolower((string) config('app.url')), 'https://');
+    }
+
+    public function stripeReadyForCustomerCheckout(): bool
+    {
+        return (bool) $this->stripeReadiness()['configured'];
+    }
+
     public function update(array $data, ?User $actor = null): void
     {
         $data = $this->validated($data);
@@ -112,6 +229,13 @@ class PaymentSettingsService
 
         if ($customerFacing) {
             unset($methods['cash'], $methods['debit_terminal'], $methods['credit_terminal']);
+
+            if (! $this->stripeReadyForCustomerCheckout()) {
+                unset($methods['stripe']);
+            }
+
+            // PayPal is deferred until a webhook ID is available; never offer it to customers.
+            unset($methods['paypal']);
         }
 
         return collect($methods)

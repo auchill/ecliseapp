@@ -31,6 +31,8 @@ class Payment extends Model
         'paid' => 'Paid',
         'failed' => 'Failed',
         'cancelled' => 'Cancelled',
+        'disputed' => 'Disputed',
+        'expired' => 'Expired',
         'refunded' => 'Refunded',
         'partially_refunded' => 'Partially refunded',
     ];

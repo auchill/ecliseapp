@@ -166,7 +166,7 @@ test('verified shop payment creates customer order items and status then removes
             'full_name' => 'Updated Customer Name',
             'email' => 'successful-checkout@example.com',
             'phone' => '416-555-2200',
-            'payment_gateway' => 'stripe',
+            'payment_gateway' => 'interac',
             'fulfillment_method' => 'pickup',
         ])
         ->assertRedirect();
@@ -231,7 +231,7 @@ test('checkout prefills and updates one existing customer profile', function () 
             'full_name' => 'Updated Existing Profile',
             'email' => 'existing-profile@example.com',
             'phone' => '416-555-1199',
-            'payment_gateway' => 'stripe',
+            'payment_gateway' => 'interac',
             'fulfillment_method' => 'pickup',
         ])
         ->assertRedirect();
@@ -254,7 +254,7 @@ test('failed order creation rolls back customer and order records without deleti
             'full_name' => 'Rollback Customer',
             'email' => 'rollback-checkout@example.com',
             'phone' => '416-555-2299',
-            'payment_gateway' => 'stripe',
+            'payment_gateway' => 'interac',
             'fulfillment_method' => 'pickup',
         ])
         ->assertRedirect();
@@ -267,7 +267,7 @@ test('failed order creation rolls back customer and order records without deleti
 
     expect(Order::query()->count())->toBe(0)
         ->and(Customer::query()->count())->toBe(1)
-        ->and($payment->fresh()->status)->toBe('pending')
+        ->and($payment->fresh()->status)->toBe('pending_verification')
         ->and(Cart::query()->whereKey($cart->id)->exists())->toBeTrue()
         ->and(CartItem::query()->where('cart_id', $cart->id)->exists())->toBeTrue();
 });
