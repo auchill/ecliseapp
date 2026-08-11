@@ -16,6 +16,7 @@ use App\Models\Product;
 use App\Models\Repair;
 use App\Models\RepairConversation;
 use App\Models\User;
+use App\Services\MobileSentrix\MobileSentrixBufferService;
 use App\Services\Payments\InvoiceService;
 use App\Services\Payments\PaymentAuditLogger;
 use App\Services\Payments\PaymentBalanceService;
@@ -35,6 +36,7 @@ class PaymentFinalizer
         private readonly PaymentBalanceService $balances,
         private readonly ReceiptService $receipts,
         private readonly PaymentAuditLogger $audit,
+        private readonly MobileSentrixBufferService $procurement,
     ) {}
 
     public function markPaid(Payment $payment, array $attributes = []): Payment
@@ -58,6 +60,10 @@ class PaymentFinalizer
                 if ($payment->invoice) {
                     $this->balances->synchronizeInvoice($payment->invoice);
                 }
+
+                // Idempotent, so replaying a settled payment also backfills any procurement
+                // requirement that predates this feature.
+                $this->queueMobileSentrixProcurement($payable);
 
                 return $payment->fresh('payable');
             }
@@ -101,15 +107,18 @@ class PaymentFinalizer
                 }
 
                 $payment->save();
+                $this->queueMobileSentrixProcurement($order);
             } elseif ($payable instanceof Order) {
                 if (! $payment->invoice_id) {
                     $payment->invoice()->associate($this->invoices->createShopOrderInvoice($payable));
                 }
                 $payment->save();
                 $this->markExistingOrderPaid($payable, $payment);
+                $this->queueMobileSentrixProcurement($payable);
             } elseif ($payable instanceof Repair) {
                 $payment->save();
                 $this->markRepairPaid($payable, $payment);
+                $this->queueMobileSentrixProcurement($payable);
             } else {
                 throw new RuntimeException('The payment checkout record is no longer available.');
             }
@@ -198,6 +207,28 @@ class PaymentFinalizer
         }
 
         return $payment->fresh('payable');
+    }
+
+    /**
+     * Queues MobileSentrix procurement requirements for a payment that has just settled.
+     *
+     * This runs inside the finalization transaction on purpose: a paid MobileSentrix item must
+     * never exist without its procurement requirement. The work is a pure insert from data
+     * already loaded in the transaction — no catalogue lookup, no network — so it cannot
+     * realistically fail and strand a customer payment. Prices are resolved later, when the
+     * admin actually creates the procurement order.
+     */
+    private function queueMobileSentrixProcurement(mixed $payable): void
+    {
+        if ($payable instanceof Order) {
+            $this->procurement->queuePaidShopOrder($payable);
+
+            return;
+        }
+
+        if ($payable instanceof Repair) {
+            $this->procurement->queuePaidRepair($payable);
+        }
     }
 
     private function recordTransaction(

@@ -8,6 +8,8 @@ use App\Http\Controllers\Admin\EcliseMarkupController as AdminEcliseMarkupContro
 use App\Http\Controllers\Admin\InvoiceController as AdminInvoiceController;
 use App\Http\Controllers\Admin\ManualPaymentController as AdminManualPaymentController;
 use App\Http\Controllers\Admin\MobileSentrixController as AdminMobileSentrixController;
+use App\Http\Controllers\Admin\MobileSentrixOrderController as AdminMobileSentrixOrderController;
+use App\Http\Controllers\Admin\MobileSentrixProcurementController as AdminMobileSentrixProcurementController;
 use App\Http\Controllers\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Admin\PartCategoryController as AdminPartCategoryController;
 use App\Http\Controllers\Admin\PartController as AdminPartController;
@@ -224,6 +226,15 @@ Route::middleware('admin')->prefix('admin')->name('admin.')->group(function (): 
     Route::get('/refunds', [AdminRefundController::class, 'index'])->name('refunds.index');
     Route::patch('/refunds/{refund}/approve', [AdminRefundController::class, 'approve'])->name('refunds.approve');
     Route::patch('/refunds/{refund}/process', [AdminRefundController::class, 'process'])->name('refunds.process');
+    // MobileSentrix procurement. Admin-only: these routes are never customer-facing.
+    Route::get('/mobilesentrix/procurement-cart', [AdminMobileSentrixProcurementController::class, 'index'])->name('mobilesentrix-procurement.index');
+    Route::post('/mobilesentrix/procurement-cart', [AdminMobileSentrixProcurementController::class, 'store'])->name('mobilesentrix-procurement.store');
+    Route::get('/mobilesentrix/orders', [AdminMobileSentrixOrderController::class, 'index'])->name('mobilesentrix-orders.index');
+    Route::get('/mobilesentrix/orders/{mobilesentrixOrder}', [AdminMobileSentrixOrderController::class, 'show'])->name('mobilesentrix-orders.show');
+    Route::patch('/mobilesentrix/orders/{mobilesentrixOrder}', [AdminMobileSentrixOrderController::class, 'update'])->name('mobilesentrix-orders.update');
+    Route::patch('/mobilesentrix/orders/{mobilesentrixOrder}/receive', [AdminMobileSentrixOrderController::class, 'receive'])->name('mobilesentrix-orders.receive');
+    Route::patch('/mobilesentrix/orders/{mobilesentrixOrder}/return', [AdminMobileSentrixOrderController::class, 'return'])->name('mobilesentrix-orders.return');
+
     Route::get('/payment-webhooks', [AdminPaymentWebhookEventController::class, 'index'])->name('payment-webhooks.index');
     Route::patch('/payment-webhooks/{event}/retry', [AdminPaymentWebhookEventController::class, 'retry'])->name('payment-webhooks.retry');
     Route::resource('shipping/methods', AdminShippingMethodController::class)->parameters(['methods' => 'shippingMethod'])->names('shipping-methods')->except(['show']);

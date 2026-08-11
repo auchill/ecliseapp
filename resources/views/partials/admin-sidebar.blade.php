@@ -10,6 +10,10 @@
         'MobileSentrix Devices' => [
             ['label' => 'Pre-Owned Devices', 'route' => 'admin.devices.index', 'icon' => 'bi-phone', 'active' => 'admin.devices.*'],
         ],
+        'MobileSentrix Procurement' => [
+            ['label' => 'Procurement Cart', 'route' => 'admin.mobilesentrix-procurement.index', 'icon' => 'bi-cart-check', 'active' => 'admin.mobilesentrix-procurement.*'],
+            ['label' => 'Orders', 'route' => 'admin.mobilesentrix-orders.index', 'icon' => 'bi-clipboard-check', 'active' => 'admin.mobilesentrix-orders.*'],
+        ],
         'Payments' => [
             ['label' => 'Dashboard', 'route' => 'admin.payments.dashboard', 'icon' => 'bi-graph-up-arrow', 'active' => 'admin.payments.dashboard'],
             ['label' => 'All Payments', 'route' => 'admin.payments.index', 'icon' => 'bi-credit-card-2-front', 'active' => 'admin.payments.index'],
