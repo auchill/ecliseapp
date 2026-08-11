@@ -16,13 +16,9 @@
             <form class="surface p-4 mb-5" method="POST" action="{{ route('repairs.track.submit') }}">
                 @csrf
                 <div class="row g-3 align-items-end">
-                    <div class="col-lg-5">
+                    <div class="col-lg-10">
                         <label class="form-label" for="repair_number">Repair number</label>
                         <input class="form-control" id="repair_number" name="repair_number" value="{{ old('repair_number', $booking->repair_number ?? '') }}" placeholder="ECL-REP-2026-0000001" required>
-                    </div>
-                    <div class="col-lg-5">
-                        <label class="form-label" for="contact">Email or phone</label>
-                        <input class="form-control" id="contact" name="contact" value="{{ old('contact') }}">
                     </div>
                     <div class="col-lg-2">
                         <button class="btn btn-primary w-100" type="submit"><i class="bi bi-search me-2"></i>Track</button>

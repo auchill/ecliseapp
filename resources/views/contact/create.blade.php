@@ -19,8 +19,8 @@
         description="Send a message about repair questions, quote assistance, booking help, parts enquiries, product questions, existing repairs, orders or general enquiries."
     >
         <x-slot:actions>
-            <a class="btn btn-primary btn-lg" href="{{ route('repairs.track') }}">Track Repair</a>
-            <a class="btn btn-outline-light btn-lg" href="{{ route('orders.track') }}">Track Order</a>
+            <a class="btn btn-primary btn-lg" href="{{ route('repairs.track') }}" @guest data-auth-required data-intended-url="{{ route('repairs.track') }}" @endguest>Track Repair</a>
+            <a class="btn btn-outline-light btn-lg" href="{{ route('orders.track') }}" @guest data-auth-required data-intended-url="{{ route('orders.track') }}" @endguest>Track Order</a>
         </x-slot:actions>
     </x-page-hero>
 
@@ -80,7 +80,7 @@
 
                         <div class="d-grid gap-2">
                             <a class="btn btn-outline-primary" href="{{ route('quotes.create') }}" @guest data-auth-required data-intended-url="{{ route('quotes.create') }}" @endguest><i class="bi bi-chat-square-text me-2" aria-hidden="true"></i>Get a Quote</a>
-                            <a class="btn btn-primary" href="{{ route('repairs.create') }}"><i class="bi bi-tools me-2" aria-hidden="true"></i>Book Repair</a>
+                            <a class="btn btn-primary" href="{{ route('repairs.create') }}" @guest data-auth-required data-intended-url="{{ route('repairs.create') }}" @endguest><i class="bi bi-tools me-2" aria-hidden="true"></i>Book Repair</a>
                             <a class="btn btn-outline-primary" href="{{ route('parts.index') }}"><i class="bi bi-cpu me-2" aria-hidden="true"></i>Browse Parts</a>
                             <a class="btn btn-outline-primary" href="{{ route('shop.index') }}"><i class="bi bi-bag me-2" aria-hidden="true"></i>Visit Shop</a>
                         </div>

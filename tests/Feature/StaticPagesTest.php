@@ -50,7 +50,7 @@ test('public static pages load with updated professional content and metadata', 
     ['contact.create', 'Reach Eclise Technology Inc.'],
 ]);
 
-test('static pages render route backed customer actions without requiring auth for public links', function () {
+test('static pages gate customer-account actions and leave genuinely public links open', function () {
     $this->get(route('home'))
         ->assertOk()
         ->assertSee('href="'.route('repairs.create').'"', false)
@@ -58,7 +58,9 @@ test('static pages render route backed customer actions without requiring auth f
         ->assertSee('href="'.route('parts.index').'"', false)
         ->assertSee('href="'.route('contact.create').'"', false)
         ->assertSee('data-intended-url="'.route('quotes.create').'"', false)
-        ->assertDontSee('data-intended-url="'.route('repairs.create').'"', false)
+        // Quote, booking and tracking all require a customer login, so guests get the
+        // auth prompt rather than an abrupt redirect.
+        ->assertSee('data-intended-url="'.route('repairs.create').'"', false)
         ->assertDontSee('data-intended-url="'.route('shop.index').'"', false)
         ->assertDontSee('data-intended-url="'.route('parts.index').'"', false);
 });

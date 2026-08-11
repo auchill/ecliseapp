@@ -14,7 +14,7 @@
                 'image_path' => 'images/brand/logo_main2.png',
                 'actions' => [
                     ['label' => 'Get a Quote', 'href' => route('quotes.create'), 'style' => 'primary', 'auth' => true],
-                    ['label' => 'Book a Repair', 'href' => route('repairs.create'), 'style' => 'outline-light'],
+                    ['label' => 'Book a Repair', 'href' => route('repairs.create'), 'style' => 'outline-light', 'auth' => true],
                 ],
             ],
             [
@@ -46,7 +46,7 @@
                 'image' => asset('images/brand/eclise-thumb-grey-m.png'),
                 'image_path' => 'images/brand/eclise-thumb-grey-m.png',
                 'actions' => [
-                    ['label' => 'Track Repair', 'href' => route('repairs.track'), 'style' => 'primary'],
+                    ['label' => 'Track Repair', 'href' => route('repairs.track'), 'style' => 'primary', 'auth' => true],
                     ['label' => 'View Services', 'href' => route('services'), 'style' => 'outline-light'],
                 ],
             ],
@@ -125,7 +125,7 @@
             </div>
             <div class="row g-4">
                 @foreach ([
-                    ['icon' => 'bi-phone', 'title' => 'Phone and Tablet Repair', 'copy' => 'Support for common device issues such as screens, batteries, charging problems, cameras, speakers and other hardware concerns.', 'href' => route('repairs.create'), 'action' => 'Book Repair'],
+                    ['icon' => 'bi-phone', 'title' => 'Phone and Tablet Repair', 'copy' => 'Support for common device issues such as screens, batteries, charging problems, cameras, speakers and other hardware concerns.', 'href' => route('repairs.create'), 'action' => 'Book Repair', 'requiresAuth' => true],
                     ['icon' => 'bi-laptop', 'title' => 'Computer and Laptop Repair', 'copy' => 'Assessment and repair options for laptop and desktop problems, including hardware diagnostics and component-related concerns.', 'href' => route('services'), 'action' => 'Learn More'],
                     ['icon' => 'bi-search', 'title' => 'Device Diagnostics', 'copy' => 'Issue details help Eclise identify likely causes, suitable next steps and parts that may need to be considered.', 'href' => route('quotes.create'), 'action' => 'Request Quote', 'requiresAuth' => true],
                     ['icon' => 'bi-cpu', 'title' => 'Replacement Parts', 'copy' => 'Browse available replacement parts for pricing visibility and compatibility discussions before purchase or service.', 'href' => route('parts.index'), 'action' => 'Browse Parts'],
@@ -171,7 +171,7 @@
         <div class="container">
             <div class="row g-4">
                 @foreach ([
-                    ['icon' => 'bi-tools', 'title' => 'Repairs', 'copy' => 'Start with a quote, continue with a repair number, or check progress on an existing repair.', 'href' => route('repairs.create'), 'action' => 'Book Repair'],
+                    ['icon' => 'bi-tools', 'title' => 'Repairs', 'copy' => 'Start with a quote, continue with a repair number, or check progress on an existing repair.', 'href' => route('repairs.create'), 'action' => 'Book Repair', 'requiresAuth' => true],
                     ['icon' => 'bi-bag', 'title' => 'Shop', 'copy' => 'Browse available products, including new and pre-owned devices and accessories.', 'href' => route('shop.index'), 'action' => 'Browse Shop'],
                     ['icon' => 'bi-cpu', 'title' => 'Parts', 'copy' => 'Review replacement part availability and pricing information for repair planning.', 'href' => route('parts.index'), 'action' => 'Browse Parts'],
                 ] as $area)
@@ -180,7 +180,7 @@
                             <span class="service-icon mb-3" aria-hidden="true"><i class="bi {{ $area['icon'] }}"></i></span>
                             <h2 class="h4 fw-bold">{{ $area['title'] }}</h2>
                             <p class="muted">{{ $area['copy'] }}</p>
-                            <a class="btn btn-outline-primary" href="{{ $area['href'] }}">{{ $area['action'] }}</a>
+                            <a class="btn btn-outline-primary" href="{{ $area['href'] }}" @if (($area['requiresAuth'] ?? false) && ! auth()->check()) data-auth-required data-intended-url="{{ $area['href'] }}" @endif>{{ $area['action'] }}</a>
                         </article>
                     </div>
                 @endforeach
@@ -283,7 +283,7 @@
 
     <x-cta-band eyebrow="Next Step" title="Need help choosing the right path?" copy="Start with a quote, continue an approved repair, or contact Eclise for help with repairs, parts and products." class="bg-white">
         <a class="btn btn-primary btn-lg" href="{{ route('quotes.create') }}" @guest data-auth-required data-intended-url="{{ route('quotes.create') }}" @endguest>Get a Quote</a>
-        <a class="btn btn-outline-primary btn-lg" href="{{ route('repairs.create') }}">Book a Repair</a>
+        <a class="btn btn-outline-primary btn-lg" href="{{ route('repairs.create') }}" @guest data-auth-required data-intended-url="{{ route('repairs.create') }}" @endguest>Book a Repair</a>
         <a class="btn btn-outline-primary btn-lg" href="{{ route('contact.create') }}">Contact Eclise</a>
     </x-cta-band>
 @endsection

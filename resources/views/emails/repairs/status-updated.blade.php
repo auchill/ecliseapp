@@ -47,7 +47,7 @@
             <p><strong>Note:</strong> {{ $repair->customer_notes }}</p>
         @endif
 
-        <p>Track your repair at {{ route('repairs.track') }} using your repair number.</p>
+        <p>Sign in and track your repair at {{ route('repairs.track') }} using your repair number.</p>
         <p>Thank you,<br>Eclise Technology Inc.</p>
     </body>
 </html>

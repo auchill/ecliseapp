@@ -52,15 +52,19 @@ Route::get('/', [PublicPageController::class, 'home'])->name('home');
 Route::get('/about', [PublicPageController::class, 'about'])->name('about');
 Route::get('/services', [PublicPageController::class, 'services'])->name('services');
 Route::get('/repairs/confirmation/{repair}', [RepairController::class, 'confirmation'])->middleware('auth')->name('repairs.confirmation');
-Route::get('/repairs/track', [RepairController::class, 'trackForm'])->name('repairs.track');
-Route::post('/repairs/track', [RepairController::class, 'track'])->name('repairs.track.submit');
+Route::middleware('auth')->group(function (): void {
+    Route::get('/repairs/track', [RepairController::class, 'trackForm'])->name('repairs.track');
+    Route::post('/repairs/track', [RepairController::class, 'track'])->name('repairs.track.submit');
+});
 
 Route::get('/shop', [ShopController::class, 'index'])->name('shop.index');
 Route::get('/shop/certified-pre-owned-devices', [CertifiedPreOwnedDeviceController::class, 'index'])->name('shop.certified-pre-owned-devices.index');
 Route::get('/shop/certified-pre-owned-devices/export', [CertifiedPreOwnedDeviceController::class, 'export'])->name('shop.certified-pre-owned-devices.export');
 Route::get('/products/{product}', [ShopController::class, 'show'])->name('products.show');
-Route::get('/orders/track', [OrderTrackingController::class, 'form'])->name('orders.track');
-Route::post('/orders/track/result', [OrderTrackingController::class, 'result'])->name('orders.track.result');
+Route::middleware('auth')->group(function (): void {
+    Route::get('/orders/track', [OrderTrackingController::class, 'form'])->name('orders.track');
+    Route::post('/orders/track/result', [OrderTrackingController::class, 'result'])->name('orders.track.result');
+});
 Route::get('/parts', [PartsMenuController::class, 'index'])->name('parts.index');
 Route::get('/parts/menu', [PartsMenuController::class, 'menu'])->name('parts.menu');
 Route::get('/parts/category/{category}/children', [PartsMenuController::class, 'children'])->whereNumber('category')->name('parts.category.children');
@@ -75,8 +79,10 @@ Route::post('/webhooks/stripe', [PaymentWebhookController::class, 'stripe'])->mi
 Route::post('/webhooks/paypal', [PaymentWebhookController::class, 'paypal'])->middleware('throttle:240,1')->name('webhooks.paypal');
 
 Route::middleware('no_admin_cart')->group(function (): void {
-    Route::get('/repairs/book', [RepairController::class, 'create'])->name('repairs.create');
-    Route::post('/repairs/book', [RepairController::class, 'store'])->name('repairs.store');
+    Route::middleware('auth')->group(function (): void {
+        Route::get('/repairs/book', [RepairController::class, 'create'])->name('repairs.create');
+        Route::post('/repairs/book', [RepairController::class, 'store'])->name('repairs.store');
+    });
     Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
     Route::post('/cart/products/{product}', [CartController::class, 'store'])->name('cart.store');
     Route::post('/cart/mobilesentrix-devices', [CartController::class, 'storeDevices'])->name('cart.devices.bulk');

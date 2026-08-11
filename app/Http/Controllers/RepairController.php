@@ -10,6 +10,7 @@ use App\Services\PaymentGatewayService;
 use App\Services\Payments\InvoiceService;
 use App\Services\Payments\PaymentSettingsService;
 use App\Services\ShippingCostService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use InvalidArgumentException;
 
@@ -30,9 +31,12 @@ class RepairController extends Controller
             'repair_number' => ['required', 'string', 'max:40'],
         ]);
 
-        $booking = Repair::query()
-            ->where('repair_number', $data['repair_number'])
-            ->first();
+        // Scoped so this cannot be used to confirm that another customer's repair number exists,
+        // or to read its payability state.
+        $booking = $this->scopeToRequester(
+            Repair::query()->where('repair_number', $data['repair_number']),
+            $request,
+        )->first();
 
         if (! $booking) {
             return back()->withErrors(['repair_number' => 'No repair was found for that repair number.'])->withInput();
@@ -233,14 +237,10 @@ class RepairController extends Controller
     {
         $data = $request->validated();
 
-        $booking = Repair::query()
-            ->where('repair_number', $data['repair_number'])
-            ->when(filled($data['contact'] ?? null), function ($query) use ($data): void {
-                $contact = trim($data['contact']);
-                $query->whereHas('customer', function ($query) use ($contact): void {
-                    $query->where('email', $contact)->orWhere('phone', $contact);
-                });
-            })
+        $booking = $this->scopeToRequester(
+            Repair::query()->where('repair_number', $data['repair_number']),
+            $request,
+        )
             ->with('customer', 'shipping', 'publicStatusUpdates', 'latestPayment', 'deviceType', 'deviceBrand', 'deviceModel', 'issueCategory')
             ->first();
 
@@ -253,6 +253,27 @@ class RepairController extends Controller
         return view('repairs.track', [
             'booking' => $booking,
         ]);
+    }
+
+    /**
+     * Restricts a lookup to records the requester is entitled to see.
+     *
+     * Tracking requires authentication, so a customer can only ever reach their own records,
+     * whatever reference they type. Admins are unrestricted because they need to look up any
+     * customer operationally.
+     */
+    private function scopeToRequester(Builder $query, Request $request): Builder
+    {
+        $user = $request->user();
+
+        if ($user?->isAdmin()) {
+            return $query;
+        }
+
+        // A guest reaching this point means the auth middleware was removed; match nothing
+        // rather than falling through to an unscoped query. A missing customer profile is
+        // matched to 0 for the same reason: never NULL, which would match orphaned records.
+        return $query->where('customer_id', $user?->customer?->id ?? 0);
     }
 
     private function bookingForCustomer(string $repairNumber, Request $request): Repair

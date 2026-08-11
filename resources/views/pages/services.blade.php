@@ -10,7 +10,7 @@
         description="Choose the service area that fits your device issue, parts enquiry, product need or existing repair question."
     >
         <x-slot:actions>
-            <a class="btn btn-primary btn-lg" href="{{ route('repairs.create') }}">Book a Repair</a>
+            <a class="btn btn-primary btn-lg" href="{{ route('repairs.create') }}" @guest data-auth-required data-intended-url="{{ route('repairs.create') }}" @endguest>Book a Repair</a>
             <a class="btn btn-outline-light btn-lg" href="{{ route('parts.index') }}">Browse Parts</a>
             <a class="btn btn-outline-light btn-lg" href="{{ route('shop.index') }}">Visit Shop</a>
         </x-slot:actions>
@@ -27,6 +27,7 @@
                         'items' => ['Screen-related repairs', 'Battery-related issues', 'Charging concerns', 'Camera or speaker issues', 'Device diagnostics'],
                         'href' => route('repairs.create'),
                         'action' => 'Book Repair',
+                        'requiresAuth' => true,
                     ],
                     [
                         'icon' => 'bi-pc-display',
@@ -68,6 +69,7 @@
                         'items' => ['Repair number lookup', 'Order tracking', 'Status updates', 'Customer-visible notes', 'Payment or completion guidance'],
                         'href' => route('repairs.track'),
                         'action' => 'Track Repair',
+                        'requiresAuth' => true,
                     ],
                 ] as $service)
                     <div class="col-md-6 col-xl-4">
@@ -99,9 +101,9 @@
                         <p class="eyebrow">Useful Links</p>
                         <div class="d-grid gap-2">
                             <a class="btn btn-primary" href="{{ route('quotes.create') }}" @guest data-auth-required data-intended-url="{{ route('quotes.create') }}" @endguest><i class="bi bi-chat-square-text me-2" aria-hidden="true"></i>Get a Quote</a>
-                            <a class="btn btn-outline-primary" href="{{ route('repairs.create') }}"><i class="bi bi-tools me-2" aria-hidden="true"></i>Book a Repair</a>
-                            <a class="btn btn-outline-primary" href="{{ route('repairs.track') }}"><i class="bi bi-search me-2" aria-hidden="true"></i>Track Repair</a>
-                            <a class="btn btn-outline-primary" href="{{ route('orders.track') }}"><i class="bi bi-receipt me-2" aria-hidden="true"></i>Track Order</a>
+                            <a class="btn btn-outline-primary" href="{{ route('repairs.create') }}" @guest data-auth-required data-intended-url="{{ route('repairs.create') }}" @endguest><i class="bi bi-tools me-2" aria-hidden="true"></i>Book a Repair</a>
+                            <a class="btn btn-outline-primary" href="{{ route('repairs.track') }}" @guest data-auth-required data-intended-url="{{ route('repairs.track') }}" @endguest><i class="bi bi-search me-2" aria-hidden="true"></i>Track Repair</a>
+                            <a class="btn btn-outline-primary" href="{{ route('orders.track') }}" @guest data-auth-required data-intended-url="{{ route('orders.track') }}" @endguest><i class="bi bi-receipt me-2" aria-hidden="true"></i>Track Order</a>
                         </div>
                     </div>
                 </div>

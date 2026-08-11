@@ -62,8 +62,8 @@
                                 <button class="nav-link dropdown-toggle {{ request()->routeIs('repairs.*') || request()->routeIs('quotes.*') ? 'active' : '' }} border-0 bg-transparent" type="button" data-bs-toggle="dropdown" aria-expanded="false">Repair</button>
                                 <ul class="dropdown-menu">
                                     <li><a class="dropdown-item" href="{{ route('quotes.create') }}" @unless($publicNavUser) data-auth-required data-intended-url="{{ route('quotes.create') }}" @endunless>Get a Quote</a></li>
-                                    <li><a class="dropdown-item" href="{{ route('repairs.create') }}">Book Repair</a></li>
-                                    <li><a class="dropdown-item" href="{{ route('repairs.track') }}">Track Repair</a></li>
+                                    <li><a class="dropdown-item" href="{{ route('repairs.create') }}" @unless($publicNavUser) data-auth-required data-intended-url="{{ route('repairs.create') }}" @endunless>Book Repair</a></li>
+                                    <li><a class="dropdown-item" href="{{ route('repairs.track') }}" @unless($publicNavUser) data-auth-required data-intended-url="{{ route('repairs.track') }}" @endunless>Track Repair</a></li>
                                 </ul>
                             </li>
                             <li class="nav-item dropdown">
@@ -71,7 +71,7 @@
                                 <ul class="dropdown-menu">
                                     <li><a class="dropdown-item" href="{{ route('shop.index') }}">New & Retail Products</a></li>
                                     <li><a class="dropdown-item" href="{{ route('shop.certified-pre-owned-devices.index') }}">Certified Pre-Owned Devices</a></li>
-                                    <li><a class="dropdown-item" href="{{ route('orders.track') }}">Track Order</a></li>
+                                    <li><a class="dropdown-item" href="{{ route('orders.track') }}" @unless($publicNavUser) data-auth-required data-intended-url="{{ route('orders.track') }}" @endunless>Track Order</a></li>
                                 </ul>
                             </li>
                             <li class="nav-item"><a class="nav-link {{ request()->routeIs('parts.*') ? 'active' : '' }}" href="{{ route('parts.index') }}">Parts</a></li>
@@ -119,9 +119,9 @@
                             <h2 class="h6">Quick Links</h2>
                             <div class="d-flex flex-wrap gap-2">
                                 <a class="btn btn-outline-light btn-sm" href="{{ route('quotes.create') }}" @unless($publicNavUser) data-auth-required data-intended-url="{{ route('quotes.create') }}" @endunless>Get a Quote</a>
-                                <a class="btn btn-outline-light btn-sm" href="{{ route('repairs.create') }}">Book Repair</a>
-                                <a class="btn btn-outline-light btn-sm" href="{{ route('repairs.track') }}">Track Repair</a>
-                                <a class="btn btn-outline-light btn-sm" href="{{ route('orders.track') }}">Track Order</a>
+                                <a class="btn btn-outline-light btn-sm" href="{{ route('repairs.create') }}" @unless($publicNavUser) data-auth-required data-intended-url="{{ route('repairs.create') }}" @endunless>Book Repair</a>
+                                <a class="btn btn-outline-light btn-sm" href="{{ route('repairs.track') }}" @unless($publicNavUser) data-auth-required data-intended-url="{{ route('repairs.track') }}" @endunless>Track Repair</a>
+                                <a class="btn btn-outline-light btn-sm" href="{{ route('orders.track') }}" @unless($publicNavUser) data-auth-required data-intended-url="{{ route('orders.track') }}" @endunless>Track Order</a>
                                 <a class="btn btn-outline-light btn-sm" href="{{ route('shop.index') }}">Shop</a>
                                 <a class="btn btn-outline-light btn-sm" href="{{ route('parts.index') }}">Parts</a>
                                 <a class="btn btn-outline-light btn-sm" href="{{ route('contact.create') }}">Contact</a>

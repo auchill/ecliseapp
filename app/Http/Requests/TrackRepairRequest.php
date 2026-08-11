@@ -13,9 +13,10 @@ class TrackRepairRequest extends FormRequest
 
     public function rules(): array
     {
+        // Tracking requires authentication and results are scoped to the signed-in customer's
+        // own repairs, so no contact detail is collected or needed.
         return [
             'repair_number' => ['required', 'string', 'max:40'],
-            'contact' => ['nullable', 'string', 'max:255'],
         ];
     }
 }

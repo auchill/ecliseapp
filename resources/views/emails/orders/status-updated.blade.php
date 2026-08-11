@@ -44,7 +44,7 @@
             <p><strong>Note:</strong> {{ $order->customer_notes }}</p>
         @endif
 
-        <p>Track your order at {{ route('orders.track') }} using your order number and email or phone number.</p>
+        <p>Sign in and track your order at {{ route('orders.track') }} using your order number.</p>
         <p>Thank you,<br>Eclise Technology Inc.</p>
     </body>
 </html>
