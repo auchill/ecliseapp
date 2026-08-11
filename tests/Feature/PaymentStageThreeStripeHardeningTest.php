@@ -9,6 +9,7 @@ use App\Models\PaymentWebhookEvent;
 use App\Models\Repair;
 use App\Models\User;
 use App\Services\PaymentGatewayService;
+use App\Services\Payments\PaymentBalanceService;
 use App\Services\Payments\PaymentSettingsService;
 use App\Support\Money;
 use Illuminate\Support\Facades\Artisan;
@@ -220,6 +221,25 @@ test('stripe api calls pin the configured stripe api version', function () {
     app(PaymentGatewayService::class)->createCheckout($payment);
 
     Http::assertSent(fn ($request): bool => $request->hasHeader('Stripe-Version', '2024-06-20'));
+});
+
+test('the payment intent carries the metadata needed to resolve it independently', function () {
+    config([
+        'services.stripe.key' => 'pk_test_hardening',
+        'services.stripe.secret' => 'sk_test_hardening',
+        'services.stripe.webhook_secret' => 'whsec_hardening',
+    ]);
+    Http::fake([
+        'https://api.stripe.com/v1/checkout/sessions' => Http::response(['id' => 'cs_meta', 'url' => 'https://checkout.stripe.test/meta']),
+    ]);
+
+    [, $payment] = hardeningRepairPayment();
+    app(PaymentGatewayService::class)->createCheckout($payment);
+
+    // Stripe does not copy session metadata onto the PaymentIntent, and
+    // payment_intent.succeeded can arrive before the session event stores the intent id, so the
+    // intent must carry its own link back to the local payment.
+    Http::assertSent(fn ($request): bool => $request['payment_intent_data[metadata][payment_id]'] === (string) $payment->id);
 });
 
 // ---------------------------------------------------------------------------
@@ -715,7 +735,7 @@ test('an admin can retry an unmatched stripe event once the payment exists', fun
 test('stripe reconciliation reports provider paid while local is unpaid', function () {
     config(['services.stripe.secret' => 'sk_test_hardening']);
     Http::fake([
-        'https://api.stripe.com/v1/payment_intents/pi_drift' => Http::response([
+        'https://api.stripe.com/v1/payment_intents/pi_drift*' => Http::response([
             'id' => 'pi_drift',
             'status' => 'succeeded',
             'amount_received' => 11300,
@@ -742,7 +762,7 @@ test('stripe reconciliation reports provider paid while local is unpaid', functi
 test('stripe reconciliation reports a refund total that drifted from the provider', function () {
     config(['services.stripe.secret' => 'sk_test_hardening']);
     Http::fake([
-        'https://api.stripe.com/v1/payment_intents/pi_refund_drift' => Http::response([
+        'https://api.stripe.com/v1/payment_intents/pi_refund_drift*' => Http::response([
             'id' => 'pi_refund_drift',
             'status' => 'succeeded',
             'amount_received' => 11300,
@@ -783,4 +803,55 @@ test('the repair confirmation page is not reachable by repair id alone', functio
     $this->actingAs($stranger)->get(route('repairs.confirmation', $repair))->assertForbidden();
     $this->actingAs($payment->customer->user)->get(route('repairs.confirmation', $repair))->assertOk();
     $this->actingAs($admin)->get(route('repairs.confirmation', $repair))->assertOk();
+});
+
+test('a fully refunded invoice reports no balance due', function () {
+    [, $payment] = hardeningRepairPayment(['status' => 'paid', 'paid_at' => now()]);
+    $invoice = $payment->invoice;
+    $balances = app(PaymentBalanceService::class);
+
+    $payment->refunds()->create([
+        'amount' => $payment->amount,
+        'currency' => 'cad',
+        'status' => 'succeeded',
+        'requested_by' => hardeningUser('hardening-refund-balance@example.com', 'admin')->id,
+        'requested_at' => now(),
+        'refunded_at' => now(),
+    ]);
+
+    $synced = $balances->synchronizeInvoice($invoice->fresh());
+
+    // synchronizeInvoice stores 0 for a fully refunded invoice; the derived value must agree,
+    // or reconciliation reports a permanent mismatch and the invoice looks payable again.
+    expect($balances->invoiceBalanceDue($synced))->toBe(0.0)
+        ->and((float) $synced->balance_due)->toBe(0.0)
+        ->and($synced->status)->toBe('refunded');
+});
+
+test('stripe reconciliation reads the refunded total from the expanded charge', function () {
+    config(['services.stripe.secret' => 'sk_test_hardening']);
+    Http::fake([
+        // Current Stripe API versions expose the refunded total only on the expanded charge.
+        'https://api.stripe.com/v1/payment_intents/pi_expanded*' => Http::response([
+            'id' => 'pi_expanded',
+            'status' => 'succeeded',
+            'amount_received' => 11300,
+            'currency' => 'cad',
+            'latest_charge' => ['id' => 'ch_expanded', 'amount_refunded' => 2000],
+        ]),
+    ]);
+
+    [, $payment] = hardeningRepairPayment([
+        'status' => 'partially_refunded',
+        'paid_at' => now(),
+        'refunded_amount' => 20,
+        'stripe_payment_intent_id' => 'pi_expanded',
+        'gateway_payment_id' => 'pi_expanded',
+    ]);
+
+    Artisan::call('eclise:reconcile-payments', ['--provider' => 'stripe', '--dry-run' => true, '--json' => true]);
+    $report = json_decode(Artisan::output(), true);
+
+    expect(array_column($report['provider_checks']['stripe']['discrepancies'], 'code'))->not->toContain('refund_mismatch');
+    Http::assertSent(fn ($request): bool => str_contains(urldecode($request->url()), 'expand[0]=latest_charge'));
 });

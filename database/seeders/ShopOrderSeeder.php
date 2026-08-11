@@ -54,7 +54,7 @@ class ShopOrderSeeder extends Seeder
                 $this->line($product, 1),
                 $this->deviceLine($device, 2),
             ],
-            gateway: 'stripe',
+            gateway: 'debit_terminal',
             fulfillment: 'pickup',
             shipping: null,
         );
@@ -82,7 +82,7 @@ class ShopOrderSeeder extends Seeder
                 $invoices,
                 'priya@example.com',
                 [$this->deviceLine($thirdDevice, 3)],
-                gateway: 'stripe',
+                gateway: 'cash',
                 fulfillment: 'pickup',
                 shipping: null,
             );
@@ -134,6 +134,8 @@ class ShopOrderSeeder extends Seeder
     ): void {
         [$cart, $customer, $payment] = $this->checkout($invoices, $email, $items, $gateway, $fulfillment, $shipping);
 
+        // Seeded settlements are never Stripe, so no synthetic provider reference is invented;
+        // reconciliation would otherwise report them as unknown Stripe references forever.
         $finalizer->markPaid($payment, array_merge([
             'gateway_reference_id' => strtoupper($gateway).'-SEED-'.$cart->id,
             'gateway_payment_id' => strtoupper($gateway).'-SEED-'.$cart->id,

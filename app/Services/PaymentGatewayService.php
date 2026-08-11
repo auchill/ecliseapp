@@ -147,6 +147,13 @@ class PaymentGatewayService
                 'metadata[purpose]' => (string) $payment->purpose,
                 'metadata[payable_type]' => class_basename($payment->payable_type),
                 'metadata[payable_id]' => (string) $payment->payable_id,
+                // Stripe does not copy session metadata onto the PaymentIntent, and
+                // payment_intent.succeeded can arrive before checkout.session.completed has
+                // stored the intent id locally. Without this, that event has nothing to resolve
+                // against and fails on every payment.
+                'payment_intent_data[metadata][payment_id]' => (string) $payment->id,
+                'payment_intent_data[metadata][payment_number]' => (string) $payment->payment_number,
+                'payment_intent_data[metadata][invoice_id]' => (string) $payment->invoice_id,
             ]);
 
         $responsePayload = $response->json() ?: [

@@ -169,9 +169,15 @@ class PaymentReconciliationService
             ->each(function (Payment $payment) use (&$checked, $discrepancies, $errors): void {
                 $checked++;
                 $paymentIntentId = $payment->stripe_payment_intent_id ?: $payment->gateway_payment_id;
+                // latest_charge must be expanded: current Stripe API versions expose neither
+                // amount_refunded nor a charges list on the PaymentIntent, so without this the
+                // remote refunded total always reads zero and every refunded payment is
+                // reported as a false refund mismatch.
                 $response = $this->stripe->request()
                     ->acceptJson()
-                    ->get($this->stripe->url('payment_intents/'.$paymentIntentId));
+                    ->get($this->stripe->url('payment_intents/'.$paymentIntentId), [
+                        'expand' => ['latest_charge'],
+                    ]);
 
                 if ($response->failed()) {
                     $errors->push([
@@ -232,7 +238,12 @@ class PaymentReconciliationService
                     ]);
                 }
 
-                $remoteRefunded = Money::fromMinorUnits((int) ($payload['amount_refunded'] ?? data_get($payload, 'charges.data.0.amount_refunded') ?? 0));
+                $remoteRefunded = Money::fromMinorUnits((int) (
+                    data_get($payload, 'latest_charge.amount_refunded')
+                    ?? $payload['amount_refunded']
+                    ?? data_get($payload, 'charges.data.0.amount_refunded')
+                    ?? 0
+                ));
                 $localRefunded = $this->balances->paymentRefundedAmount($payment);
 
                 if (abs($remoteRefunded - $localRefunded) > 0.01) {

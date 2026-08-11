@@ -77,7 +77,7 @@ class RepairScenarioSeeder extends Seeder
         ]);
         $paidGroup = $this->proposal($paid, 'Display', $parts[0], $parts[1]);
         $this->select($paidGroup, $paidGroup->options()->where('is_system_option', false)->first());
-        $this->settleRepair($paid, 248.60, 'stripe');
+        $this->settleRepair($paid, 248.60, 'debit_terminal');
 
         // 4. Paid repair where the customer supplied the part — nothing may be procured.
         $supplied = $this->repair('marcus@example.com', 'Phone', 'Google', 'Pixel 8', 'Customer supplied replacement screen.', [

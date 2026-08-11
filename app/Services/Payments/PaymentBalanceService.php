@@ -39,9 +39,22 @@ class PaymentBalanceService
         return round(max(0, $this->invoicePaidAmount($invoice) - $this->invoiceRefundedAmount($invoice)), 2);
     }
 
+    /**
+     * A fully refunded invoice is settled, not awaiting payment again.
+     *
+     * synchronizeInvoice() already stores 0 in that case; this must agree with it, or
+     * reconciliation reports a permanent balance mismatch and — more seriously — a refunded
+     * invoice would report a payable balance and could be sent back to Stripe for payment.
+     */
     public function invoiceBalanceDue(Invoice $invoice): float
     {
-        return round(max(0, (float) $invoice->total - $this->invoiceNetPaidAmount($invoice)), 2);
+        $total = (float) $invoice->total;
+
+        if ($total > 0 && $this->invoiceRefundedAmount($invoice) >= $total) {
+            return 0.0;
+        }
+
+        return round(max(0, $total - $this->invoiceNetPaidAmount($invoice)), 2);
     }
 
     public function refundableAmount(Payment $payment): float

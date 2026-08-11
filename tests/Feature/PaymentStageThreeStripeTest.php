@@ -293,7 +293,7 @@ test('stripe refund processing waits for stripe success before updating payment 
 test('stripe reconciliation dry run compares configured stripe payment intents', function () {
     config(['services.stripe.secret' => 'sk_test_stage3']);
     Http::fake([
-        'https://api.stripe.com/v1/payment_intents/pi_stage3_reconcile' => Http::response([
+        'https://api.stripe.com/v1/payment_intents/pi_stage3_reconcile*' => Http::response([
             'id' => 'pi_stage3_reconcile',
             'status' => 'succeeded',
             'amount_received' => 11300,
