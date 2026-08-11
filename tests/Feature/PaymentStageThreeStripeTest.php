@@ -150,11 +150,13 @@ test('stripe checkout uses cents idempotency and safe metadata', function () {
 
     expect($url)->toBe('https://checkout.stripe.test/stage3')
         ->and($payment->fresh()->stripe_checkout_session_id)->toBe('cs_stage3_checkout')
-        ->and($payment->fresh()->idempotency_key)->toBe('stripe-checkout-payment-'.$payment->id);
+        // The key is derived from the payload and the session being replaced, so it varies
+        // rather than being fixed to the payment id.
+        ->and($payment->fresh()->idempotency_key)->toStartWith('stripe-checkout-payment-'.$payment->id.'-');
 
     Http::assertSent(function ($request) use ($payment): bool {
         return $request->url() === 'https://api.stripe.com/v1/checkout/sessions'
-            && $request->hasHeader('Idempotency-Key', 'stripe-checkout-payment-'.$payment->id)
+            && $request->hasHeader('Idempotency-Key', $payment->fresh()->idempotency_key)
             && $request['line_items[0][price_data][unit_amount]'] === 1010
             && $request['line_items[0][price_data][currency]'] === 'cad'
             && $request['metadata[payment_id]'] === (string) $payment->id

@@ -117,44 +117,58 @@ class PaymentGatewayService
             return $reusableUrl;
         }
 
-        if (blank($payment->idempotency_key)) {
-            $payment->forceFill([
-                'idempotency_key' => 'stripe-checkout-payment-'.$payment->id,
-            ])->save();
-        }
-
         $payable = $payment->payable;
         $customerEmail = data_get($payment->checkout_data, 'customer.email')
             ?: $payable?->customer?->email;
 
+        $parameters = [
+            'mode' => 'payment',
+            'client_reference_id' => (string) $payment->id,
+            'customer_email' => $customerEmail,
+            'success_url' => route('payments.stripe.success', $payment).'?session_id={CHECKOUT_SESSION_ID}',
+            'cancel_url' => route('payments.cancel', $payment),
+            'payment_method_types[0]' => 'card',
+            'line_items[0][quantity]' => 1,
+            'line_items[0][price_data][currency]' => strtolower((string) $payment->currency),
+            'line_items[0][price_data][unit_amount]' => $amountInCents,
+            'line_items[0][price_data][product_data][name]' => $this->paymentDescription($payment),
+            'metadata[payment_id]' => (string) $payment->id,
+            'metadata[payment_number]' => (string) $payment->payment_number,
+            'metadata[invoice_id]' => (string) $payment->invoice_id,
+            'metadata[invoice_number]' => (string) $payment->invoice?->invoice_number,
+            'metadata[purpose]' => (string) $payment->purpose,
+            'metadata[payable_type]' => class_basename($payment->payable_type),
+            'metadata[payable_id]' => (string) $payment->payable_id,
+            // Stripe does not copy session metadata onto the PaymentIntent, and
+            // payment_intent.succeeded can arrive before checkout.session.completed has
+            // stored the intent id locally. Without this, that event has nothing to resolve
+            // against and fails on every payment.
+            'payment_intent_data[metadata][payment_id]' => (string) $payment->id,
+            'payment_intent_data[metadata][payment_number]' => (string) $payment->payment_number,
+            'payment_intent_data[metadata][invoice_id]' => (string) $payment->invoice_id,
+        ];
+
+        // The key must follow the parameters *and* the session being replaced.
+        //
+        // Keyed on the payment alone, Stripe rejects the request once the payload changes (a
+        // deploy that alters this array dead-ends every in-flight payment). Keyed on the
+        // parameters alone, an identical retry after the session expired replays Stripe's cached
+        // response and hands the customer back the same dead session, because the idempotency
+        // window outlives the session. Including the superseded session id gives a fresh key
+        // exactly when a replacement is genuinely needed, while a true double-submit — same
+        // parameters, same session state — still deduplicates.
+        $idempotencyKey = 'stripe-checkout-payment-'.$payment->id.'-'.substr(hash('sha256', json_encode([
+            'parameters' => $parameters,
+            'superseding_session' => (string) $payment->stripe_checkout_session_id,
+        ])), 0, 24);
+
+        if ($payment->idempotency_key !== $idempotencyKey) {
+            $payment->forceFill(['idempotency_key' => $idempotencyKey])->save();
+        }
+
         $response = $this->stripe
-            ->form(['Idempotency-Key' => $payment->idempotency_key])
-            ->post($this->stripe->url('checkout/sessions'), [
-                'mode' => 'payment',
-                'client_reference_id' => (string) $payment->id,
-                'customer_email' => $customerEmail,
-                'success_url' => route('payments.stripe.success', $payment).'?session_id={CHECKOUT_SESSION_ID}',
-                'cancel_url' => route('payments.cancel', $payment),
-                'payment_method_types[0]' => 'card',
-                'line_items[0][quantity]' => 1,
-                'line_items[0][price_data][currency]' => strtolower((string) $payment->currency),
-                'line_items[0][price_data][unit_amount]' => $amountInCents,
-                'line_items[0][price_data][product_data][name]' => $this->paymentDescription($payment),
-                'metadata[payment_id]' => (string) $payment->id,
-                'metadata[payment_number]' => (string) $payment->payment_number,
-                'metadata[invoice_id]' => (string) $payment->invoice_id,
-                'metadata[invoice_number]' => (string) $payment->invoice?->invoice_number,
-                'metadata[purpose]' => (string) $payment->purpose,
-                'metadata[payable_type]' => class_basename($payment->payable_type),
-                'metadata[payable_id]' => (string) $payment->payable_id,
-                // Stripe does not copy session metadata onto the PaymentIntent, and
-                // payment_intent.succeeded can arrive before checkout.session.completed has
-                // stored the intent id locally. Without this, that event has nothing to resolve
-                // against and fails on every payment.
-                'payment_intent_data[metadata][payment_id]' => (string) $payment->id,
-                'payment_intent_data[metadata][payment_number]' => (string) $payment->payment_number,
-                'payment_intent_data[metadata][invoice_id]' => (string) $payment->invoice_id,
-            ]);
+            ->form(['Idempotency-Key' => $idempotencyKey])
+            ->post($this->stripe->url('checkout/sessions'), $parameters);
 
         $responsePayload = $response->json() ?: [
             'status' => $response->status(),

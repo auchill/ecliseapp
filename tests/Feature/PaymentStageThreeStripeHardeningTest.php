@@ -855,3 +855,51 @@ test('stripe reconciliation reads the refunded total from the expanded charge', 
     expect(array_column($report['provider_checks']['stripe']['discrepancies'], 'code'))->not->toContain('refund_mismatch');
     Http::assertSent(fn ($request): bool => str_contains(urldecode($request->url()), 'expand[0]=latest_charge'));
 });
+
+test('the idempotency key changes when the checkout payload changes', function () {
+    config([
+        'services.stripe.key' => 'pk_test_hardening',
+        'services.stripe.secret' => 'sk_test_hardening',
+        'services.stripe.webhook_secret' => 'whsec_hardening',
+    ]);
+    Http::fake([
+        'https://api.stripe.com/v1/checkout/sessions/*' => Http::response(['status' => 'expired']),
+        'https://api.stripe.com/v1/checkout/sessions' => Http::response(['id' => 'cs_key', 'url' => 'https://checkout.stripe.test/key']),
+    ]);
+
+    [, $payment] = hardeningRepairPayment();
+    app(PaymentGatewayService::class)->createCheckout($payment);
+    $first = $payment->fresh()->idempotency_key;
+
+    // A deploy that alters the payload must not dead-end an in-flight payment: Stripe rejects a
+    // reused key whose parameters changed. The amount must stay within the invoice balance or
+    // validation short-circuits before a session is ever requested.
+    $payment->fresh()->update(['amount' => 100.00]);
+    app(PaymentGatewayService::class)->createCheckout($payment->fresh());
+
+    expect($payment->fresh()->idempotency_key)->not->toBe($first);
+});
+
+test('replacing a dead session uses a new idempotency key', function () {
+    config([
+        'services.stripe.key' => 'pk_test_hardening',
+        'services.stripe.secret' => 'sk_test_hardening',
+        'services.stripe.webhook_secret' => 'whsec_hardening',
+    ]);
+    Http::fake([
+        'https://api.stripe.com/v1/checkout/sessions/*' => Http::response(['status' => 'expired']),
+        'https://api.stripe.com/v1/checkout/sessions' => Http::response(['id' => 'cs_replacement', 'url' => 'https://checkout.stripe.test/replacement']),
+    ]);
+
+    [, $payment] = hardeningRepairPayment();
+    app(PaymentGatewayService::class)->createCheckout($payment);
+    $first = $payment->fresh()->idempotency_key;
+
+    // Same parameters, but the stored session has expired. Reusing the key would make Stripe
+    // replay its cached response and hand the customer back the same dead session, which its
+    // idempotency window outlives.
+    $payment->fresh()->update(['status' => 'pending']);
+    app(PaymentGatewayService::class)->createCheckout($payment->fresh());
+
+    expect($payment->fresh()->idempotency_key)->not->toBe($first);
+});
