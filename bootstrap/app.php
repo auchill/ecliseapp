@@ -5,6 +5,7 @@ use App\Console\Commands\DebugMobileSentrixAuthCommand;
 use App\Console\Commands\GeneratePartCategoryPivotCommand;
 use App\Console\Commands\ReconcilePaymentsCommand;
 use App\Console\Commands\RefreshMobileSentrixPartCommand;
+use App\Console\Commands\ResetAppDataCommand;
 use App\Console\Commands\SyncMobileSentrixCategoriesCommand;
 use App\Console\Commands\SyncMobileSentrixPartsCommand;
 use App\Console\Commands\SyncMobileSentrixPartsFullCommand;
@@ -30,6 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
         DebugMobileSentrixAuthCommand::class,
         GeneratePartCategoryPivotCommand::class,
         ReconcilePaymentsCommand::class,
+        ResetAppDataCommand::class,
         SyncMobileSentrixCategoriesCommand::class,
         SyncMobileSentrixPartsCommand::class,
         SyncMobileSentrixPartsFullCommand::class,

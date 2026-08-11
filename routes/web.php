@@ -51,7 +51,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', [PublicPageController::class, 'home'])->name('home');
 Route::get('/about', [PublicPageController::class, 'about'])->name('about');
 Route::get('/services', [PublicPageController::class, 'services'])->name('services');
-Route::get('/repairs/confirmation/{repair}', [RepairController::class, 'confirmation'])->name('repairs.confirmation');
+Route::get('/repairs/confirmation/{repair}', [RepairController::class, 'confirmation'])->middleware('auth')->name('repairs.confirmation');
 Route::get('/repairs/track', [RepairController::class, 'trackForm'])->name('repairs.track');
 Route::post('/repairs/track', [RepairController::class, 'track'])->name('repairs.track.submit');
 

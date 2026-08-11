@@ -208,6 +208,17 @@ class RepairController extends Controller
 
     public function confirmation(Repair $repair)
     {
+        // This page renders customer name, shipping address and payment state, so it must never
+        // be reachable by repair id alone. Never compare two nulls: an orphaned repair must not
+        // resolve to "owned by everyone".
+        $user = auth()->user();
+        $ownerId = $repair->customer?->user_id;
+
+        abort_unless(
+            $user && ($user->isAdmin() || ($ownerId !== null && (int) $ownerId === (int) $user->id)),
+            403,
+        );
+
         return view('repairs.confirmation', [
             'booking' => $repair->load('customer', 'shipping', 'publicStatusUpdates', 'latestPayment', 'deviceType', 'deviceBrand', 'deviceModel', 'issueCategory'),
         ]);

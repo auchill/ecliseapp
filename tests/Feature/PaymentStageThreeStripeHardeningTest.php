@@ -772,3 +772,15 @@ test('local reconciliation still runs with no paypal configuration', function ()
         ->and($report['provider_checks']['paypal']['available'])->toBeFalse()
         ->and($report['dry_run'])->toBeTrue();
 });
+
+test('the repair confirmation page is not reachable by repair id alone', function () {
+    [$repair, $payment] = hardeningRepairPayment();
+    $stranger = hardeningUser('hardening-repair-stranger@example.com');
+    $admin = hardeningUser('hardening-repair-admin@example.com', 'admin');
+
+    // It renders customer name, shipping address and payment state.
+    $this->get(route('repairs.confirmation', $repair))->assertRedirect(route('login'));
+    $this->actingAs($stranger)->get(route('repairs.confirmation', $repair))->assertForbidden();
+    $this->actingAs($payment->customer->user)->get(route('repairs.confirmation', $repair))->assertOk();
+    $this->actingAs($admin)->get(route('repairs.confirmation', $repair))->assertOk();
+});
