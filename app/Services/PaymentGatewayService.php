@@ -113,12 +113,8 @@ class PaymentGatewayService
             return route('payments.show', $payment);
         }
 
-        if ($payment->stripe_checkout_session_id && filled(data_get($payment->raw_response, 'url'))) {
-            return data_get($payment->raw_response, 'url');
-        }
-
-        if ($openSessionUrl = $this->openSiblingCheckoutUrl($payment)) {
-            return $openSessionUrl;
+        if ($reusableUrl = $this->reusableCheckoutUrl($payment)) {
+            return $reusableUrl;
         }
 
         if (blank($payment->idempotency_key)) {
@@ -281,6 +277,25 @@ class PaymentGatewayService
     }
 
     /**
+     * Returns a Checkout Session URL that Stripe will still accept, or null to create a new one.
+     *
+     * A stored URL is never enough on its own: sessions expire after 24 hours and are consumed
+     * once paid. Handing a customer a completed or expired session drops them on Stripe's
+     * "You're all done here" dead end, so every candidate is confirmed open with Stripe first.
+     */
+    private function reusableCheckoutUrl(Payment $payment): ?string
+    {
+        $ownUrl = data_get($payment->raw_response, 'url');
+
+        if ($payment->stripe_checkout_session_id && filled($ownUrl)
+            && $this->checkoutSessionIsOpen($payment->stripe_checkout_session_id)) {
+            return $ownUrl;
+        }
+
+        return $this->openSiblingCheckoutUrl($payment);
+    }
+
+    /**
      * Two tabs against one invoice must not become two live Checkout Sessions. When an equivalent
      * Stripe attempt for the same invoice is still open, send the customer back to it.
      */
@@ -302,7 +317,7 @@ class PaymentGatewayService
 
         $url = data_get($sibling?->raw_response, 'url');
 
-        if (blank($url)) {
+        if (blank($url) || ! $this->checkoutSessionIsOpen($sibling->stripe_checkout_session_id)) {
             return null;
         }
 
@@ -313,6 +328,31 @@ class PaymentGatewayService
         ]);
 
         return $url;
+    }
+
+    /**
+     * Only an "open" session can still be paid. Complete, expired, or unreadable sessions are
+     * treated as unusable so the caller creates a fresh one.
+     */
+    private function checkoutSessionIsOpen(?string $sessionId): bool
+    {
+        if (blank($sessionId)) {
+            return false;
+        }
+
+        $response = $this->stripe->request()
+            ->acceptJson()
+            ->get($this->stripe->url('checkout/sessions/'.$sessionId));
+
+        if ($response->failed()) {
+            Log::warning('Stripe checkout session lookup failed; creating a new session', [
+                'session_id' => $sessionId,
+            ]);
+
+            return false;
+        }
+
+        return $response->json('status') === 'open';
     }
 
     private function validatedStripeAmountInCents(Payment $payment): int

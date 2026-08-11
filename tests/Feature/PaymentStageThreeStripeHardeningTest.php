@@ -599,6 +599,7 @@ test('a second stripe attempt on one invoice reuses the open checkout session', 
         'services.stripe.webhook_secret' => 'whsec_hardening',
     ]);
     Http::fake([
+        'https://api.stripe.com/v1/checkout/sessions/*' => Http::response(['id' => 'cs_reuse', 'status' => 'open']),
         'https://api.stripe.com/v1/checkout/sessions' => Http::response(['id' => 'cs_reuse', 'url' => 'https://checkout.stripe.test/reuse']),
     ]);
 
@@ -622,7 +623,65 @@ test('a second stripe attempt on one invoice reuses the open checkout session', 
     expect(app(PaymentGatewayService::class)->createCheckout($second))->toBe('https://checkout.stripe.test/reuse')
         ->and($second->fresh()->stripe_checkout_session_id)->toBeNull();
 
-    Http::assertSentCount(1);
+    // One session creation, plus the liveness check on the session being reused.
+    Http::assertSentCount(2);
+});
+
+test('a completed checkout session is never handed back to a customer', function () {
+    config([
+        'services.stripe.key' => 'pk_test_hardening',
+        'services.stripe.secret' => 'sk_test_hardening',
+        'services.stripe.webhook_secret' => 'whsec_hardening',
+    ]);
+    Http::fake([
+        // Stripe reports the stored session as already paid.
+        'https://api.stripe.com/v1/checkout/sessions/cs_spent' => Http::response(['id' => 'cs_spent', 'status' => 'complete', 'payment_status' => 'paid']),
+        'https://api.stripe.com/v1/checkout/sessions' => Http::response(['id' => 'cs_fresh', 'url' => 'https://checkout.stripe.test/fresh']),
+    ]);
+
+    [, $payment] = hardeningRepairPayment([
+        'stripe_checkout_session_id' => 'cs_spent',
+        'raw_response' => ['id' => 'cs_spent', 'url' => 'https://checkout.stripe.test/spent'],
+    ]);
+
+    // A spent session must not be replayed; a new one is created instead.
+    expect(app(PaymentGatewayService::class)->createCheckout($payment))->toBe('https://checkout.stripe.test/fresh')
+        ->and($payment->fresh()->stripe_checkout_session_id)->toBe('cs_fresh');
+});
+
+test('an expired sibling checkout session is not reused', function () {
+    config([
+        'services.stripe.key' => 'pk_test_hardening',
+        'services.stripe.secret' => 'sk_test_hardening',
+        'services.stripe.webhook_secret' => 'whsec_hardening',
+    ]);
+    Http::fake([
+        'https://api.stripe.com/v1/checkout/sessions/cs_stale' => Http::response(['id' => 'cs_stale', 'status' => 'expired']),
+        'https://api.stripe.com/v1/checkout/sessions' => Http::response(['id' => 'cs_new', 'url' => 'https://checkout.stripe.test/new']),
+    ]);
+
+    [$repair, $first] = hardeningRepairPayment();
+    $first->update([
+        'stripe_checkout_session_id' => 'cs_stale',
+        'raw_response' => ['id' => 'cs_stale', 'url' => 'https://checkout.stripe.test/stale'],
+    ]);
+
+    $second = $repair->payments()->create([
+        'invoice_id' => $first->invoice_id,
+        'customer_id' => $first->customer_id,
+        'repair_id' => $repair->id,
+        'source' => 'repair',
+        'gateway' => 'stripe',
+        'method' => 'stripe',
+        'provider' => 'stripe',
+        'purpose' => 'balance',
+        'amount' => 113,
+        'currency' => 'cad',
+        'status' => 'pending',
+    ]);
+
+    expect(app(PaymentGatewayService::class)->createCheckout($second))->toBe('https://checkout.stripe.test/new')
+        ->and($second->fresh()->stripe_checkout_session_id)->toBe('cs_new');
 });
 
 // ---------------------------------------------------------------------------
